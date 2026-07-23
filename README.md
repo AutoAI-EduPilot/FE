@@ -35,15 +35,33 @@ npm run dev
 
 ```text
 src/
-├─ app/             # 앱 진입 화면과 라우팅
+├─ app/             # 앱 진입, 라우팅, 레이아웃, route placeholder 화면
 ├─ shared/
 │  ├─ api/          # 공통 응답 계약, 오류, Spring API client
 │  ├─ config/       # 환경 변수 검증
-│  └─ ui/           # 공통 UI
+│  └─ ui/           # 공통 UI 컴포넌트
 └─ test/            # 테스트 공통 설정
 ```
 
 기능별 `features/` 구조는 실제 기능 Epic에서 필요한 시점에 추가합니다.
+
+## 앱 셸과 라우팅
+
+FE#1 범위에서는 후속 기능 이슈가 연결할 기본 route와 화면 골격만 제공합니다.
+
+| Route | 목적 |
+| --- | --- |
+| `/` | `/materials`로 이동 |
+| `/login` | 로그인 화면 골격 |
+| `/signup` | 회원가입 화면 골격 |
+| `/materials` | 자료 목록·업로드 진입 placeholder |
+| `/materials/:materialId` | 자료 상세 placeholder |
+| `/sessions` | 세션 목록·재진입 placeholder |
+| `/sessions/:sessionId` | PDF 뷰어·학습 채팅 placeholder |
+| `/quizzes/:quizId` | 퀴즈 풀이·결과 placeholder |
+| `/sessions/:sessionId/diagnosis/:diagnosisId` | 진단·교정 placeholder |
+
+공통 UI는 Tailwind 기반 자체 컴포넌트(`Button`, `TextInput`, `Badge`, `PageHeader`, `EmptyState`, `LoadingState`, `ErrorState`)만 사용합니다. 실제 인증·자료·세션·퀴즈·진단 API 호출은 각 기능 Epic에서 연결합니다.
 
 ## API 호출 원칙
 

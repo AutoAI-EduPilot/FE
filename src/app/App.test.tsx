@@ -1,17 +1,43 @@
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
 
-import { App } from './App'
+import { AppRoutes } from './AppRoutes'
 
-describe('App', () => {
-  it('renders the Epic1 foundation status', () => {
-    render(<App />)
+function renderRoute(path: string) {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <AppRoutes />
+    </MemoryRouter>,
+  )
+}
+
+describe('AppRoutes', () => {
+  it('redirects the root route to materials', () => {
+    renderRoute('/')
+
+    expect(screen.getByRole('heading', { name: '자료' })).toBeInTheDocument()
+    expect(screen.getByText('BE#48 연동 예정')).toBeInTheDocument()
+  })
+
+  it('renders the session detail placeholder route', () => {
+    renderRoute('/sessions/session-100')
+
+    expect(screen.getByRole('heading', { name: '학습 공간' })).toBeInTheDocument()
+    expect(screen.getByText(/세션 session-100/)).toBeInTheDocument()
+  })
+
+  it('renders the not found route for unknown paths', () => {
+    renderRoute('/missing-page')
 
     expect(
       screen.getByRole('heading', {
-        name: '학습 경험을 위한 프론트엔드 기반이 준비되었습니다.',
+        name: '페이지를 찾을 수 없습니다.',
       }),
     ).toBeInTheDocument()
-    expect(screen.getByText('Spring 전용 공통 API client')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '자료 화면으로' })).toHaveAttribute(
+      'href',
+      '/materials',
+    )
   })
 })
