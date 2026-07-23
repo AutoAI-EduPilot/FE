@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from 'react-router-dom'
 
+import { RequireAuth } from '../features/auth'
 import { AppLayout } from './layouts/AppLayout'
 import { AuthLayout } from './layouts/AuthLayout'
 import { DiagnosisPage } from './pages/DiagnosisPage'
@@ -23,14 +24,16 @@ export function AppRoutes() {
         <Route path={routes.signup} element={<SignupPage />} />
       </Route>
 
-      <Route element={<AppLayout />}>
-        <Route path={routes.materials} element={<MaterialsPage />} />
-        <Route path={routes.materialDetail} element={<MaterialDetailPage />} />
-        <Route path={routes.sessions} element={<SessionsPage />} />
-        <Route path={routes.sessionDetail} element={<SessionDetailPage />} />
-        <Route path={routes.quizDetail} element={<QuizPage />} />
-        <Route path={routes.diagnosis} element={<DiagnosisPage />} />
-        <Route path="*" element={<NotFoundPage />} />
+      <Route element={<RequireAuth />}>
+        <Route element={<AppLayout />}>
+          <Route path={routes.materials} element={<MaterialsPage />} />
+          <Route path={routes.materialDetail} element={<MaterialDetailPage />} />
+          <Route path={routes.sessions} element={<SessionsPage />} />
+          <Route path={routes.sessionDetail} element={<SessionDetailPage />} />
+          <Route path={routes.quizDetail} element={<QuizPage />} />
+          <Route path={routes.diagnosis} element={<DiagnosisPage />} />
+          <Route path="*" element={<NotFoundPage />} />
+        </Route>
       </Route>
     </Routes>
   )

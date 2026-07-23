@@ -1,6 +1,7 @@
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 
-import { Badge } from '../../shared/ui'
+import { useAuth } from '../../features/auth'
+import { Badge, Button } from '../../shared/ui'
 import { routes } from '../routes'
 
 const primaryNavigation = [
@@ -8,12 +9,15 @@ const primaryNavigation = [
   { label: '세션', to: routes.sessions },
 ]
 
-const accountNavigation = [
-  { label: '로그인', to: routes.login },
-  { label: '회원가입', to: routes.signup },
-]
-
 export function AppLayout() {
+  const { logout, user } = useAuth()
+  const navigate = useNavigate()
+
+  function handleLogout() {
+    logout()
+    navigate(routes.login, { replace: true })
+  }
+
   return (
     <div className="min-h-screen bg-stone-50 text-zinc-950">
       <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col lg:flex-row">
@@ -34,14 +38,20 @@ export function AppLayout() {
             ))}
           </nav>
 
-          <div className="mt-5 hidden border-t border-zinc-200 pt-5 lg:block">
+          <div className="mt-5 border-t border-zinc-200 pt-5">
             <p className="text-xs font-semibold text-zinc-500">계정</p>
-            <div className="mt-2 flex flex-col gap-2">
-              {accountNavigation.map((item) => (
-                <NavLink key={item.to} to={item.to} className={navLinkClassName}>
-                  {item.label}
-                </NavLink>
-              ))}
+            <div className="mt-2 rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+              <p className="text-sm font-semibold text-zinc-900">{user?.name}</p>
+              <p className="mt-1 break-all text-xs text-zinc-500">{user?.email}</p>
+              <Button
+                className="mt-3 w-full"
+                onClick={handleLogout}
+                size="sm"
+                type="button"
+                variant="secondary"
+              >
+                로그아웃
+              </Button>
             </div>
           </div>
         </aside>

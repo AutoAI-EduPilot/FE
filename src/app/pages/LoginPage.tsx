@@ -1,22 +1,86 @@
+import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 
+import {
+  hasFormErrors,
+  useAuth,
+  validateLoginForm,
+  type LoginFormErrors,
+  type LoginFormValues,
+} from '../../features/auth'
 import { Button, PageHeader, TextInput } from '../../shared/ui'
 import { routes } from '../routes'
 
+interface LoginLocationState {
+  from?: string
+}
+
+const initialValues: LoginFormValues = {
+  email: '',
+  password: '',
+}
+
 export function LoginPage() {
+  const { login } = useAuth()
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [values, setValues] = useState<LoginFormValues>(initialValues)
+  const [errors, setErrors] = useState<LoginFormErrors>({})
+  const [isSubmitting, setIsSubmitting] = useState(false)
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+
+    const nextErrors = validateLoginForm(values)
+    setErrors(nextErrors)
+
+    if (hasFormErrors(nextErrors)) {
+      return
+    }
+
+    setIsSubmitting(true)
+    await login(values)
+    setIsSubmitting(false)
+    navigate(getRedirectPath(location.state), { replace: true })
+  }
+
+  function updateValue(field: keyof LoginFormValues, value: string) {
+    setValues((current) => ({ ...current, [field]: value }))
+    setErrors((current) => ({ ...current, [field]: undefined }))
+  }
+
   return (
     <div>
       <PageHeader
         eyebrow="Auth"
         title="로그인"
-        description="인증 API 연결 전까지 화면 구조만 준비합니다."
+        description="학습 자료와 세션으로 이동하려면 계정 인증이 필요합니다."
       />
 
-      <form className="mt-6 space-y-4">
-        <TextInput id="login-email" label="이메일" type="email" placeholder="user@example.com" />
-        <TextInput id="login-password" label="비밀번호" type="password" placeholder="password" />
-        <Button type="button" disabled className="w-full">
-          로그인 준비 중
+      <form className="mt-6 space-y-4" noValidate onSubmit={handleSubmit}>
+        <TextInput
+          autoComplete="email"
+          error={errors.email}
+          id="login-email"
+          label="이메일"
+          onChange={(event) => updateValue('email', event.target.value)}
+          placeholder="user@example.com"
+          type="email"
+          value={values.email}
+        />
+        <TextInput
+          autoComplete="current-password"
+          error={errors.password}
+          id="login-password"
+          label="비밀번호"
+          onChange={(event) => updateValue('password', event.target.value)}
+          placeholder="8자 이상"
+          type="password"
+          value={values.password}
+        />
+        <Button className="w-full" disabled={isSubmitting} type="submit">
+          {isSubmitting ? '로그인 중' : '로그인'}
         </Button>
       </form>
 
@@ -31,4 +95,16 @@ export function LoginPage() {
       </p>
     </div>
   )
+}
+
+function getRedirectPath(state: unknown): string {
+  if (isLoginLocationState(state) && state.from?.startsWith('/')) {
+    return state.from
+  }
+
+  return routes.materials
+}
+
+function isLoginLocationState(state: unknown): state is LoginLocationState {
+  return typeof state === 'object' && state !== null && 'from' in state
 }
