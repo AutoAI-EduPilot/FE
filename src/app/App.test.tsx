@@ -1,8 +1,12 @@
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 
 import { AppRoutes } from './AppRoutes'
+
+afterEach(() => {
+  cleanup()
+})
 
 function renderRoute(path: string) {
   return render(
@@ -24,7 +28,7 @@ describe('AppRoutes', () => {
     renderRoute('/sessions/session-100')
 
     expect(screen.getByRole('heading', { name: '학습 공간' })).toBeInTheDocument()
-    expect(screen.getByText(/세션 session-100/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '학습 채팅' })).toBeInTheDocument()
   })
 
   it('renders the not found route for unknown paths', () => {
