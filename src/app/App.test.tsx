@@ -24,7 +24,7 @@ describe('AppRoutes', () => {
     renderRoute('/sessions/session-100')
 
     expect(screen.getByRole('heading', { name: '학습 공간' })).toBeInTheDocument()
-    expect(screen.getByText(/세션 session-100/)).toBeInTheDocument()
+    expect(screen.getByText('시험 대비 요약.pdf 학습 화면입니다.')).toBeInTheDocument()
   })
 
   it('renders the not found route for unknown paths', () => {
