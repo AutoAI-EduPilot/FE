@@ -2,21 +2,22 @@ import { useState, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 
 import {
-  correctionMessage,
-  restorePendingDiagnosis,
+  mockDiagnosisRepository,
   validateDiagnosisAnswer,
+  type CorrectionMessage,
 } from '../../features/diagnosis'
 import { Badge, Button, ButtonLink, PageHeader } from '../../shared/ui'
 import { sessionDetailPath } from '../routes'
 
 export function DiagnosisPage() {
   const { diagnosisId, sessionId } = useParams()
-  const pendingDiagnosis = restorePendingDiagnosis(diagnosisId, sessionId)
+  const pendingDiagnosis = mockDiagnosisRepository.restorePending(diagnosisId, sessionId)
   const [answer, setAnswer] = useState('')
+  const [correction, setCorrection] = useState<CorrectionMessage | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isSubmitted, setIsSubmitted] = useState(false)
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     const validationError = validateDiagnosisAnswer(answer)
@@ -26,6 +27,8 @@ export function DiagnosisPage() {
       return
     }
 
+    const nextCorrection = await mockDiagnosisRepository.submitAnswer(pendingDiagnosis, answer)
+    setCorrection(nextCorrection)
     setIsSubmitted(true)
   }
 
@@ -78,10 +81,23 @@ export function DiagnosisPage() {
         </form>
       </section>
 
-      {isSubmitted ? (
+      {isSubmitted && correction ? (
         <section className="rounded-lg border border-emerald-200 bg-emerald-50 p-5 text-emerald-950">
-          <h2 className="text-lg font-bold">{correctionMessage.title}</h2>
-          <p className="mt-2 text-sm leading-6">{correctionMessage.summary}</p>
+          <h2 className="text-lg font-bold">{correction.title}</h2>
+          <p className="mt-2 text-sm leading-6">{correction.summary}</p>
+          <ul className="mt-4 grid gap-2 sm:grid-cols-3">
+            {correction.focusAreas.map((focusArea) => (
+              <li
+                className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm font-semibold"
+                key={focusArea}
+              >
+                {focusArea}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-4 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm">
+            {correction.nextQuestionPrompt}
+          </p>
           <ButtonLink
             className="mt-4"
             to={sessionDetailPath(pendingDiagnosis.sessionId)}

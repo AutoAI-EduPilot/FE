@@ -7,6 +7,8 @@ export interface PendingDiagnosis {
 }
 
 export interface CorrectionMessage {
+  focusAreas: string[]
+  nextQuestionPrompt: string
   summary: string
   title: string
 }

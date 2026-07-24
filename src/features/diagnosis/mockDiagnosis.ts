@@ -9,6 +9,8 @@ export const pendingDiagnosis: PendingDiagnosis = {
 }
 
 export const correctionMessage: CorrectionMessage = {
+  focusAreas: ['개념 정의', '적용 사례', '오답 선택 이유'],
+  nextQuestionPrompt: '같은 개념을 다른 예시로 다시 질문해 보세요.',
   summary:
     '개념 정의와 적용 사례를 분리해서 다시 정리하면 같은 유형의 문제를 더 안정적으로 풀 수 있습니다.',
   title: '교정 메시지',
