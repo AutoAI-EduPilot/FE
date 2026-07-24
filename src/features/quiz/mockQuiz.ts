@@ -35,16 +35,24 @@ export const publicQuizQuestions: PublicQuizQuestion[] = [
 ]
 
 export const publicQuizResult: PublicQuizResult = {
+  diagnosisEntry: {
+    diagnosisId: 'diagnosis-low-score',
+    sessionId: 'session-100',
+  },
   feedback: [
     {
       message: '핵심 개념을 짧게 정리했습니다.',
       questionId: 'question-short',
     },
   ],
-  score: 72,
+  score: 48,
   submittedAt: '2026-07-24T07:00:00+09:00',
 }
 
 export function getQuestionByKind(kind: QuizKind): PublicQuizQuestion {
   return publicQuizQuestions.find((question) => question.kind === kind) ?? publicQuizQuestions[0]
+}
+
+export function shouldShowDiagnosisEntry(result: PublicQuizResult): boolean {
+  return result.score < 60 && result.diagnosisEntry !== undefined
 }

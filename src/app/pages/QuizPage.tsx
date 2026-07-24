@@ -2,31 +2,36 @@ import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { useParams } from 'react-router-dom'
 
 import {
-  getQuestionByKind,
+  publicQuizQuestions,
   publicQuizResult,
   quizKinds,
+  shouldShowDiagnosisEntry,
   validateQuizAnswer,
   type PublicQuizQuestion,
   type QuizAnswers,
   type QuizKind,
 } from '../../features/quiz'
 import { Badge, Button, ButtonLink, PageHeader } from '../../shared/ui'
-import { routes } from '../routes'
+import { diagnosisPath, routes } from '../routes'
 
 export function QuizPage() {
   const { quizId } = useParams()
-  const [selectedKind, setSelectedKind] = useState<QuizKind>('MCQ')
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0)
   const [answers, setAnswers] = useState<QuizAnswers>({})
   const [error, setError] = useState<string | null>(null)
   const [isSubmitted, setIsSubmitted] = useState(false)
-  const question = getQuestionByKind(selectedKind)
+  const question = publicQuizQuestions[currentQuestionIndex] ?? publicQuizQuestions[0]
+  const answeredCount = publicQuizQuestions.filter((item) => answers[item.id]?.trim()).length
+  const diagnosisEntry = publicQuizResult.diagnosisEntry
 
   function handleKindChange(kind: QuizKind) {
     if (isSubmitted) {
       return
     }
 
-    setSelectedKind(kind)
+    setCurrentQuestionIndex(
+      publicQuizQuestions.findIndex((candidate) => candidate.kind === kind),
+    )
     setError(null)
   }
 
@@ -38,10 +43,16 @@ export function QuizPage() {
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
-    const validationError = validateQuizAnswer(question, answers)
+    const firstInvalidQuestion = publicQuizQuestions.find(
+      (candidate) => validateQuizAnswer(candidate, answers) !== null,
+    )
+    const validationError = firstInvalidQuestion
+      ? validateQuizAnswer(firstInvalidQuestion, answers)
+      : null
     setError(validationError)
 
-    if (validationError) {
+    if (validationError && firstInvalidQuestion) {
+      setCurrentQuestionIndex(publicQuizQuestions.indexOf(firstInvalidQuestion))
       return
     }
 
@@ -61,10 +72,10 @@ export function QuizPage() {
         <div className="flex flex-wrap gap-2" role="tablist">
           {quizKinds.map((kind) => (
             <button
-              aria-selected={kind === selectedKind}
+              aria-selected={kind === question.kind}
               className={[
                 'rounded-lg border px-3 py-2 text-sm font-semibold',
-                kind === selectedKind
+                kind === question.kind
                   ? 'border-teal-600 bg-teal-50 text-teal-800'
                   : 'border-zinc-200 text-zinc-600 hover:bg-zinc-50',
               ].join(' ')}
@@ -78,6 +89,10 @@ export function QuizPage() {
             </button>
           ))}
         </div>
+        <p className="mt-4 text-sm font-medium text-zinc-600">
+          문항 {currentQuestionIndex + 1} / {publicQuizQuestions.length} · 답변 {answeredCount} /{' '}
+          {publicQuizQuestions.length}
+        </p>
 
         <form className="mt-6 space-y-5" onSubmit={handleSubmit}>
           <QuestionInput
@@ -86,6 +101,33 @@ export function QuizPage() {
             question={question}
             value={answers[question.id] ?? ''}
           />
+
+          <div className="flex flex-wrap gap-2">
+            <Button
+              disabled={isSubmitted || currentQuestionIndex <= 0}
+              onClick={() => {
+                setCurrentQuestionIndex((index) => Math.max(index - 1, 0))
+                setError(null)
+              }}
+              type="button"
+              variant="secondary"
+            >
+              이전 문항
+            </Button>
+            <Button
+              disabled={isSubmitted || currentQuestionIndex >= publicQuizQuestions.length - 1}
+              onClick={() => {
+                setCurrentQuestionIndex((index) =>
+                  Math.min(index + 1, publicQuizQuestions.length - 1),
+                )
+                setError(null)
+              }}
+              type="button"
+              variant="secondary"
+            >
+              다음 문항
+            </Button>
+          </div>
 
           {error ? (
             <p className="text-sm font-medium text-rose-700" role="alert">
@@ -106,9 +148,19 @@ export function QuizPage() {
               <h2 className="text-lg font-bold">결과</h2>
               <p className="mt-1 text-sm">점수 {publicQuizResult.score}</p>
             </div>
-            <ButtonLink to={routes.sessions} variant="secondary">
-              세션으로 돌아가기
-            </ButtonLink>
+            <div className="flex flex-wrap gap-2">
+              {shouldShowDiagnosisEntry(publicQuizResult) && diagnosisEntry ? (
+                <ButtonLink
+                  to={diagnosisPath(diagnosisEntry.sessionId, diagnosisEntry.diagnosisId)}
+                  variant="secondary"
+                >
+                  진단으로 이어가기
+                </ButtonLink>
+              ) : null}
+              <ButtonLink to={routes.sessions} variant="secondary">
+                세션으로 돌아가기
+              </ButtonLink>
+            </div>
           </div>
 
           <ul className="mt-4 grid gap-2">

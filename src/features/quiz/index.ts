@@ -3,6 +3,7 @@ export {
   publicQuizQuestions,
   publicQuizResult,
   quizKinds,
+  shouldShowDiagnosisEntry,
 } from './mockQuiz'
 export { validateQuizAnswer } from './quizValidation'
 export type {

@@ -20,6 +20,10 @@ export interface PublicQuizFeedback {
 }
 
 export interface PublicQuizResult {
+  diagnosisEntry?: {
+    diagnosisId: string
+    sessionId: string
+  }
   feedback: PublicQuizFeedback[]
   score: number
   submittedAt: string
