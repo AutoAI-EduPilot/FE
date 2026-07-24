@@ -1,8 +1,14 @@
-import { useMemo, useRef, useState, type ChangeEvent } from 'react'
+import {
+  useMemo,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent,
+} from 'react'
 
 import {
-  createLocalMaterial,
   getMaterialStatusLabel,
+  mockMaterialsRepository,
   mockMaterials,
   validateMaterialUpload,
   type MaterialStatus,
@@ -13,6 +19,7 @@ import { materialDetailPath, sessionDetailPath } from '../routes'
 
 export function MaterialsPage() {
   const [materials, setMaterials] = useState<StudyMaterial[]>(mockMaterials)
+  const [isDropActive, setIsDropActive] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [selectedFileName, setSelectedFileName] = useState<string | null>(null)
   const [materialToDelete, setMaterialToDelete] = useState<StudyMaterial | null>(null)
@@ -22,8 +29,19 @@ export function MaterialsPage() {
     [materials],
   )
 
-  function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
+  async function handleFileChange(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0] ?? null
+    await acceptFile(file)
+    event.target.value = ''
+  }
+
+  async function handleDrop(event: DragEvent<HTMLDivElement>) {
+    event.preventDefault()
+    setIsDropActive(false)
+    await acceptFile(event.dataTransfer.files?.[0] ?? null)
+  }
+
+  async function acceptFile(file: File | null) {
     const validationError = validateMaterialUpload(file)
     setUploadError(validationError)
 
@@ -32,20 +50,38 @@ export function MaterialsPage() {
       return
     }
 
+    const nextMaterial = await mockMaterialsRepository.upload(file)
     setSelectedFileName(file.name)
-    setMaterials((current) => [createLocalMaterial(file), ...current])
-    event.target.value = ''
+    setMaterials((current) => [nextMaterial, ...current])
   }
 
-  function confirmDelete() {
+  async function confirmDelete() {
     if (!materialToDelete) {
       return
     }
 
+    await mockMaterialsRepository.delete(materialToDelete.id)
     setMaterials((current) =>
       current.filter((material) => material.id !== materialToDelete.id),
     )
     setMaterialToDelete(null)
+  }
+
+  async function refreshProcessingStatuses() {
+    const nextMaterials = await mockMaterialsRepository.refreshStatuses(materials)
+    setMaterials(nextMaterials)
+  }
+
+  async function cancelProcessing(material: StudyMaterial) {
+    await mockMaterialsRepository.cancelUpload(material.id)
+    setMaterials((current) => current.filter((item) => item.id !== material.id))
+  }
+
+  async function retryProcessing(material: StudyMaterial) {
+    const nextMaterial = await mockMaterialsRepository.retryProcessing(material)
+    setMaterials((current) =>
+      current.map((item) => (item.id === nextMaterial.id ? nextMaterial : item)),
+    )
   }
 
   return (
@@ -69,7 +105,19 @@ export function MaterialsPage() {
           </div>
         </div>
 
-        <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+        <div
+          aria-label="PDF 업로드 드롭 영역"
+          className={[
+            'mt-5 rounded-lg border border-dashed p-4',
+            isDropActive ? 'border-teal-500 bg-teal-50' : 'border-zinc-300 bg-zinc-50',
+          ].join(' ')}
+          onDragLeave={() => setIsDropActive(false)}
+          onDragOver={(event) => {
+            event.preventDefault()
+            setIsDropActive(true)
+          }}
+          onDrop={handleDrop}
+        >
           <input
             aria-label="PDF 파일"
             accept="application/pdf,.pdf"
@@ -79,12 +127,20 @@ export function MaterialsPage() {
             ref={fileInputRef}
             type="file"
           />
-          <Button onClick={() => fileInputRef.current?.click()} type="button">
-            PDF 선택
-          </Button>
-          <label className="text-sm text-zinc-600" htmlFor="material-upload">
-            {selectedFileName ?? '선택된 파일 없음'}
-          </label>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <Button onClick={() => fileInputRef.current?.click()} type="button">
+              PDF 선택
+            </Button>
+            <Button onClick={refreshProcessingStatuses} type="button" variant="secondary">
+              처리 상태 새로고침
+            </Button>
+            <label className="text-sm text-zinc-600" htmlFor="material-upload">
+              {selectedFileName ?? '선택된 파일 없음'}
+            </label>
+          </div>
+          <p className="mt-3 text-sm text-zinc-600">
+            파일을 이 영역으로 끌어 놓아도 로컬 목록에 추가됩니다.
+          </p>
         </div>
 
         {uploadError ? (
@@ -120,6 +176,26 @@ export function MaterialsPage() {
               </div>
 
               <div className="flex shrink-0 flex-wrap gap-2">
+                {material.status === 'PROCESSING' ? (
+                  <Button
+                    aria-label={`${material.title} 업로드 취소`}
+                    onClick={() => cancelProcessing(material)}
+                    type="button"
+                    variant="secondary"
+                  >
+                    취소
+                  </Button>
+                ) : null}
+                {material.status === 'FAILED' ? (
+                  <Button
+                    aria-label={`${material.title} 다시 시도`}
+                    onClick={() => retryProcessing(material)}
+                    type="button"
+                    variant="secondary"
+                  >
+                    다시 시도
+                  </Button>
+                ) : null}
                 <ButtonLink to={materialDetailPath(material.id)} variant="secondary">
                   상세
                 </ButtonLink>
@@ -174,6 +250,7 @@ function DeleteMaterialDialog({
   return (
     <div
       aria-labelledby="delete-material-title"
+      aria-modal="true"
       className="fixed inset-0 z-10 flex items-center justify-center bg-zinc-950/40 px-4"
       role="dialog"
     >
@@ -185,7 +262,7 @@ function DeleteMaterialDialog({
           {material.title} 항목을 목록에서 삭제합니다.
         </p>
         <div className="mt-5 flex justify-end gap-2">
-          <Button onClick={onCancel} type="button" variant="secondary">
+          <Button autoFocus onClick={onCancel} type="button" variant="secondary">
             취소
           </Button>
           <Button onClick={onConfirm} type="button">

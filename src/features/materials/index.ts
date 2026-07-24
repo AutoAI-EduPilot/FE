@@ -5,6 +5,10 @@ export {
   mockMaterials,
 } from './mockMaterials'
 export {
+  mockMaterialsRepository,
+  type MockMaterialsRepository,
+} from './mockMaterialsRepository'
+export {
   MAX_MATERIAL_UPLOAD_BYTES,
   validateMaterialUpload,
 } from './materialUploadValidation'

@@ -1,4 +1,11 @@
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { afterEach, describe, expect, it } from 'vitest'
 
@@ -64,14 +71,71 @@ describe('MaterialsPage', () => {
     )
   })
 
-  it('confirms before removing a material from local state', () => {
+  it('adds a dropped PDF to local processing state', async () => {
+    renderMaterialsPage()
+
+    fireEvent.drop(screen.getByLabelText('PDF 업로드 드롭 영역'), {
+      dataTransfer: {
+        files: [new File(['pdf'], 'dragged.pdf', { type: 'application/pdf' })],
+      },
+    })
+
+    expect(await screen.findByRole('heading', { name: 'dragged.pdf' })).toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: 'dragged.pdf 업로드 취소' }),
+    ).toBeInTheDocument()
+  })
+
+  it('refreshes processing materials into ready placeholder state', async () => {
+    renderMaterialsPage()
+
+    fireEvent.click(screen.getByRole('button', { name: '처리 상태 새로고침' }))
+
+    await waitFor(() => {
+      expect(
+        screen.queryByRole('button', { name: '강의 노트 5주차.pdf 업로드 취소' }),
+      ).not.toBeInTheDocument()
+    })
+    const processingCard = screen.getByText('강의 노트 5주차.pdf').closest('article')
+    expect(processingCard).not.toBeNull()
+    expect(within(processingCard as HTMLElement).getByText('READY')).toBeInTheDocument()
+  })
+
+  it('cancels processing uploads from local state', async () => {
+    renderMaterialsPage()
+
+    fireEvent.click(screen.getByRole('button', { name: '강의 노트 5주차.pdf 업로드 취소' }))
+
+    await waitFor(() => {
+      expect(screen.queryByText('강의 노트 5주차.pdf')).not.toBeInTheDocument()
+    })
+  })
+
+  it('retries failed materials as processing placeholders', async () => {
+    renderMaterialsPage()
+
+    fireEvent.click(screen.getByRole('button', { name: '스캔본 복습자료.pdf 다시 시도' }))
+
+    const failedMaterialCard = (await screen.findByText('스캔본 복습자료.pdf')).closest(
+      'article',
+    )
+    expect(failedMaterialCard).not.toBeNull()
+    expect(within(failedMaterialCard as HTMLElement).getByText('PROCESSING')).toBeInTheDocument()
+    expect(
+      within(failedMaterialCard as HTMLElement).queryByText('텍스트 추출 중 오류가 발생했습니다.'),
+    ).not.toBeInTheDocument()
+  })
+
+  it('confirms before removing a material from local state', async () => {
     renderMaterialsPage()
 
     fireEvent.click(screen.getByRole('button', { name: '시험 대비 요약.pdf 삭제' }))
     const dialog = screen.getByRole('dialog', { name: '자료 삭제' })
     fireEvent.click(within(dialog).getByRole('button', { name: '삭제' }))
 
-    expect(screen.queryByText('시험 대비 요약.pdf')).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.queryByText('시험 대비 요약.pdf')).not.toBeInTheDocument()
+    })
   })
 })
 
