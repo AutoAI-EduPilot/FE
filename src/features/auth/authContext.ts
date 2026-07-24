@@ -10,7 +10,7 @@ export interface AuthUser {
 export interface AuthContextValue {
   isAuthenticated: boolean
   login: (values: LoginFormValues) => Promise<void>
-  logout: () => void
+  logout: () => Promise<void>
   signup: (values: SignupFormValues) => Promise<void>
   user: AuthUser | null
 }

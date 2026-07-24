@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState, type PropsWithChildren } from 'react'
 
 import { AuthContext, type AuthContextValue, type AuthUser } from './authContext'
+import { mockAuthRepository } from './mockAuthRepository'
 import type { LoginFormValues, SignupFormValues } from './authValidation'
 
 interface AuthProviderProps {
@@ -14,22 +15,17 @@ export function AuthProvider({
   const [user, setUser] = useState<AuthUser | null>(initialUser)
 
   const login = useCallback(async (values: LoginFormValues) => {
-    await waitForMockAuth()
-    setUser({
-      email: values.email.trim().toLowerCase(),
-      name: getNameFromEmail(values.email),
-    })
+    const nextUser = await mockAuthRepository.login(values)
+    setUser(nextUser)
   }, [])
 
   const signup = useCallback(async (values: SignupFormValues) => {
-    await waitForMockAuth()
-    setUser({
-      email: values.email.trim().toLowerCase(),
-      name: values.name.trim(),
-    })
+    const nextUser = await mockAuthRepository.signup(values)
+    setUser(nextUser)
   }, [])
 
-  const logout = useCallback(() => {
+  const logout = useCallback(async () => {
+    await mockAuthRepository.logout()
     setUser(null)
   }, [])
 
@@ -45,12 +41,4 @@ export function AuthProvider({
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
-}
-
-function getNameFromEmail(email: string): string {
-  return email.trim().split('@')[0] || 'EduPilot 사용자'
-}
-
-function waitForMockAuth(): Promise<void> {
-  return Promise.resolve()
 }

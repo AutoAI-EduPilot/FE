@@ -61,6 +61,29 @@ describe('AppRoutes', () => {
     expect(screen.getByLabelText('이메일')).toBeInTheDocument()
   })
 
+  it('returns to the originally requested protected route after login', async () => {
+    renderRoute('/sessions/session-100', null)
+
+    fireEvent.change(screen.getByLabelText('이메일'), {
+      target: { value: 'learner@example.com' },
+    })
+    fireEvent.change(screen.getByLabelText('비밀번호'), {
+      target: { value: 'password1' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '로그인' }))
+
+    expect(await screen.findByRole('heading', { name: '학습 공간' })).toBeInTheDocument()
+    expect(screen.getByText(/세션 session-100/)).toBeInTheDocument()
+  })
+
+  it('shows the mock session expired login notice', () => {
+    renderRoute('/login?reason=session-expired', null)
+
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      '세션이 만료되었습니다. 다시 로그인하세요.',
+    )
+  })
+
   it('validates login form fields', () => {
     renderRoute('/login', null)
 
@@ -72,6 +95,8 @@ describe('AppRoutes', () => {
 
   it('logs in with memory-only mock auth state', async () => {
     const setItemSpy = vi.spyOn(Storage.prototype, 'setItem')
+    window.localStorage.clear()
+    window.sessionStorage.clear()
     renderRoute('/login', null)
 
     fireEvent.change(screen.getByLabelText('이메일'), {
@@ -85,6 +110,24 @@ describe('AppRoutes', () => {
     expect(await screen.findByRole('heading', { name: '자료' })).toBeInTheDocument()
     expect(screen.getByText('learner')).toBeInTheDocument()
     expect(setItemSpy).not.toHaveBeenCalled()
+    expect(window.localStorage.getItem('token')).toBeNull()
+    expect(window.sessionStorage.getItem('token')).toBeNull()
+  })
+
+  it('maps mock server validation errors onto login fields', async () => {
+    renderRoute('/login', null)
+
+    fireEvent.change(screen.getByLabelText('이메일'), {
+      target: { value: 'locked@example.com' },
+    })
+    fireEvent.change(screen.getByLabelText('비밀번호'), {
+      target: { value: 'password1' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '로그인' }))
+
+    expect(
+      await screen.findByText('가입되지 않았거나 비활성화된 계정입니다.'),
+    ).toBeInTheDocument()
   })
 
   it('validates signup form fields', () => {
