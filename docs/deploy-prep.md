@@ -48,6 +48,15 @@ Get-ChildItem dist\assets
 - 정적 asset 요청은 fallback 대상이 아니며 정상 asset으로 응답합니다.
 - 앱 내부 404 화면은 client route에서만 렌더링됩니다.
 
+## Preview/Production 환경 기준
+
+| 환경 | 목적 | 필수 확인 |
+| --- | --- | --- |
+| preview | PR 단위 FE 확인 | SPA fallback, env 주입, 주요 route 직접 진입 |
+| production | 운영 배포 | BE CORS allowlist, Spring API URL, health/CORS smoke |
+
+자세한 smoke 절차는 `docs/deploy-smoke.md`를 따릅니다.
+
 ## 배포 전 보류 사항
 
 - Related to AutoAI-EduPilot/BE#46

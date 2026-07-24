@@ -84,7 +84,7 @@ GitHub Actions의 `frontend-ci`가 `main`·`develop` 대상 PR과 `develop` push
 
 ## 정적 배포 준비
 
-정적 배포 전 점검 절차는 [docs/deploy-prep.md](docs/deploy-prep.md)에 정리합니다.
+정적 배포 전 점검 절차는 [docs/deploy-prep.md](docs/deploy-prep.md)에 정리합니다. 배포 후 smoke 절차는 [docs/deploy-smoke.md](docs/deploy-smoke.md)를 따릅니다.
 
 - `npm run build`로 `dist/` 산출물을 생성하고 `dist/index.html`, `dist/assets/*`가 있는지 확인합니다.
 - `dist/`는 배포 산출물이며 저장소에 커밋하지 않습니다.
