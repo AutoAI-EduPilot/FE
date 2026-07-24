@@ -3,6 +3,7 @@ import { useState, type FormEvent } from 'react'
 import { Button } from '../../shared/ui'
 import type { ChatMessage } from './chatTypes'
 import {
+  advanceStreamingReply,
   cancelStreamingReply,
   createRequestId,
   createStreamingReply,
@@ -19,6 +20,7 @@ export function ChatPanel({ sessionId }: ChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialChatMessages)
   const [question, setQuestion] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const hasActiveStream = messages.some((message) => message.status === 'streaming')
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -26,6 +28,11 @@ export function ChatPanel({ sessionId }: ChatPanelProps) {
     const trimmedQuestion = question.trim()
     if (!trimmedQuestion) {
       setError('질문을 입력하세요.')
+      return
+    }
+
+    if (hasActiveStream) {
+      setError('응답 생성 중에는 새 질문을 잠시 멈춥니다.')
       return
     }
 
@@ -57,6 +64,14 @@ export function ChatPanel({ sessionId }: ChatPanelProps) {
     )
   }
 
+  function advanceStream(messageId: string) {
+    setMessages((current) =>
+      current.map((message) =>
+        message.id === messageId ? advanceStreamingReply(message) : message,
+      ),
+    )
+  }
+
   return (
     <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
       <div>
@@ -66,11 +81,16 @@ export function ChatPanel({ sessionId }: ChatPanelProps) {
         </div>
       </div>
 
-      <div className="mt-5 grid max-h-[460px] gap-3 overflow-y-auto pr-1">
+      <div
+        aria-live="polite"
+        className="mt-5 grid max-h-[460px] gap-3 overflow-y-auto pr-1"
+        role="log"
+      >
         {messages.map((message) => (
           <MessageBubble
             key={message.id}
             message={message}
+            onAdvance={() => advanceStream(message.id)}
             onCancel={() => cancelStream(message.id)}
             onRetry={() => retryStream(message.id)}
           />
@@ -83,6 +103,7 @@ export function ChatPanel({ sessionId }: ChatPanelProps) {
         </label>
         <textarea
           className="min-h-24 w-full resize-y rounded-lg border border-zinc-300 bg-white px-3 py-2 text-sm text-zinc-950 placeholder:text-zinc-400 focus:border-teal-600 focus:outline-none focus:ring-2 focus:ring-teal-100"
+          disabled={hasActiveStream}
           id="chat-question"
           onChange={(event) => {
             setQuestion(event.target.value)
@@ -96,7 +117,9 @@ export function ChatPanel({ sessionId }: ChatPanelProps) {
             {error}
           </p>
         ) : null}
-        <Button type="submit">질문 보내기</Button>
+        <Button disabled={hasActiveStream} type="submit">
+          {hasActiveStream ? '응답 대기 중' : '질문 보내기'}
+        </Button>
       </form>
     </section>
   )
@@ -104,10 +127,12 @@ export function ChatPanel({ sessionId }: ChatPanelProps) {
 
 function MessageBubble({
   message,
+  onAdvance,
   onCancel,
   onRetry,
 }: {
   message: ChatMessage
+  onAdvance: () => void
   onCancel: () => void
   onRetry: () => void
 }) {
@@ -129,15 +154,24 @@ function MessageBubble({
       ) : null}
       {message.status === 'streaming' ? (
         <div className="mt-3">
-          <div className="h-2 overflow-hidden rounded-full bg-zinc-200">
+          <div
+            aria-label={`응답 진행률 ${message.progress ?? 0}%`}
+            className="h-2 overflow-hidden rounded-full bg-zinc-200"
+            role="progressbar"
+          >
             <div
               className="h-full rounded-full bg-teal-600"
               style={{ width: `${message.progress ?? 0}%` }}
             />
           </div>
-          <Button className="mt-3" onClick={onCancel} size="sm" type="button" variant="secondary">
-            응답 취소
-          </Button>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button onClick={onAdvance} size="sm" type="button" variant="secondary">
+              응답 진행
+            </Button>
+            <Button onClick={onCancel} size="sm" type="button" variant="secondary">
+              응답 취소
+            </Button>
+          </div>
         </div>
       ) : null}
       {message.status === 'cancelled' ? (
