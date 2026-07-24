@@ -1,0 +1,16 @@
+export {
+  getQuestionByKind,
+  publicQuizQuestions,
+  publicQuizResult,
+  quizKinds,
+  shouldShowDiagnosisEntry,
+} from './mockQuiz'
+export { validateQuizAnswer } from './quizValidation'
+export type {
+  PublicQuizFeedback,
+  PublicQuizQuestion,
+  PublicQuizResult,
+  QuizAnswers,
+  QuizChoice,
+  QuizKind,
+} from './quizTypes'
