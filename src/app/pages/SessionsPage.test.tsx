@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   applyUiActionToPage,
   mockUiActions,
+  resetMockSessionProgress,
   UiActionsRenderer,
 } from '../../features/sessions'
 import { SessionDetailPage } from './SessionDetailPage'
@@ -12,6 +13,7 @@ import { SessionsPage } from './SessionsPage'
 
 afterEach(() => {
   cleanup()
+  resetMockSessionProgress()
   vi.restoreAllMocks()
 })
 
@@ -51,11 +53,31 @@ describe('SessionDetailPage', () => {
   it('moves pages through the mock PDF controller', () => {
     renderSessionDetail()
 
-    expect(screen.getByText('페이지 1 / 5')).toBeInTheDocument()
+    expect(screen.getByText(/페이지 1 \/ 5/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '다음' }))
-    expect(screen.getByText('페이지 2 / 5')).toBeInTheDocument()
+    expect(screen.getByText(/페이지 2 \/ 5/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '4쪽으로 이동' }))
-    expect(screen.getByText('페이지 4 / 5')).toBeInTheDocument()
+    expect(screen.getByText(/페이지 4 \/ 5/)).toBeInTheDocument()
+  })
+
+  it('supports mock PDF zoom controls and thumbnails', () => {
+    renderSessionDetail()
+
+    fireEvent.click(screen.getByRole('button', { name: 'PDF 확대' }))
+    expect(screen.getByText(/확대 110%/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '5쪽으로 이동' }))
+    expect(screen.getByText(/페이지 5 \/ 5/)).toBeInTheDocument()
+  })
+
+  it('restores the last visited page from memory-only mock state', () => {
+    const { unmount } = renderSessionDetail()
+
+    fireEvent.click(screen.getByRole('button', { name: '4쪽으로 이동' }))
+    expect(screen.getByText(/페이지 4 \/ 5/)).toBeInTheDocument()
+    unmount()
+    renderSessionDetail()
+
+    expect(screen.getByText(/페이지 4 \/ 5/)).toBeInTheDocument()
   })
 
   it('applies MOVE_NEXT_PAGE as a page action and keeps WAIT local', () => {
@@ -63,7 +85,7 @@ describe('SessionDetailPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '다음 페이지로' }))
 
-    expect(screen.getByText('페이지 2 / 5')).toBeInTheDocument()
+    expect(screen.getByText(/페이지 2 \/ 5/)).toBeInTheDocument()
     expect(screen.getByRole('status')).toHaveTextContent('로컬 대기 0.8초')
   })
 
