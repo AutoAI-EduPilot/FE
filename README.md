@@ -82,6 +82,16 @@ npm run build
 
 GitHub Actions의 `frontend-ci`가 `main`·`develop` 대상 PR과 `develop` push에서 동일한 검증을 실행합니다.
 
+## 정적 배포 준비
+
+정적 배포 전 점검 절차는 [docs/deploy-prep.md](docs/deploy-prep.md)에 정리합니다. 배포 후 smoke 절차는 [docs/deploy-smoke.md](docs/deploy-smoke.md)를 따릅니다.
+
+- `npm run build`로 `dist/` 산출물을 생성하고 `dist/index.html`, `dist/assets/*`가 있는지 확인합니다.
+- `dist/`는 배포 산출물이며 저장소에 커밋하지 않습니다.
+- 운영/개발 배포 환경에는 `VITE_API_BASE_URL`만 주입하고 `.env`, 인증키, 로그 파일은 업로드하지 않습니다.
+- SPA fallback은 `/materials`, `/sessions/:sessionId`, `/quizzes/:quizId` 같은 client route가 새로고침에서 `/index.html`로 복구되는지 확인합니다.
+- 실제 dev 배포는 BE #46과 infra 환경 준비 후 진행합니다.
+
 ## Health/CORS 연동 확인
 
 [BE #8](https://github.com/AutoAI-EduPilot/BE/issues/8)에서 health endpoint와 CORS 설정이 구현된 후 다음을 확인합니다.
