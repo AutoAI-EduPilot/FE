@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useParams } from 'react-router-dom'
 
+import { ChatPanel } from '../../features/chat'
 import {
   applyUiActionToPage,
   findMockSession,
@@ -53,7 +54,7 @@ export function SessionDetailPage() {
         eyebrow="Learning Session"
         title="학습 공간"
         description={`${activeSession.materialTitle} 학습 화면입니다.`}
-        actions={<Badge tone="info">BE#20 · BE#28</Badge>}
+        actions={<Badge tone="info">BE#20 · BE#27 · BE#28</Badge>}
       />
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
@@ -65,22 +66,15 @@ export function SessionDetailPage() {
           zoomPercent={zoomPercent}
         />
 
-        <aside className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
-          <h2 className="text-lg font-bold text-zinc-950">학습 안내</h2>
-          <div className="mt-4 rounded-lg border border-zinc-200 bg-zinc-50 p-4">
-            <p className="text-sm font-semibold text-zinc-900">현재 페이지 핵심 질문</p>
-            <p className="mt-2 text-sm leading-6 text-zinc-600">
-              이 페이지에서 가장 중요한 개념을 한 문장으로 정리해 보세요.
-            </p>
-          </div>
-
-          <div className="mt-5">
-            <h3 className="text-sm font-bold text-zinc-950">UI Actions</h3>
+        <div className="min-w-0 space-y-5">
+          <ChatPanel sessionId={activeSession.id} />
+          <aside className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+            <h2 className="text-sm font-bold text-zinc-950">UI Actions</h2>
             <div className="mt-3">
               <UiActionsRenderer actions={mockUiActions} onMoveNextPage={handleUiAction} />
             </div>
-          </div>
-        </aside>
+          </aside>
+        </div>
       </section>
     </div>
   )

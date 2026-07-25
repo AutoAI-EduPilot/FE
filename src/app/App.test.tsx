@@ -33,11 +33,12 @@ describe('AppRoutes', () => {
     expect(screen.getByText('BE#48 연동 예정')).toBeInTheDocument()
   })
 
-  it('renders the session detail placeholder route', () => {
+  it('renders the integrated session detail route', () => {
     renderRoute('/sessions/session-100')
 
     expect(screen.getByRole('heading', { name: '학습 공간' })).toBeInTheDocument()
     expect(screen.getByText('시험 대비 요약.pdf 학습 화면입니다.')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '학습 채팅' })).toBeInTheDocument()
   })
 
   it('renders the not found route for unknown paths', () => {
@@ -73,7 +74,7 @@ describe('AppRoutes', () => {
     fireEvent.click(screen.getByRole('button', { name: '로그인' }))
 
     expect(await screen.findByRole('heading', { name: '학습 공간' })).toBeInTheDocument()
-    expect(screen.getByText(/세션 session-100/)).toBeInTheDocument()
+    expect(screen.getByText('시험 대비 요약.pdf 학습 화면입니다.')).toBeInTheDocument()
   })
 
   it('shows the mock session expired login notice', () => {
