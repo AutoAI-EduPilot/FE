@@ -17,6 +17,10 @@
 - 배포: 있음 / 없음
 - 문서: 있음 / 없음
 
+## 참조한 MengTo skill
+
+- 없음 / `agent-skills/<category>/<skill-name>/SKILL.md`
+
 ## 관련 이슈
 
 Related to #이슈번호

@@ -35,7 +35,8 @@ npm run dev
 
 ```text
 src/
-├─ app/             # 앱 진입, 라우팅, 레이아웃, route placeholder 화면
+├─ app/             # 앱 진입, 라우팅, 레이아웃, 페이지
+├─ features/        # 기능 모델, API repository, 기능 UI
 ├─ shared/
 │  ├─ api/          # 공통 응답 계약, 오류, Spring API client
 │  ├─ config/       # 환경 변수 검증
@@ -43,32 +44,33 @@ src/
 └─ test/            # 테스트 공통 설정
 ```
 
-기능별 `features/` 구조는 실제 기능 Epic에서 필요한 시점에 추가합니다.
-
 ## 앱 셸과 라우팅
-
-FE#1 범위에서는 후속 기능 이슈가 연결할 기본 route와 화면 골격만 제공합니다.
 
 | Route | 목적 |
 | --- | --- |
 | `/` | `/materials`로 이동 |
-| `/login` | 로그인 화면 골격 |
-| `/signup` | 회원가입 화면 골격 |
-| `/materials` | 자료 목록·업로드 진입 placeholder |
-| `/materials/:materialId` | 자료 상세 placeholder |
-| `/sessions` | 세션 목록·재진입 placeholder |
-| `/sessions/:sessionId` | PDF 뷰어·학습 채팅 placeholder |
-| `/quizzes/:quizId` | 퀴즈 풀이·결과 placeholder |
-| `/sessions/:sessionId/diagnosis/:diagnosisId` | 진단·교정 placeholder |
+| `/login` | 로그인 및 저장 세션 복원 |
+| `/signup` | 회원가입 후 자동 로그인 |
+| `/materials` | 자료 목록과 PDF 업로드 |
+| `/materials/:materialId` | 자료 상세와 학습 세션 생성 |
+| `/sessions` | 세션 목록과 재진입 |
+| `/sessions/:sessionId` | 페이지 이동과 학습 채팅 |
+| `/quizzes/:quizId` | 퀴즈 풀이와 제출 결과 |
+| `/sessions/:sessionId/diagnosis/:diagnosisId` | 진행 중 진단 복원과 교정 답변 |
 
-공통 UI는 Tailwind 기반 자체 컴포넌트(`Button`, `TextInput`, `Badge`, `PageHeader`, `EmptyState`, `LoadingState`, `ErrorState`)만 사용합니다. 실제 인증·자료·세션·퀴즈·진단 API 호출은 각 기능 Epic에서 연결합니다.
+화면은 기능별 repository를 통해 Spring API를 호출합니다. 네트워크 오류가 발생해도 로컬 데이터로 자동 전환하지 않습니다.
+
+## UI 작업 가이드
+
+EduPilot FE는 운영형 SaaS 학습 도구 방향을 기본으로 합니다. 외부 디자인 skill을 참고할 때는 [MengTo/Skills 적용 가이드](docs/mengto-skills-guide.md)를 따릅니다.
 
 ## API 호출 원칙
 
 - 모든 브라우저 요청은 `VITE_API_BASE_URL`에 설정한 Spring Main Service로 보냅니다.
 - `apiRequest`는 `/api/...` 형태의 상대 경로만 허용합니다. 절대 URL이나 FastAPI URL을 직접 전달할 수 없습니다.
 - 요청에는 기본적으로 `credentials: include`를 적용합니다.
-- access token이 필요한 기능은 `accessToken` 옵션을 명시적으로 전달합니다. 저장과 갱신은 인증 Epic의 책임입니다.
+- 인증된 repository 요청에는 저장된 access token을 Bearer 헤더로 자동 주입합니다.
+- access token, 사용자 정보, 마지막 활동 시각은 `edupilot.auth.session.v1` localStorage 항목에 저장합니다. 10분 동안 사용자 활동이 없거나 401 응답을 받으면 폐기합니다.
 - 성공 응답은 `ApiSuccess<T>`로 반환하고 실패 응답은 `ApiClientError`로 정규화합니다.
 
 ## 검증 명령
@@ -88,7 +90,7 @@ GitHub Actions의 `frontend-ci`가 `main`·`develop` 대상 PR과 `develop` push
 
 - `npm run build`로 `dist/` 산출물을 생성하고 `dist/index.html`, `dist/assets/*`가 있는지 확인합니다.
 - `dist/`는 배포 산출물이며 저장소에 커밋하지 않습니다.
-- 운영/개발 배포 환경에는 `VITE_API_BASE_URL`만 주입하고 `.env`, 인증키, 로그 파일은 업로드하지 않습니다.
+- 운영 배포 환경에는 `VITE_API_BASE_URL`을 주입하고 `.env`, 인증키, 로그 파일은 업로드하지 않습니다.
 - SPA fallback은 `/materials`, `/sessions/:sessionId`, `/quizzes/:quizId` 같은 client route가 새로고침에서 `/index.html`로 복구되는지 확인합니다.
 - 실제 dev 배포는 BE #46과 infra 환경 준비 후 진행합니다.
 
@@ -105,7 +107,8 @@ BE #8이 완료되기 전에는 실제 health/CORS 연동이 확인됐다고 표
 
 ## 현재 범위에서 제외
 
-- 인증 화면과 access/refresh token 수명주기
-- 학습 기능 화면
+- refresh token과 HttpOnly cookie 전환
 - SSE 스트리밍
+- 인증된 PDF 원본 URL 렌더링
+- 자료 삭제·업로드 취소·재처리 remote API
 - FastAPI 직접 호출
