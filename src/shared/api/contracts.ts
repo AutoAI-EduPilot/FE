@@ -19,6 +19,14 @@ export interface ApiFailure {
 
 export type ApiEnvelope<T> = ApiSuccess<T> | ApiFailure
 
+export interface PagedResponse<T> {
+  items: T[]
+  page: number
+  size: number
+  totalElements: number
+  totalPages: number
+}
+
 export function isApiSuccess<T>(value: unknown): value is ApiSuccess<T> {
   if (!isRecord(value) || value.success !== true) {
     return false

@@ -1,11 +1,6 @@
-export {
-  correctionMessage,
-  pendingDiagnosis,
-  restorePendingDiagnosis,
-} from './mockDiagnosis'
-export {
-  mockDiagnosisRepository,
-  type MockDiagnosisRepository,
-} from './mockDiagnosisRepository'
 export { validateDiagnosisAnswer } from './diagnosisValidation'
+export {
+  createDiagnosisRepository,
+  type DiagnosisRepository,
+} from './diagnosisRepository'
 export type { CorrectionMessage, PendingDiagnosis } from './diagnosisTypes'

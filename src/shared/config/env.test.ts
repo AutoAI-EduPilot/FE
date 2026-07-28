@@ -22,4 +22,9 @@ describe('normalizeApiBaseUrl', () => {
       'http://localhost:8080',
     )
   })
+
+  it('maps same-origin markers to an empty base', () => {
+    expect(normalizeApiBaseUrl('/api')).toBe('')
+    expect(normalizeApiBaseUrl('/')).toBe('')
+  })
 })

@@ -14,6 +14,18 @@ export interface PublicQuizQuestion {
 
 export type QuizAnswers = Record<string, string>
 
+export interface PublicQuiz {
+  coverageEndPage?: number
+  coverageStartPage?: number
+  id: string
+  kind: QuizKind
+  page?: number
+  questions: PublicQuizQuestion[]
+  sessionId: string
+  submitted: boolean
+  title: string
+}
+
 export interface PublicQuizFeedback {
   message: string
   questionId: string
@@ -25,6 +37,8 @@ export interface PublicQuizResult {
     sessionId: string
   }
   feedback: PublicQuizFeedback[]
+  maxScore?: number
+  passed?: boolean
   score: number
   submittedAt: string
 }
