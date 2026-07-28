@@ -1,112 +1,132 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { afterEach, describe, expect, it, vi } from 'vitest'
-
 import {
-  applyUiActionToPage,
-  mockUiActions,
-  resetMockSessionProgress,
-  UiActionsRenderer,
-} from '../../features/sessions'
-import { SessionDetailPage } from './SessionDetailPage'
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { UiActionsRenderer, type UiAction } from '../../features/sessions'
+import { TestAuthProvider } from '../../test/TestAuthProvider'
+import { installApiFixtureServer } from '../../test/apiFixtureServer'
 import { SessionsPage } from './SessionsPage'
+
+beforeEach(() => {
+  installApiFixtureServer()
+})
 
 afterEach(() => {
   cleanup()
-  resetMockSessionProgress()
   vi.restoreAllMocks()
+  vi.unstubAllEnvs()
 })
 
 function renderSessionsPage() {
   return render(
-    <MemoryRouter>
-      <SessionsPage />
-    </MemoryRouter>,
-  )
-}
-
-function renderSessionDetail(path = '/sessions/session-100') {
-  return render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/sessions/:sessionId" element={<SessionDetailPage />} />
-      </Routes>
-    </MemoryRouter>,
+    <TestAuthProvider>
+      <MemoryRouter>
+        <SessionsPage />
+      </MemoryRouter>
+    </TestAuthProvider>,
   )
 }
 
 describe('SessionsPage', () => {
-  it('renders session list and resume entry points', () => {
+  it('renders sessions returned by the API', async () => {
     renderSessionsPage()
 
-    expect(screen.getByRole('heading', { name: '학습 세션' })).toBeInTheDocument()
-    expect(screen.getByText('ACTIVE')).toBeInTheDocument()
-    expect(screen.getByText('PAUSED')).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: '학습 세션' }),
+    ).toBeInTheDocument()
+    expect(await screen.findByText('진행 중')).toBeInTheDocument()
+    expect(screen.getByText('완료')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '학습 재개' })).toHaveAttribute(
       'href',
-      '/sessions/session-100',
+      '/sessions/100',
     )
   })
-})
 
-describe('SessionDetailPage', () => {
-  it('moves pages through the mock PDF controller', () => {
-    renderSessionDetail()
+  it('deletes a session after user confirmation', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderSessionsPage()
 
-    expect(screen.getByText(/페이지 1 \/ 5/)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '다음' }))
-    expect(screen.getByText(/페이지 2 \/ 5/)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '4쪽으로 이동' }))
-    expect(screen.getByText(/페이지 4 \/ 5/)).toBeInTheDocument()
+    const [deleteButton] = await screen.findAllByRole('button', {
+      name: '시험 대비 요약.pdf 세션 삭제',
+    })
+    fireEvent.click(deleteButton)
+
+    await waitFor(() =>
+      expect(screen.queryByText('진행 중')).not.toBeInTheDocument(),
+    )
+    expect(window.confirm).toHaveBeenCalled()
   })
 
-  it('supports mock PDF zoom controls and thumbnails', () => {
-    renderSessionDetail()
+  it('keeps the session when deletion is not confirmed', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    renderSessionsPage()
 
-    fireEvent.click(screen.getByRole('button', { name: 'PDF 확대' }))
-    expect(screen.getByText(/확대 110%/)).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '5쪽으로 이동' }))
-    expect(screen.getByText(/페이지 5 \/ 5/)).toBeInTheDocument()
-  })
+    const [deleteButton] = await screen.findAllByRole('button', {
+      name: '시험 대비 요약.pdf 세션 삭제',
+    })
+    fireEvent.click(deleteButton)
 
-  it('restores the last visited page from memory-only mock state', () => {
-    const { unmount } = renderSessionDetail()
-
-    fireEvent.click(screen.getByRole('button', { name: '4쪽으로 이동' }))
-    expect(screen.getByText(/페이지 4 \/ 5/)).toBeInTheDocument()
-    unmount()
-    renderSessionDetail()
-
-    expect(screen.getByText(/페이지 4 \/ 5/)).toBeInTheDocument()
-  })
-
-  it('applies MOVE_NEXT_PAGE as a page action and keeps WAIT local', () => {
-    renderSessionDetail()
-
-    fireEvent.click(screen.getByRole('button', { name: '다음 페이지로' }))
-
-    expect(screen.getByText(/페이지 2 \/ 5/)).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('로컬 대기 0.8초')
-  })
-
-  it('renders missing session state', () => {
-    renderSessionDetail('/sessions/missing-session')
-
-    expect(screen.getByRole('alert')).toHaveTextContent('세션을 찾을 수 없습니다.')
+    expect(screen.getByText('진행 중')).toBeInTheDocument()
   })
 })
 
 describe('UiActionsRenderer', () => {
-  it('renders supported actions and emits page actions only for MOVE_NEXT_PAGE', () => {
-    const onMoveNextPage = vi.fn()
+  it('renders binary decision widgets and emits yes/no events', () => {
+    const onEvent = vi.fn()
+    const actions: UiAction[] = [
+      {
+        kind: 'BINARY_DECISION',
+        label: '현재 페이지를 설명할까요?',
+        noEvent: 'WAIT',
+        yesEvent: 'EXPLAIN_CURRENT_PAGE',
+      },
+    ]
 
-    render(<UiActionsRenderer actions={mockUiActions} onMoveNextPage={onMoveNextPage} />)
-    fireEvent.click(screen.getByRole('button', { name: '다음 페이지로' }))
-
-    expect(onMoveNextPage).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'MOVE_NEXT_PAGE' }),
+    render(
+      <UiActionsRenderer
+        actions={actions}
+        onEvent={onEvent}
+        onOpenDiagnosis={vi.fn()}
+      />,
     )
+    expect(screen.getByText('현재 페이지를 설명할까요?')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '네' }))
+    expect(onEvent).toHaveBeenCalledWith('EXPLAIN_CURRENT_PAGE')
+
+    fireEvent.click(screen.getByRole('button', { name: '아니요' }))
+    expect(onEvent).toHaveBeenCalledWith('WAIT')
+  })
+
+  it('renders diagnosis widgets and move/wait actions', () => {
+    const onEvent = vi.fn()
+    const onOpenDiagnosis = vi.fn()
+    const actions: UiAction[] = [
+      { diagnosisId: '30', kind: 'DIAGNOSIS_QUESTION', label: '어디서 막혔나요?' },
+      { kind: 'MOVE_NEXT_PAGE', label: '다음 페이지로', step: 1 },
+      { durationMs: 800, kind: 'WAIT', label: '잠시 생각하기' },
+    ]
+
+    render(
+      <UiActionsRenderer
+        actions={actions}
+        onEvent={onEvent}
+        onOpenDiagnosis={onOpenDiagnosis}
+      />,
+    )
+
+    fireEvent.click(screen.getByRole('button', { name: '진단 답변 작성' }))
+    expect(onOpenDiagnosis).toHaveBeenCalledWith('30')
+
+    fireEvent.click(screen.getByRole('button', { name: '다음 페이지로' }))
+    expect(onEvent).toHaveBeenCalledWith('MOVE_NEXT_PAGE')
+
     expect(screen.getByRole('status')).toHaveTextContent('잠시 생각하기')
-    expect(applyUiActionToPage(mockUiActions[1], 2, 5)).toBe(2)
   })
 })

@@ -4,48 +4,130 @@ import {
   render,
   screen,
   waitFor,
-  within,
 } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { MAX_MATERIAL_UPLOAD_BYTES } from '../../features/materials'
+import { TestAuthProvider } from '../../test/TestAuthProvider'
+import { apiSuccess, installApiFixtureServer } from '../../test/apiFixtureServer'
 import { MaterialDetailPage } from './MaterialDetailPage'
 import { MaterialsPage } from './MaterialsPage'
 
+beforeEach(() => {
+  installApiFixtureServer()
+})
+
 afterEach(() => {
   cleanup()
+  vi.restoreAllMocks()
+  vi.unstubAllEnvs()
 })
 
 function renderMaterialsPage() {
   return render(
-    <MemoryRouter>
-      <MaterialsPage />
-    </MemoryRouter>,
+    <TestAuthProvider>
+      <MemoryRouter>
+        <MaterialsPage />
+      </MemoryRouter>
+    </TestAuthProvider>,
   )
 }
 
 function renderMaterialDetail(path: string) {
   return render(
-    <MemoryRouter initialEntries={[path]}>
-      <Routes>
-        <Route path="/materials/:materialId" element={<MaterialDetailPage />} />
-      </Routes>
-    </MemoryRouter>,
+    <TestAuthProvider>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/materials/:materialId" element={<MaterialDetailPage />} />
+        </Routes>
+      </MemoryRouter>
+    </TestAuthProvider>,
   )
 }
 
 describe('MaterialsPage', () => {
-  it('renders material status UI', () => {
+  it('renders statuses returned by the materials API', async () => {
     renderMaterialsPage()
 
-    expect(screen.getByText('READY')).toBeInTheDocument()
-    expect(screen.getByText('PROCESSING')).toBeInTheDocument()
-    expect(screen.getByText('FAILED')).toBeInTheDocument()
+    expect(await screen.findByText('시험 대비 요약.pdf')).toBeInTheDocument()
+    expect(screen.getByText('준비 완료')).toBeInTheDocument()
+    expect(screen.getByText('처리 중')).toBeInTheDocument()
+    expect(screen.getByText('처리 실패')).toBeInTheDocument()
+    expect(
+      screen.getByText('파일 업로드는 완료됐지만 PDF 분석에 실패했습니다.'),
+    ).toBeInTheDocument()
     expect(screen.getByText('진행 중인 학습 세션이 있습니다.')).toBeInTheDocument()
   })
 
-  it('rejects non-PDF uploads', () => {
+  it('polls the list while a material is processing and stops when ready', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true })
+    let listCalls = 0
+    installApiFixtureServer((request) => {
+      const url = new URL(request.url)
+      if (request.method === 'GET' && url.pathname === '/api/materials') {
+        listCalls += 1
+        return apiSuccess({
+          items: [
+            {
+              createdAt: '2026-07-23T00:00:00Z',
+              materialId: 11,
+              pageCount: listCalls > 1 ? 12 : undefined,
+              processingStatus: listCalls > 1 ? 'READY' : 'PROCESSING',
+              title: '강의 노트 5주차.pdf',
+            },
+          ],
+          page: 0,
+          size: 20,
+          totalElements: 1,
+          totalPages: 1,
+        })
+      }
+      return undefined
+    })
+    renderMaterialsPage()
+
+    expect(await screen.findByText('처리 중')).toBeInTheDocument()
+
+    await vi.advanceTimersByTimeAsync(5000)
+    expect(await screen.findByText('준비 완료')).toBeInTheDocument()
+
+    await vi.advanceTimersByTimeAsync(15_000)
+    expect(listCalls).toBe(2)
+    vi.useRealTimers()
+  })
+
+  it('deletes a material after confirmation', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderMaterialsPage()
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: '강의 노트 5주차.pdf 삭제' }),
+    )
+
+    await waitFor(() =>
+      expect(
+        screen.queryByText('강의 노트 5주차.pdf'),
+      ).not.toBeInTheDocument(),
+    )
+    expect(screen.getByText('자료를 삭제했습니다.')).toBeInTheDocument()
+  })
+
+  it('explains the active-session conflict when deletion returns 409', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    renderMaterialsPage()
+
+    fireEvent.click(
+      await screen.findByRole('button', { name: '시험 대비 요약.pdf 삭제' }),
+    )
+
+    expect(
+      await screen.findByText(/진행 중인 학습 세션이 있어 삭제할 수 없습니다/),
+    ).toBeInTheDocument()
+    expect(screen.getByText('시험 대비 요약.pdf')).toBeInTheDocument()
+  })
+
+  it('rejects non-PDF uploads before making an API request', () => {
     renderMaterialsPage()
 
     fireEvent.change(screen.getByLabelText('PDF 파일'), {
@@ -54,13 +136,17 @@ describe('MaterialsPage', () => {
       },
     })
 
-    expect(screen.getByRole('alert')).toHaveTextContent('PDF 파일만 업로드할 수 있습니다.')
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'PDF 파일만 업로드할 수 있습니다.',
+    )
   })
 
   it('rejects uploads over 45MB before submission', () => {
     renderMaterialsPage()
     const file = new File(['pdf'], 'large.pdf', { type: 'application/pdf' })
-    Object.defineProperty(file, 'size', { value: MAX_MATERIAL_UPLOAD_BYTES + 1 })
+    Object.defineProperty(file, 'size', {
+      value: MAX_MATERIAL_UPLOAD_BYTES + 1,
+    })
 
     fireEvent.change(screen.getByLabelText('PDF 파일'), {
       target: { files: [file] },
@@ -71,7 +157,7 @@ describe('MaterialsPage', () => {
     )
   })
 
-  it('adds a dropped PDF to local processing state', async () => {
+  it('adds the material returned by the upload API', async () => {
     renderMaterialsPage()
 
     fireEvent.drop(screen.getByLabelText('PDF 업로드 드롭 영역'), {
@@ -80,80 +166,63 @@ describe('MaterialsPage', () => {
       },
     })
 
-    expect(await screen.findByRole('heading', { name: 'dragged.pdf' })).toBeInTheDocument()
     expect(
-      screen.getByRole('button', { name: 'dragged.pdf 업로드 취소' }),
+      await screen.findByRole('heading', { name: 'dragged.pdf' }),
     ).toBeInTheDocument()
-  })
-
-  it('refreshes processing materials into ready placeholder state', async () => {
-    renderMaterialsPage()
-
-    fireEvent.click(screen.getByRole('button', { name: '처리 상태 새로고침' }))
-
-    await waitFor(() => {
-      expect(
-        screen.queryByRole('button', { name: '강의 노트 5주차.pdf 업로드 취소' }),
-      ).not.toBeInTheDocument()
-    })
-    const processingCard = screen.getByText('강의 노트 5주차.pdf').closest('article')
-    expect(processingCard).not.toBeNull()
-    expect(within(processingCard as HTMLElement).getByText('READY')).toBeInTheDocument()
-  })
-
-  it('cancels processing uploads from local state', async () => {
-    renderMaterialsPage()
-
-    fireEvent.click(screen.getByRole('button', { name: '강의 노트 5주차.pdf 업로드 취소' }))
-
-    await waitFor(() => {
-      expect(screen.queryByText('강의 노트 5주차.pdf')).not.toBeInTheDocument()
-    })
-  })
-
-  it('retries failed materials as processing placeholders', async () => {
-    renderMaterialsPage()
-
-    fireEvent.click(screen.getByRole('button', { name: '스캔본 복습자료.pdf 다시 시도' }))
-
-    const failedMaterialCard = (await screen.findByText('스캔본 복습자료.pdf')).closest(
-      'article',
-    )
-    expect(failedMaterialCard).not.toBeNull()
-    expect(within(failedMaterialCard as HTMLElement).getByText('PROCESSING')).toBeInTheDocument()
     expect(
-      within(failedMaterialCard as HTMLElement).queryByText('텍스트 추출 중 오류가 발생했습니다.'),
+      screen.queryByRole('button', { name: /업로드 취소/ }),
     ).not.toBeInTheDocument()
-  })
-
-  it('confirms before removing a material from local state', async () => {
-    renderMaterialsPage()
-
-    fireEvent.click(screen.getByRole('button', { name: '시험 대비 요약.pdf 삭제' }))
-    const dialog = screen.getByRole('dialog', { name: '자료 삭제' })
-    fireEvent.click(within(dialog).getByRole('button', { name: '삭제' }))
-
-    await waitFor(() => {
-      expect(screen.queryByText('시험 대비 요약.pdf')).not.toBeInTheDocument()
-    })
   })
 })
 
 describe('MaterialDetailPage', () => {
-  it('renders active session conflict guidance', () => {
-    renderMaterialDetail('/materials/material-ready')
+  it('renders API material details and active session guidance', async () => {
+    renderMaterialDetail('/materials/10')
 
-    expect(screen.getByRole('heading', { name: '시험 대비 요약.pdf' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '활성 세션 충돌 안내' })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '진행 중인 세션으로' })).toHaveAttribute(
-      'href',
-      '/sessions/session-100',
+    expect(
+      await screen.findByRole('heading', { name: '시험 대비 요약.pdf' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: '활성 세션 충돌 안내' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByRole('link', { name: '진행 중인 세션으로' }),
+    ).toHaveAttribute('href', '/sessions/100')
+  })
+
+  it('renders the API 404 material state', async () => {
+    renderMaterialDetail('/materials/999')
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      '자료를 찾을 수 없습니다.',
     )
   })
 
-  it('renders missing material state', () => {
-    renderMaterialDetail('/materials/missing-material')
+  it('renders the learner memory card when analysis exists', async () => {
+    renderMaterialDetail('/materials/10')
 
-    expect(screen.getByRole('alert')).toHaveTextContent('자료를 찾을 수 없습니다.')
+    expect(await screen.findByText('학습 분석')).toBeInTheDocument()
+    expect(
+      screen.getByText('수식 전개를 어려워하고 쉬운 예시를 선호함'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('평균 개념을 정확히 사용함')).toBeInTheDocument()
+    expect(screen.getByText('수식 전개 과정 설명')).toBeInTheDocument()
+  })
+
+  it('starts a session from a ready material and navigates to it', async () => {
+    render(
+      <TestAuthProvider>
+        <MemoryRouter initialEntries={['/materials/14']}>
+          <Routes>
+            <Route path="/materials/:materialId" element={<MaterialDetailPage />} />
+            <Route path="/sessions/:sessionId" element={<p>세션 화면</p>} />
+          </Routes>
+        </MemoryRouter>
+      </TestAuthProvider>,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: /학습 시작/ }))
+
+    expect(await screen.findByText('세션 화면')).toBeInTheDocument()
   })
 })

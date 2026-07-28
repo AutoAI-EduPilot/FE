@@ -11,6 +11,7 @@ import { NotFoundPage } from './pages/NotFoundPage'
 import { QuizPage } from './pages/QuizPage'
 import { SessionDetailPage } from './pages/SessionDetailPage'
 import { SessionsPage } from './pages/SessionsPage'
+import { SettingsPage } from './pages/SettingsPage'
 import { SignupPage } from './pages/SignupPage'
 import { routes } from './routes'
 
@@ -32,6 +33,7 @@ export function AppRoutes() {
           <Route path={routes.sessionDetail} element={<SessionDetailPage />} />
           <Route path={routes.quizDetail} element={<QuizPage />} />
           <Route path={routes.diagnosis} element={<DiagnosisPage />} />
+          <Route path={routes.settings} element={<SettingsPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Route>

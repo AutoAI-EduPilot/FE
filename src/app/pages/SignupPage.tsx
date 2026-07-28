@@ -1,17 +1,18 @@
+import { ArrowLeft, UserPlus } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 import {
   hasFormErrors,
-  mapMockAuthErrorToFormErrors,
+  mapAuthErrorToFormErrors,
   useAuth,
   validateSignupForm,
   type SignupFormErrors,
   type SignupFormValues,
 } from '../../features/auth'
-import { Button, PageHeader, TextInput } from '../../shared/ui'
+import { Button, TextInput } from '../../shared/ui'
 import { routes } from '../routes'
+import { usePageTitle } from '../../shared/lib/usePageTitle'
 
 const initialValues: SignupFormValues = {
   email: '',
@@ -21,6 +22,7 @@ const initialValues: SignupFormValues = {
 }
 
 export function SignupPage() {
+  usePageTitle('회원가입')
   const { signup } = useAuth()
   const navigate = useNavigate()
   const [values, setValues] = useState<SignupFormValues>(initialValues)
@@ -30,28 +32,19 @@ export function SignupPage() {
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-
     const nextErrors = validateSignupForm(values)
     setErrors(nextErrors)
-
-    if (hasFormErrors(nextErrors)) {
-      return
-    }
+    if (hasFormErrors(nextErrors)) return
 
     setIsSubmitting(true)
     setServerError(null)
-
     try {
       await signup(values)
       navigate(routes.materials, { replace: true })
     } catch (error) {
-      const formErrors = mapMockAuthErrorToFormErrors(error)
-
-      if (formErrors) {
-        setErrors(formErrors as SignupFormErrors)
-      } else {
-        setServerError('회원가입 요청을 처리하지 못했습니다.')
-      }
+      const formErrors = mapAuthErrorToFormErrors(error)
+      if (formErrors) setErrors(formErrors as SignupFormErrors)
+      else setServerError('회원가입 요청을 처리하지 못했습니다.')
     } finally {
       setIsSubmitting(false)
     }
@@ -65,11 +58,10 @@ export function SignupPage() {
 
   return (
     <div>
-      <PageHeader
-        eyebrow="Auth"
-        title="회원가입"
-        description="학습 자료와 세션을 관리할 계정을 만듭니다."
-      />
+      <div className="flex flex-col gap-1.5">
+        <h1 className="text-2xl font-bold text-stone-900">회원가입</h1>
+        <p className="text-sm text-stone-400">학습 자료와 세션을 관리할 계정을 만듭니다</p>
+      </div>
 
       <form className="mt-6 space-y-4" noValidate onSubmit={handleSubmit}>
         <TextInput
@@ -97,7 +89,7 @@ export function SignupPage() {
           id="signup-password"
           label="비밀번호"
           onChange={(event) => updateValue('password', event.target.value)}
-          placeholder="8자 이상"
+          placeholder="영문·숫자 포함 8~64자"
           type="password"
           value={values.password}
         />
@@ -107,11 +99,12 @@ export function SignupPage() {
           id="signup-password-confirm"
           label="비밀번호 확인"
           onChange={(event) => updateValue('passwordConfirm', event.target.value)}
-          placeholder="8자 이상"
+          placeholder="영문·숫자 포함 8~64자"
           type="password"
           value={values.passwordConfirm}
         />
         <Button className="w-full" disabled={isSubmitting} type="submit">
+          <UserPlus aria-hidden="true" size={15} />
           {isSubmitting ? '가입 중' : '회원가입'}
         </Button>
       </form>
@@ -122,12 +115,13 @@ export function SignupPage() {
         </p>
       ) : null}
 
-      <p className="mt-5 text-center text-sm text-zinc-600">
+      <p className="mt-6 text-center text-sm text-stone-600">
         이미 계정이 있다면{' '}
         <Link
           to={routes.login}
-          className="font-semibold text-teal-700 underline-offset-4 hover:underline"
+          className="inline-flex items-center gap-1 font-semibold text-brand-700 underline-offset-4 hover:underline"
         >
+          <ArrowLeft aria-hidden="true" size={14} />
           로그인
         </Link>
       </p>
