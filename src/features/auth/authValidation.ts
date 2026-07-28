@@ -13,6 +13,7 @@ export type SignupFormErrors = Partial<Record<keyof SignupFormValues, string>>
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const MIN_PASSWORD_LENGTH = 8
+const MAX_PASSWORD_LENGTH = 64
 
 export function validateLoginForm(values: LoginFormValues): LoginFormErrors {
   const errors: LoginFormErrors = {}
@@ -34,6 +35,17 @@ export function validateLoginForm(values: LoginFormValues): LoginFormErrors {
 
 export function validateSignupForm(values: SignupFormValues): SignupFormErrors {
   const errors: SignupFormErrors = { ...validateLoginForm(values) }
+
+  // 서버 규칙(8~64자, 영문·숫자 각 1자 이상)과 동일하게 가입 시점에 먼저 거른다.
+  if (
+    values.password &&
+    !errors.password &&
+    (values.password.length > MAX_PASSWORD_LENGTH ||
+      !/[a-z]/i.test(values.password) ||
+      !/\d/.test(values.password))
+  ) {
+    errors.password = '8~64자, 영문·숫자를 포함해야 합니다.'
+  }
 
   if (!values.name.trim()) {
     errors.name = '이름을 입력하세요.'

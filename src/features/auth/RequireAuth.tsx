@@ -1,14 +1,32 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom'
 
 import { routes } from '../../app/routes'
+import { LoadingState } from '../../shared/ui'
 import { useAuth } from './useAuth'
 
 export function RequireAuth() {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, isInitializing, logoutReason } = useAuth()
   const location = useLocation()
 
+  if (isInitializing) {
+    return <LoadingState message="로그인 상태를 확인하는 중입니다." />
+  }
+
   if (!isAuthenticated) {
-    return <Navigate to={routes.login} replace state={{ from: location.pathname }} />
+    const reason =
+      logoutReason === 'idle'
+        ? '?reason=idle'
+        : logoutReason === 'session-expired'
+          ? '?reason=session-expired'
+          : ''
+
+    return (
+      <Navigate
+        to={`${routes.login}${reason}`}
+        replace
+        state={{ from: location.pathname }}
+      />
+    )
   }
 
   return <Outlet />

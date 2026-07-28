@@ -1,13 +1,15 @@
-export { AuthProvider } from './AuthProvider'
+export { AUTH_IDLE_TIMEOUT_MS, AuthProvider } from './AuthProvider'
 export { RequireAuth } from './RequireAuth'
 export { useAuth } from './useAuth'
 export type { AuthContextValue, AuthUser } from './authContext'
+export type {
+  AuthenticatedRequest,
+  LogoutReason,
+} from './authContext'
 export {
-  mapMockAuthErrorToFormErrors,
-  MockAuthValidationError,
-  mockAuthRepository,
-  type MockAuthRepository,
-} from './mockAuthRepository'
+  AuthValidationError,
+  mapAuthErrorToFormErrors,
+} from './authErrors'
 export {
   hasFormErrors,
   validateLoginForm,
