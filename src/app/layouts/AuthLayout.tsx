@@ -1,18 +1,50 @@
+import { BookOpenCheck } from 'lucide-react'
 import { Link, Outlet } from 'react-router-dom'
 
 import { routes } from '../routes'
 
 export function AuthLayout() {
   return (
-    <main className="flex min-h-screen items-center justify-center bg-stone-50 px-4 py-10 text-zinc-950">
-      <section className="w-full max-w-md rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
+    <main className="grid min-h-screen bg-white text-stone-900 lg:grid-cols-[minmax(420px,1fr)_minmax(0,2fr)]">
+      <aside className="hidden border-r border-stone-200 bg-stone-100 px-13 py-14 lg:flex lg:flex-col lg:justify-between">
         <Link
           to={routes.materials}
-          className="text-xl font-bold text-zinc-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600"
+          className="flex items-center gap-2.5 self-start rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600"
         >
-          EduPilot
+          <span className="flex size-8 items-center justify-center rounded-[9px] bg-brand-600 text-white">
+            <BookOpenCheck aria-hidden="true" size={17} />
+          </span>
+          <span className="text-lg font-bold">EduPilot</span>
         </Link>
-        <div className="mt-6">
+
+        <div className="flex flex-col gap-4">
+          <p className="max-w-sm text-[34px] font-bold leading-[1.35]">
+            강의 자료를 읽고,
+            <br />
+            바로 물어보세요.
+          </p>
+          <p className="max-w-sm text-[15px] leading-relaxed text-stone-500">
+            PDF·PPT를 보면서 AI 학습 도우미와
+            <br />
+            대화하는 학습 플랫폼
+          </p>
+        </div>
+
+        <p className="text-[12.5px] text-stone-400">© 2026 EduPilot</p>
+      </aside>
+
+      <section className="flex min-h-screen items-center justify-center px-4 py-8 sm:px-8">
+        <div className="w-full max-w-[400px]">
+          <Link
+            to={routes.materials}
+            className="mb-8 flex items-center gap-2.5 rounded-lg lg:hidden"
+          >
+            <span className="flex size-8 items-center justify-center rounded-[9px] bg-brand-600 text-white">
+              <BookOpenCheck aria-hidden="true" size={17} />
+            </span>
+            <span className="text-lg font-bold">EduPilot</span>
+          </Link>
+
           <Outlet />
         </div>
       </section>

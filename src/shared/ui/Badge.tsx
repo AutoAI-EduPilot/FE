@@ -10,7 +10,7 @@ export function Badge({ children, tone = 'neutral' }: PropsWithChildren<BadgePro
   return (
     <span
       className={[
-        'inline-flex min-h-6 items-center rounded-md border px-2 py-0.5 text-xs font-semibold',
+        'inline-flex min-h-6 items-center rounded-lg border px-2 py-0.5 text-xs font-semibold',
         toneClasses[tone],
       ].join(' ')}
     >
@@ -20,7 +20,7 @@ export function Badge({ children, tone = 'neutral' }: PropsWithChildren<BadgePro
 }
 
 const toneClasses: Record<BadgeTone, string> = {
-  neutral: 'border-zinc-200 bg-zinc-50 text-zinc-700',
+  neutral: 'border-stone-200 bg-stone-50 text-stone-700',
   info: 'border-cyan-200 bg-cyan-50 text-cyan-800',
   success: 'border-emerald-200 bg-emerald-50 text-emerald-800',
   warning: 'border-amber-200 bg-amber-50 text-amber-800',

@@ -1,19 +1,49 @@
 @import "tailwindcss";
 
-:root {
-  font-family:
-    Inter, Pretendard, "Noto Sans KR", system-ui, -apple-system, BlinkMacSystemFont,
+@theme {
+  --font-sans:
+    "Pretendard Variable", Pretendard, ui-sans-serif, system-ui, -apple-system,
     "Segoe UI", sans-serif;
-  color: #172033;
-  background: #f5f7fb;
+}
+
+/* 브랜드 컬러 — 디자인 시안(강의실 레이아웃 시안.dc.html)의 #4059d6 인디고 스케일.
+   팔레트 교체 시 이 블록만 수정한다. */
+@theme {
+  --color-brand-50: #f0f2fc;
+  --color-brand-100: #e3e8ff;
+  --color-brand-200: #c9d2f8;
+  --color-brand-300: #a3b0f0;
+  --color-brand-400: #7787e4;
+  --color-brand-500: #5567dc;
+  --color-brand-600: #4059d6;
+  --color-brand-700: #3448bb;
+  --color-brand-800: #2c3c9a;
+  --color-brand-900: #28357d;
+  --color-brand-950: #1a2150;
+}
+
+:root {
+  font-family: var(--font-sans);
+  color: var(--color-stone-900);
+  background: #fff;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: #fff;
 }
 
 body {
   min-width: 320px;
   min-height: 100vh;
   margin: 0;
+  background: #fff;
 }
 
 button,
@@ -21,4 +51,14 @@ input,
 textarea,
 select {
   font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  color: var(--color-brand-900);
+  background: var(--color-brand-100);
 }

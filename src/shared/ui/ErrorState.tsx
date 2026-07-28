@@ -1,3 +1,4 @@
+import { CircleAlert } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 export interface ErrorStateProps {
@@ -9,11 +10,16 @@ export interface ErrorStateProps {
 export function ErrorState({ action, description, title }: ErrorStateProps) {
   return (
     <section
-      className="rounded-lg border border-rose-200 bg-white p-6 text-center shadow-sm"
+      className="flex min-h-64 flex-col items-center justify-center border-y border-stone-200 py-10 text-center"
       role="alert"
     >
-      <h1 className="text-xl font-bold text-zinc-950">{title}</h1>
-      <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-zinc-600">{description}</p>
+      <span className="flex size-10 items-center justify-center rounded-lg bg-rose-50 text-rose-700">
+        <CircleAlert aria-hidden="true" size={19} />
+      </span>
+      <h1 className="mt-4 text-xl font-bold text-stone-950">{title}</h1>
+      <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-stone-600">
+        {description}
+      </p>
       {action ? <div className="mt-5 flex justify-center">{action}</div> : null}
     </section>
   )

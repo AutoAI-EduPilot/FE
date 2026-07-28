@@ -1,3 +1,5 @@
+import { LoaderCircle } from 'lucide-react'
+
 export interface LoadingStateProps {
   message?: string
 }
@@ -5,9 +7,10 @@ export interface LoadingStateProps {
 export function LoadingState({ message = '불러오는 중입니다.' }: LoadingStateProps) {
   return (
     <div
-      className="rounded-lg border border-zinc-200 bg-white p-6 text-center text-sm font-medium text-zinc-600 shadow-sm"
+      className="flex min-h-32 items-center justify-center gap-2 border-y border-stone-200 text-sm font-medium text-stone-600"
       role="status"
     >
+      <LoaderCircle aria-hidden="true" className="animate-spin" size={16} />
       {message}
     </div>
   )

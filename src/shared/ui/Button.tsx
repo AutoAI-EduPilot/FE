@@ -54,9 +54,9 @@ function getButtonClassName({
   variant,
 }: Required<ButtonStyleProps> & { className?: string }): string {
   return [
-    'inline-flex min-h-10 items-center justify-center rounded-lg border font-semibold',
-    'transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-600',
-    'disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400',
+    'inline-flex min-h-9 items-center justify-center gap-2 rounded-lg border font-semibold',
+    'transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
+    'disabled:cursor-not-allowed disabled:border-stone-200 disabled:bg-stone-100 disabled:text-stone-400',
     sizeClasses[size],
     variantClasses[variant],
     className,
@@ -66,12 +66,12 @@ function getButtonClassName({
 }
 
 const sizeClasses: Record<ButtonSize, string> = {
-  sm: 'px-3 py-1.5 text-sm',
-  md: 'px-4 py-2 text-sm',
+  sm: 'px-3 py-1.5 text-xs',
+  md: 'px-3.5 py-2 text-sm',
 }
 
 const variantClasses: Record<ButtonVariant, string> = {
-  primary: 'border-teal-700 bg-teal-700 text-white hover:bg-teal-800',
-  secondary: 'border-zinc-300 bg-white text-zinc-900 hover:bg-zinc-50',
-  ghost: 'border-transparent bg-transparent text-zinc-700 hover:bg-zinc-100',
+  primary: 'border-brand-700 bg-brand-700 text-white hover:bg-brand-800',
+  secondary: 'border-stone-300 bg-white text-stone-800 hover:bg-stone-50',
+  ghost: 'border-transparent bg-transparent text-stone-600 hover:bg-stone-100 hover:text-stone-950',
 }
