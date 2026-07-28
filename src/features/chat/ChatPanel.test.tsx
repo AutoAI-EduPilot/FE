@@ -1,67 +1,81 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
+import type { SessionsRepository } from '../sessions'
 import { ChatPanel } from './ChatPanel'
-import {
-  cancelStreamingReply,
-  createRequestId,
-  createStreamingReply,
-  isMockStreamAborted,
-  resetMockStreamingState,
-} from './mockStreaming'
+import { useSessionChat } from './useSessionChat'
 
 afterEach(() => {
   cleanup()
-  resetMockStreamingState()
   vi.restoreAllMocks()
 })
 
-describe('createRequestId', () => {
-  it('creates unique request IDs', () => {
-    const first = createRequestId(1000)
-    const second = createRequestId(1000)
-
-    expect(first).toMatch(/^req-1000-/)
-    expect(second).toMatch(/^req-1000-/)
-    expect(first).not.toBe(second)
-  })
-})
-
-describe('mock streaming controller', () => {
-  it('aborts mock streams through AbortController when cancelled', () => {
-    const message = createStreamingReply('req-abort')
-
-    expect(isMockStreamAborted('req-abort')).toBe(false)
-    cancelStreamingReply(message)
-
-    expect(isMockStreamAborted('req-abort')).toBe(true)
-  })
-})
+function ChatHarness({
+  repository,
+  sessionId = '100',
+}: {
+  repository: SessionsRepository
+  sessionId?: string
+}) {
+  const chat = useSessionChat(repository, sessionId)
+  return <ChatPanel chat={chat} sessionId={sessionId} />
+}
 
 describe('ChatPanel', () => {
-  it('validates empty questions before starting a stream', () => {
-    render(<ChatPanel sessionId="session-100" />)
+  it('validates empty questions before sending a turn', async () => {
+    render(<ChatHarness repository={createRepository()} />)
+    await screen.findByText('아직 대화 기록이 없습니다. 현재 페이지에 대해 질문해 보세요.')
 
     fireEvent.click(screen.getByRole('button', { name: '질문 보내기' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent('질문을 입력하세요.')
   })
 
-  it('renders submitted questions with a streaming assistant message', () => {
-    render(<ChatPanel sessionId="session-100" />)
+  it('loads server history and renders the completed turn response', async () => {
+    const repository = createRepository({
+      listMessages: vi.fn().mockResolvedValue([
+        {
+          content: '이전 답변',
+          createdAt: '2026-07-27T00:00:00Z',
+          id: '500',
+          senderType: 'AI',
+        },
+      ]),
+    })
+    render(<ChatHarness repository={repository} />)
 
+    expect(await screen.findByText('이전 답변')).toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('질문'), {
       target: { value: '이 페이지의 핵심은 무엇인가요?' },
     })
     fireEvent.click(screen.getByRole('button', { name: '질문 보내기' }))
 
-    expect(screen.getByText('이 페이지의 핵심은 무엇인가요?')).toBeInTheDocument()
-    expect(screen.getByText('답변을 생성하는 중입니다.')).toBeInTheDocument()
-    expect(screen.getByText(/requestId req-/)).toBeInTheDocument()
+    expect(
+      await screen.findByText('서버에서 반환한 답변입니다.'),
+    ).toBeInTheDocument()
+    expect(repository.submitTurn).toHaveBeenCalledWith(
+      '100',
+      expect.objectContaining({
+        eventType: 'USER_QUESTION',
+        payload: { message: '이 페이지의 핵심은 무엇인가요?' },
+      }),
+    )
   })
 
-  it('locks new input while a mock stream is active', () => {
-    render(<ChatPanel sessionId="session-100" />)
+  it('locks input while the learning turn request is pending', async () => {
+    let resolveTurn: ((value: Awaited<
+      ReturnType<SessionsRepository['submitTurn']>
+    >) => void) | undefined
+    const repository = createRepository({
+      submitTurn: vi.fn().mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveTurn = resolve
+          }),
+      ),
+    })
+    render(<ChatHarness repository={repository} />)
+    await screen.findByText('아직 대화 기록이 없습니다. 현재 페이지에 대해 질문해 보세요.')
 
     fireEvent.change(screen.getByLabelText('질문'), {
       target: { value: '핵심 개념을 알려 주세요.' },
@@ -70,38 +84,59 @@ describe('ChatPanel', () => {
 
     expect(screen.getByLabelText('질문')).toBeDisabled()
     expect(screen.getByRole('button', { name: '응답 대기 중' })).toBeDisabled()
+
+    resolveTurn?.({ messages: [], uiActions: [] })
   })
 
-  it('advances mock streaming progress into a completed message', () => {
-    render(<ChatPanel sessionId="session-100" />)
-
-    fireEvent.change(screen.getByLabelText('질문'), {
-      target: { value: '예시와 함께 설명해 주세요.' },
+  it('renders assistant messages as markdown but keeps user text literal', async () => {
+    const repository = createRepository({
+      listMessages: vi.fn().mockResolvedValue([
+        {
+          content: '**핵심** 개념은 다음과 같습니다.\n\n- 첫째\n- 둘째',
+          createdAt: '2026-07-27T00:00:00Z',
+          id: '500',
+          senderType: 'AI',
+        },
+        {
+          content: '*별표*는 그대로 보여야 합니다.',
+          createdAt: '2026-07-27T00:01:00Z',
+          id: '501',
+          senderType: 'USER',
+        },
+      ]),
     })
-    fireEvent.click(screen.getByRole('button', { name: '질문 보내기' }))
-    fireEvent.click(screen.getByRole('button', { name: '응답 진행' }))
+    render(<ChatHarness repository={repository} />)
 
-    expect(screen.getByRole('progressbar', { name: '응답 진행률 70%' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '응답 진행' }))
-
-    expect(
-      screen.getByText('현재 페이지의 핵심 개념을 예시와 함께 정리했습니다.'),
-    ).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: '질문 보내기' })).toBeEnabled()
-  })
-
-  it('supports stream cancel and retry states', () => {
-    render(<ChatPanel sessionId="session-100" />)
-
-    fireEvent.change(screen.getByLabelText('질문'), {
-      target: { value: '예시를 들어 주세요.' },
-    })
-    fireEvent.click(screen.getByRole('button', { name: '질문 보내기' }))
-    fireEvent.click(screen.getByRole('button', { name: '응답 취소' }))
-
-    expect(screen.getByText('응답이 취소되었습니다.')).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '다시 시도' }))
-
-    expect(screen.getByText('답변을 다시 생성하는 중입니다.')).toBeInTheDocument()
+    const strong = await screen.findByText('핵심')
+    expect(strong.tagName).toBe('STRONG')
+    expect(screen.getByRole('list')).toBeInTheDocument()
+    expect(screen.getByText('*별표*는 그대로 보여야 합니다.')).toBeInTheDocument()
   })
 })
+
+function createRepository(
+  overrides: Partial<SessionsRepository> = {},
+): SessionsRepository {
+  return {
+    complete: vi.fn(),
+    create: vi.fn(),
+    delete: vi.fn(),
+    getById: vi.fn(),
+    list: vi.fn(),
+    listMessages: vi.fn().mockResolvedValue([]),
+    listQuizzes: vi.fn(),
+    movePage: vi.fn(),
+    submitTurn: vi.fn().mockResolvedValue({
+      messages: [
+        {
+          content: '서버에서 반환한 답변입니다.',
+          createdAt: '2026-07-27T00:00:00Z',
+          id: '501',
+          senderType: 'AI',
+        },
+      ],
+      uiActions: [],
+    }),
+    ...overrides,
+  }
+}

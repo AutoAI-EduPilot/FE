@@ -1,10 +1,20 @@
-export { mockSessions, mockUiActions, findMockSession } from './mockSessions'
-export { MockPdfViewer } from './MockPdfViewer'
-export {
-  resetMockSessionProgress,
-  restoreLastPage,
-  saveLastPage,
-} from './mockSessionProgress'
-export { applyUiActionToPage, movePage } from './pageActions'
+export { SessionPageViewer } from './SessionPageViewer'
+export { movePage } from './pageActions'
 export { UiActionsRenderer } from './UiActionsRenderer'
-export type { LearningSession, LearningSessionStatus, UiAction } from './sessionTypes'
+export type {
+  LearningSession,
+  LearningSessionStatus,
+  UiAction,
+  UiActionEvent,
+} from './sessionTypes'
+export type {
+  PendingDiagnosisReference,
+  SessionMessage,
+  SessionQuizSummary,
+  SessionTurnResult,
+} from './sessionTypes'
+export {
+  createSessionsRepository,
+  type SessionsRepository,
+  type SessionTurnRequest,
+} from './sessionsRepository'
