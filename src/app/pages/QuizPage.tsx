@@ -345,11 +345,13 @@ function QuestionInput({
               key={choice.id}
             >
               <input
+                aria-label={choice.label}
                 checked={value === choice.id}
                 disabled={disabled}
                 name={question.id}
                 onChange={() => onChange(choice.id)}
                 type="radio"
+                value={choice.id}
               />
               {choice.label}
             </label>

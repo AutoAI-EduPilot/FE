@@ -184,6 +184,7 @@ export function AppLayout() {
           <button
             aria-expanded={isMenuOpen}
             aria-haspopup="menu"
+            aria-label="프로필 메뉴"
             className={cx(
               'flex w-full items-center gap-2.5 rounded-lg border-t border-transparent p-1.5 text-left hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
               isCollapsed && 'justify-center p-1',

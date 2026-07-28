@@ -61,7 +61,8 @@ describe('AppRoutes', () => {
   it('opens the settings page from the profile menu', async () => {
     renderRoute('/')
 
-    fireEvent.click(screen.getByRole('button', { name: /learner@example.com/ }))
+    const [profileTrigger] = screen.getAllByRole('button', { name: '프로필 메뉴' })
+    fireEvent.click(profileTrigger)
     const [settingsMenuItem] = screen.getAllByRole('menuitem', { name: '설정' })
     fireEvent.click(settingsMenuItem)
 
