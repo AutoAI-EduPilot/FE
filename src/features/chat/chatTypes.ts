@@ -3,7 +3,10 @@ export type ChatMessageStatus = 'sent'
 
 export interface ChatMessage {
   content: string
+  createdAt?: string
   id: string
+  messageType?: string
+  pageNumber?: number
   role: ChatMessageRole
   status: ChatMessageStatus
 }

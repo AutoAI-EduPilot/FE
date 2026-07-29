@@ -4,6 +4,13 @@ const dateTimeFormatter = new Intl.DateTimeFormat('ko-KR', {
   timeStyle: 'short',
 })
 
+const timeFormatter = new Intl.DateTimeFormat('ko-KR', { timeStyle: 'short' })
+
+export function formatTime(iso: string): string {
+  const date = new Date(iso)
+  return Number.isNaN(date.getTime()) ? '' : timeFormatter.format(date)
+}
+
 export function formatDate(iso: string): string {
   const date = new Date(iso)
   return Number.isNaN(date.getTime()) ? iso : dateFormatter.format(date)

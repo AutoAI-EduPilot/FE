@@ -43,14 +43,20 @@ describe('SessionDetailPage', () => {
   it('updates pages only after the page API succeeds', async () => {
     renderSessionDetail()
 
-    expect(await screen.findByText(/페이지 1 \/ 5/)).toBeInTheDocument()
+    expect(
+      await screen.findByRole('progressbar', { name: '학습 진행률 1 / 5쪽' }),
+    ).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '다음' }))
     await waitFor(() =>
-      expect(screen.getByText(/페이지 2 \/ 5/)).toBeInTheDocument(),
+      expect(
+        screen.getByRole('progressbar', { name: '학습 진행률 2 / 5쪽' }),
+      ).toBeInTheDocument(),
     )
     fireEvent.click(screen.getByRole('button', { name: '4쪽으로 이동' }))
     await waitFor(() =>
-      expect(screen.getByText(/페이지 4 \/ 5/)).toBeInTheDocument(),
+      expect(
+        screen.getByRole('progressbar', { name: '학습 진행률 4 / 5쪽' }),
+      ).toBeInTheDocument(),
     )
   })
 

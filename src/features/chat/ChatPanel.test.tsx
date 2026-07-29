@@ -24,7 +24,7 @@ function ChatHarness({
 describe('ChatPanel', () => {
   it('validates empty questions before sending a turn', async () => {
     render(<ChatHarness repository={createRepository()} />)
-    await screen.findByText('아직 대화 기록이 없습니다. 현재 페이지에 대해 질문해 보세요.')
+    await screen.findByText('보고 있는 페이지를 함께 읽고 답변해요')
 
     fireEvent.click(screen.getByRole('button', { name: '질문 보내기' }))
 
@@ -75,7 +75,7 @@ describe('ChatPanel', () => {
       ),
     })
     render(<ChatHarness repository={repository} />)
-    await screen.findByText('아직 대화 기록이 없습니다. 현재 페이지에 대해 질문해 보세요.')
+    await screen.findByText('보고 있는 페이지를 함께 읽고 답변해요')
 
     fireEvent.change(screen.getByLabelText('질문'), {
       target: { value: '핵심 개념을 알려 주세요.' },

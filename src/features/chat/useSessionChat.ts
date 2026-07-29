@@ -104,7 +104,10 @@ export function useSessionChat(
 function mapSessionMessage(message: SessionMessage): ChatMessage {
   return {
     content: message.content,
+    createdAt: message.createdAt,
     id: message.id,
+    messageType: message.messageType,
+    pageNumber: message.pageNumber,
     role: message.senderType === 'USER' ? 'user' : 'assistant',
     status: 'sent',
   }

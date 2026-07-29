@@ -304,58 +304,80 @@ export function SessionDetailPage() {
         }
       />
 
-      <section className="grid min-h-[calc(100vh-190px)] gap-4 xl:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.8fr)]">
-        <SessionPageViewer
-          currentPage={currentPage}
-          onMovePage={handlePageMove}
-          totalPages={totalPages}
-        />
+      <section className="grid min-h-[calc(100vh-190px)] gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
+        <div className="grid min-h-0 min-w-0 content-start gap-4">
+          <SessionPageViewer
+            currentPage={currentPage}
+            isPending={isActionPending}
+            materialTitle={activeSession.materialTitle}
+            onMovePage={handlePageMove}
+            totalPages={totalPages}
+          />
 
-        <div className="grid min-h-0 min-w-0 gap-4 xl:grid-rows-[minmax(0,1fr)_auto]">
-          <ChatPanel chat={chat} sessionId={activeSession.id} />
-          <aside className="rounded-xl border border-stone-200 bg-white px-4 py-3">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between xl:block">
-              <div>
-                <h2 className="text-sm font-bold text-stone-950">학습 진행</h2>
-                <p className="mt-1 text-xs text-stone-500">
-                  AI 튜터의 제안에 따라 학습을 이어가세요.
-                </p>
-              </div>
-              <div className="mt-0 min-w-0 flex-1 sm:ml-4 xl:mt-3 xl:ml-0">
-                {isSelectingQuizType ? (
-                  <div className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2.5">
-                    <p className="text-sm font-semibold text-brand-950">
-                      어떤 유형의 퀴즈를 풀까요?
-                    </p>
-                    <div className="mt-2 grid grid-cols-2 gap-2">
-                      {QUIZ_TYPE_OPTIONS.map((option) => (
-                        <Button
-                          disabled={isActionPending}
-                          key={option.kind}
-                          onClick={() => void handleQuizTypeSelected(option.kind)}
-                          size="sm"
-                          type="button"
-                          variant="secondary"
-                        >
-                          {option.label}
-                        </Button>
-                      ))}
-                    </div>
+          {quizHistory.length > 0 ? (
+            <aside className="rounded-xl border border-stone-200 bg-white px-4 py-3">
+              <h2 className="text-xs font-bold text-stone-500">퀴즈 기록</h2>
+              <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
+                {quizHistory.map((quiz) => (
+                  <li key={quiz.quizId}>
+                    <Link
+                      className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+                      to={quizDetailPath(quiz.quizId)}
+                    >
+                      <span className="min-w-0 flex-1 truncate font-medium text-stone-800">
+                        {quiz.title}
+                      </span>
+                      <Badge tone="neutral">{quizKindLabel(quiz.quizType)}</Badge>
+                      {quiz.score !== undefined ? (
+                        <Badge tone={quiz.score >= 60 ? 'success' : 'warning'}>
+                          {quiz.score}점
+                        </Badge>
+                      ) : null}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </aside>
+          ) : null}
+        </div>
+
+        <ChatPanel
+          chat={chat}
+          currentPage={currentPage}
+          footer={
+            <div className="grid gap-2">
+              {isSelectingQuizType ? (
+                <div className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2.5">
+                  <p className="text-sm font-semibold text-brand-950">
+                    어떤 유형의 퀴즈를 풀까요?
+                  </p>
+                  <div className="mt-2 grid grid-cols-2 gap-2">
+                    {QUIZ_TYPE_OPTIONS.map((option) => (
+                      <Button
+                        disabled={isActionPending}
+                        key={option.kind}
+                        onClick={() => void handleQuizTypeSelected(option.kind)}
+                        size="sm"
+                        type="button"
+                        variant="secondary"
+                      >
+                        {option.label}
+                      </Button>
+                    ))}
                   </div>
-                ) : (
-                  <UiActionsRenderer
-                    actions={activeSession.uiActions ?? []}
-                    disabled={isActionPending}
-                    onEvent={(event) => void handleEvent(event)}
-                    onOpenDiagnosis={(diagnosisId) =>
-                      navigate(diagnosisPath(activeSession.id, diagnosisId))
-                    }
-                  />
-                )}
-              </div>
-            </div>
-            {activeSession.activeQuizId && !isSelectingQuizType ? (
-              <div className="mt-3 border-t border-stone-100 pt-3">
+                </div>
+              ) : (
+                <UiActionsRenderer
+                  actions={activeSession.uiActions ?? []}
+                  disabled={isActionPending}
+                  onEvent={(event) => void handleEvent(event)}
+                  onOpenDiagnosis={(diagnosisId) =>
+                    navigate(diagnosisPath(activeSession.id, diagnosisId))
+                  }
+                />
+              )}
+
+              {activeSession.activeQuizId && !isSelectingQuizType ? (
                 <ButtonLink
                   size="sm"
                   to={quizDetailPath(activeSession.activeQuizId)}
@@ -363,47 +385,17 @@ export function SessionDetailPage() {
                 >
                   진행 중인 퀴즈 풀기
                 </ButtonLink>
-              </div>
-            ) : null}
-            {quizHistory.length > 0 ? (
-              <div className="mt-3 border-t border-stone-100 pt-3">
-                <h3 className="text-xs font-bold text-stone-500">퀴즈 기록</h3>
-                <ul className="mt-2 space-y-1.5">
-                  {quizHistory.map((quiz) => (
-                    <li key={quiz.quizId}>
-                      <Link
-                        className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
-                        to={quizDetailPath(quiz.quizId)}
-                      >
-                        <span className="min-w-0 flex-1 truncate font-medium text-stone-800">
-                          {quiz.title}
-                        </span>
-                        <Badge tone="neutral">
-                          {quizKindLabel(quiz.quizType)}
-                        </Badge>
-                        {quiz.score !== undefined ? (
-                          <Badge tone={quiz.score >= 60 ? 'success' : 'warning'}>
-                            {quiz.score}점
-                          </Badge>
-                        ) : null}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            ) : null}
-            {isActionPending ? (
-              <p className="mt-2 text-xs font-medium text-stone-500" role="status">
-                요청을 처리하는 중입니다.
-              </p>
-            ) : null}
-            {error ? (
-              <p className="mt-2 text-xs font-medium text-rose-700" role="alert">
-                {error}
-              </p>
-            ) : null}
-          </aside>
-        </div>
+              ) : null}
+
+              {error ? (
+                <p className="text-xs font-medium text-rose-700" role="alert">
+                  {error}
+                </p>
+              ) : null}
+            </div>
+          }
+          sessionId={activeSession.id}
+        />
       </section>
     </div>
   )
