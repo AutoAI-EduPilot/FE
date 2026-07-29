@@ -33,8 +33,8 @@ describe('SettingsPage', () => {
   it('shows the profile and logs out via the server', async () => {
     renderSettings()
 
-    expect(screen.getByText('learner')).toBeInTheDocument()
-    expect(screen.getByText('learner@example.com')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('learner')).toBeInTheDocument()
+    expect(screen.getByDisplayValue('learner@example.com')).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /로그아웃/ }))
     expect(await screen.findByText('로그인 화면')).toBeInTheDocument()
@@ -43,6 +43,7 @@ describe('SettingsPage', () => {
   it('withdraws the account after password confirmation', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     renderSettings()
+    fireEvent.click(screen.getByRole('button', { name: '계정 · 보안' }))
 
     fireEvent.change(screen.getByLabelText('비밀번호 확인'), {
       target: { value: 'password-123' },
@@ -56,6 +57,7 @@ describe('SettingsPage', () => {
   it('shows a field error for a wrong password', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     renderSettings()
+    fireEvent.click(screen.getByRole('button', { name: '계정 · 보안' }))
 
     fireEvent.change(screen.getByLabelText('비밀번호 확인'), {
       target: { value: 'wrong-password-1' },

@@ -1,4 +1,4 @@
-import { ArrowUp, FileText, RotateCcw } from 'lucide-react'
+import { ArrowUp, FileText, NotebookPen, RotateCcw, Trash2 } from 'lucide-react'
 import {
   useEffect,
   useRef,
@@ -22,6 +22,12 @@ interface ChatPanelProps {
   sessionId: string
 }
 
+interface LocalNote {
+  content: string
+  id: string
+  pageNumber?: number
+}
+
 const QUICK_PROMPTS = ['쉽게 설명해줘', '핵심만 요약해줘', '예시를 들어줘']
 
 function createRequestId(): string {
@@ -38,6 +44,10 @@ export function ChatPanel({
 }: ChatPanelProps) {
   const [question, setQuestion] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [tab, setTab] = useState<'chat' | 'notes'>('chat')
+  // TODO(BE): 노트 API가 없어 화면 메모리에만 저장된다. docs/be-api-requests.md §1-1
+  const [notes, setNotes] = useState<LocalNote[]>([])
+  const [hiddenMessageCount, setHiddenMessageCount] = useState(0)
   const logEndRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -80,17 +90,46 @@ export function ChatPanel({
     void sendQuestion(question)
   }
 
-  const hasAssistantReply = chat.messages.some(
+  const visibleMessages = chat.messages.slice(hiddenMessageCount)
+  const hasAssistantReply = visibleMessages.some(
     (message) => message.role === 'assistant',
   )
 
   return (
     <section className="flex min-h-[620px] min-w-0 flex-col overflow-hidden rounded-xl border border-stone-200 bg-white">
-      <div className="flex h-13 shrink-0 items-center justify-between gap-3 border-b border-stone-200 px-4">
-        <h2 className="text-sm font-bold text-stone-950">AI 채팅</h2>
-        <span className="truncate text-xs text-stone-400">세션 {sessionId}</span>
+      <div className="flex h-13 shrink-0 items-center gap-1 border-b border-stone-200 px-3">
+        <PanelTab
+          isActive={tab === 'chat'}
+          label="AI 채팅"
+          onSelect={() => setTab('chat')}
+        />
+        <PanelTab
+          count={notes.length}
+          isActive={tab === 'notes'}
+          label="내 노트"
+          onSelect={() => setTab('notes')}
+        />
+        <span className="sr-only">세션 {sessionId}</span>
+        <button
+          className="ml-auto flex items-center gap-1.5 rounded-lg px-2 py-1 text-[12.5px] text-stone-400 hover:bg-stone-50 hover:text-stone-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+          onClick={() => setHiddenMessageCount(chat.messages.length)}
+          title="화면의 대화를 접습니다. 서버 이력은 유지됩니다."
+          type="button"
+        >
+          <RotateCcw aria-hidden="true" size={13} />
+          대화 새로 시작
+        </button>
       </div>
 
+      {tab === 'notes' ? (
+        <NotesPanel
+          notes={notes}
+          onRemove={(id) =>
+            setNotes((current) => current.filter((note) => note.id !== id))
+          }
+        />
+      ) : (
+        <>
       <div
         aria-live="polite"
         className="grid min-h-0 flex-1 content-start gap-3.5 overflow-y-auto px-4 py-4"
@@ -125,8 +164,24 @@ export function ChatPanel({
           </div>
         ) : null}
 
-        {chat.messages.map((message) => (
-          <MessageBubble key={message.id} message={message} />
+        {visibleMessages.map((message) => (
+          <MessageBubble
+            key={message.id}
+            message={message}
+            onSaveNote={
+              message.role === 'assistant'
+                ? () =>
+                    setNotes((current) => [
+                      ...current,
+                      {
+                        content: message.content,
+                        id: `note-${message.id}`,
+                        pageNumber: message.pageNumber,
+                      },
+                    ])
+                : undefined
+            }
+          />
         ))}
 
         {chat.isTurnPending ? (
@@ -207,11 +262,109 @@ export function ChatPanel({
           </p>
         ) : null}
       </form>
+        </>
+      )}
     </section>
   )
 }
 
-function MessageBubble({ message }: { message: ChatMessage }) {
+function PanelTab({
+  count,
+  isActive,
+  label,
+  onSelect,
+}: {
+  count?: number
+  isActive: boolean
+  label: string
+  onSelect: () => void
+}) {
+  return (
+    <button
+      aria-selected={isActive}
+      className={cx(
+        'flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-[13.5px]',
+        'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
+        isActive
+          ? 'bg-brand-50 font-semibold text-brand-700'
+          : 'font-medium text-stone-400 hover:text-stone-600',
+      )}
+      onClick={onSelect}
+      role="tab"
+      type="button"
+    >
+      {label}
+      {count ? (
+        <span className="rounded-full bg-stone-100 px-1.5 text-[11px] font-semibold text-stone-500">
+          {count}
+        </span>
+      ) : null}
+    </button>
+  )
+}
+
+function NotesPanel({
+  notes,
+  onRemove,
+}: {
+  notes: LocalNote[]
+  onRemove: (id: string) => void
+}) {
+  if (notes.length === 0) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
+        <NotebookPen aria-hidden="true" className="text-stone-300" size={26} />
+        <p className="text-sm font-semibold text-stone-500">
+          저장한 노트가 없습니다.
+        </p>
+        <p className="text-xs text-stone-400">
+          AI 답변의 &lsquo;노트에 저장&rsquo;을 눌러 정리해 보세요.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="grid min-h-0 flex-1 content-start gap-2.5 overflow-y-auto px-4 py-4">
+      <p className="text-[11.5px] text-stone-400">
+        노트는 아직 서버에 저장되지 않습니다(연동 대기).
+      </p>
+      {notes.map((note) => (
+        <article
+          className="rounded-xl border border-stone-200 px-3.5 py-2.5"
+          key={note.id}
+        >
+          <div className="flex items-start gap-2">
+            <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm leading-6 text-stone-800">
+              {note.content}
+            </p>
+            <button
+              aria-label="노트 삭제"
+              className="shrink-0 rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+              onClick={() => onRemove(note.id)}
+              type="button"
+            >
+              <Trash2 aria-hidden="true" size={14} />
+            </button>
+          </div>
+          {note.pageNumber ? (
+            <p className="mt-1.5 text-[11.5px] font-semibold text-brand-700">
+              {note.pageNumber}쪽
+            </p>
+          ) : null}
+        </article>
+      ))}
+    </div>
+  )
+}
+
+function MessageBubble({
+  message,
+  onSaveNote,
+}: {
+  message: ChatMessage
+  onSaveNote?: () => void
+}) {
   const time = message.createdAt ? formatTime(message.createdAt) : ''
 
   if (message.role === 'user') {
@@ -233,12 +386,24 @@ function MessageBubble({ message }: { message: ChatMessage }) {
         <div className="break-words text-sm leading-6 [&_a]:text-brand-600 [&_a]:underline [&_code]:rounded [&_code]:bg-white [&_code]:px-1 [&_code]:py-0.5 [&_code]:text-[13px] [&_h1]:mt-2 [&_h1]:text-base [&_h1]:font-bold [&_h2]:mt-2 [&_h2]:text-sm [&_h2]:font-bold [&_h3]:mt-2 [&_h3]:font-bold [&_li]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p+p]:mt-2 [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-white [&_pre]:p-2 [&_strong]:font-bold [&_ul]:list-disc [&_ul]:pl-5">
           <Markdown>{message.content}</Markdown>
         </div>
-        {message.pageNumber ? (
-          <p className="mt-2 inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2 py-1 text-[11.5px] font-semibold text-brand-700">
-            <FileText aria-hidden="true" size={12} />
-            {message.pageNumber}쪽 참조
-          </p>
-        ) : null}
+        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          {message.pageNumber ? (
+            <p className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2 py-1 text-[11.5px] font-semibold text-brand-700">
+              <FileText aria-hidden="true" size={12} />
+              {message.pageNumber}쪽 참조
+            </p>
+          ) : null}
+          {onSaveNote ? (
+            <button
+              className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2 py-1 text-[11.5px] font-semibold text-stone-500 hover:text-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+              onClick={onSaveNote}
+              type="button"
+            >
+              <NotebookPen aria-hidden="true" size={12} />
+              노트에 저장
+            </button>
+          ) : null}
+        </div>
       </article>
       {time ? <span className="text-[11px] text-stone-400">{time}</span> : null}
     </div>

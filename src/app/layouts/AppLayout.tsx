@@ -1,5 +1,6 @@
 import {
   BookOpenCheck,
+  LayoutGrid,
   ChevronsLeft,
   ChevronsRight,
   FileText,
@@ -16,6 +17,7 @@ import { cx } from '../../shared/lib/cx'
 import { routes } from '../routes'
 
 const primaryNavigation: Array<{ icon: LucideIcon; label: string; to: string }> = [
+  { icon: LayoutGrid, label: '강의실', to: routes.classrooms },
   { icon: FileText, label: '자료', to: routes.materials },
   { icon: GraduationCap, label: '세션', to: routes.sessions },
 ]

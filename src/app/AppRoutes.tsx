@@ -3,6 +3,8 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { RequireAuth } from '../features/auth'
 import { AppLayout } from './layouts/AppLayout'
 import { AuthLayout } from './layouts/AuthLayout'
+import { ClassroomDetailPage } from './pages/ClassroomDetailPage'
+import { ClassroomsPage } from './pages/ClassroomsPage'
 import { DiagnosisPage } from './pages/DiagnosisPage'
 import { LoginPage } from './pages/LoginPage'
 import { MaterialDetailPage } from './pages/MaterialDetailPage'
@@ -27,6 +29,11 @@ export function AppRoutes() {
 
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
+          <Route path={routes.classrooms} element={<ClassroomsPage />} />
+          <Route
+            path={routes.classroomDetail}
+            element={<ClassroomDetailPage />}
+          />
           <Route path={routes.materials} element={<MaterialsPage />} />
           <Route path={routes.materialDetail} element={<MaterialDetailPage />} />
           <Route path={routes.sessions} element={<SessionsPage />} />

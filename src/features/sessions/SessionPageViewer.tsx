@@ -1,4 +1,16 @@
-import { ChevronLeft, ChevronRight, FileWarning } from 'lucide-react'
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  FileWarning,
+  Highlighter,
+  List,
+  Minus,
+  Plus,
+} from 'lucide-react'
+import { useState } from 'react'
+
+import type { LucideIcon } from 'lucide-react'
 
 import { cx } from '../../shared/lib/cx'
 
@@ -17,6 +29,7 @@ export function SessionPageViewer({
   onMovePage,
   totalPages,
 }: SessionPageViewerProps) {
+  const [zoom, setZoom] = useState(100)
   const progress = totalPages > 0 ? (currentPage / totalPages) * 100 : 0
 
   return (
@@ -37,6 +50,29 @@ export function SessionPageViewer({
             className="h-full rounded-full bg-brand-600 transition-[width]"
             style={{ width: `${progress}%` }}
           />
+        </div>
+
+        <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          <div className="flex h-8 items-center gap-1 rounded-lg border border-stone-200 px-1.5">
+            <ToolbarIconButton
+              icon={Minus}
+              label="축소"
+              onClick={() => setZoom((value) => Math.max(50, value - 10))}
+            />
+            <span className="min-w-10 text-center text-[12.5px] font-medium text-stone-600">
+              {zoom}%
+            </span>
+            <ToolbarIconButton
+              icon={Plus}
+              label="확대"
+              onClick={() => setZoom((value) => Math.min(200, value + 10))}
+            />
+          </div>
+          {/* TODO(BE): 목차·형광펜·다운로드는 PDF 파일/하이라이트 API 대기.
+              docs/be-api-requests.md §0-2, §1-2 */}
+          <ToolbarButton icon={List} label="목차" />
+          <ToolbarButton icon={Highlighter} label="형광펜" />
+          <ToolbarButton icon={Download} label="원본 내려받기" />
         </div>
       </div>
 
@@ -69,7 +105,10 @@ export function SessionPageViewer({
         </nav>
 
         <div className="relative flex min-h-0 items-center justify-center bg-stone-100 p-6">
-          <div className="flex aspect-[64/74] max-h-full min-h-0 w-full max-w-md flex-col items-center justify-center rounded-sm bg-white px-6 text-center shadow-[0_2px_14px_rgba(0,0,0,0.08)]">
+          <div
+            className="flex aspect-[64/74] max-h-full min-h-0 w-full max-w-md flex-col items-center justify-center rounded-sm bg-white px-6 text-center shadow-[0_2px_14px_rgba(0,0,0,0.08)] transition-transform"
+            style={{ transform: `scale(${zoom / 100})` }}
+          >
             <FileWarning aria-hidden="true" className="text-stone-300" size={26} />
             <p className="mt-3 text-sm font-semibold text-stone-500">
               원본 PDF를 표시할 수 없습니다.
@@ -100,6 +139,43 @@ export function SessionPageViewer({
         </div>
       </div>
     </section>
+  )
+}
+
+function ToolbarIconButton({
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  icon: LucideIcon
+  label: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      aria-label={label}
+      className="flex size-5.5 items-center justify-center rounded text-stone-500 hover:bg-stone-100 hover:text-stone-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600"
+      onClick={onClick}
+      type="button"
+    >
+      <Icon aria-hidden="true" size={13} />
+    </button>
+  )
+}
+
+/** 백엔드 연동 대기 중인 뷰어 도구 — 시안 유지를 위해 노출하되 비활성 상태로 둔다. */
+function ToolbarButton({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
+  return (
+    <button
+      aria-label={`${label} (백엔드 연동 대기)`}
+      className="flex h-8 items-center gap-1.5 rounded-lg border border-stone-200 px-2.5 text-[12.5px] font-medium text-stone-400 disabled:cursor-not-allowed"
+      disabled
+      title="백엔드 연동 대기 중입니다."
+      type="button"
+    >
+      <Icon aria-hidden="true" size={13} />
+      <span className="hidden sm:inline">{label}</span>
+    </button>
   )
 }
 

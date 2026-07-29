@@ -2,6 +2,8 @@ export const routes = {
   root: '/',
   login: '/login',
   signup: '/signup',
+  classrooms: '/classrooms',
+  classroomDetail: '/classrooms/:classroomId',
   materials: '/materials',
   materialDetail: '/materials/:materialId',
   sessions: '/sessions',
@@ -10,6 +12,10 @@ export const routes = {
   quizDetail: '/quizzes/:quizId',
   diagnosis: '/sessions/:sessionId/diagnosis/:diagnosisId',
 } as const
+
+export function classroomDetailPath(classroomId: string): string {
+  return `/classrooms/${classroomId}`
+}
 
 export function materialDetailPath(materialId: string | number): string {
   return `/materials/${materialId}`

@@ -55,7 +55,7 @@ describe('AppRoutes', () => {
       await screen.findByRole('heading', { name: '학습 공간' }),
     ).toBeInTheDocument()
     expect(screen.getByText('시험 대비 요약.pdf 학습 화면입니다.')).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'AI 채팅' })).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'AI 채팅' })).toBeInTheDocument()
   })
 
   it('opens the settings page from the profile menu', async () => {
@@ -69,6 +69,8 @@ describe('AppRoutes', () => {
     expect(
       await screen.findByRole('heading', { name: '설정' }),
     ).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '계정 · 보안' }))
     expect(screen.getByRole('button', { name: /회원 탈퇴/ })).toBeInTheDocument()
   })
 
