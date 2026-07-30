@@ -1,7 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { ApiSuccess } from '../shared/api'
-import type { AuthenticatedRequest } from './auth'
+import type {
+  AuthenticatedRawRequest,
+  AuthenticatedRequest,
+} from './auth'
 import { createMaterialsRepository } from './materials'
 import { createMemoryRepository } from './memory'
 import { createQuizRepository } from './quiz'
@@ -63,6 +66,59 @@ describe('remote feature repositories', () => {
     expect(uploadOptions.method).toBe('POST')
     expect(uploadOptions.body.get('file')).toBe(file)
     expect(uploadOptions.body.get('title')).toBe('새 자료.pdf')
+  })
+
+  it('loads authenticated PDF files as binary data', async () => {
+    const request = vi.fn()
+    const rawRequest = vi.fn().mockResolvedValue(
+      new Response(new Uint8Array([37, 80, 68, 70]), {
+        headers: { 'Content-Type': 'application/pdf' },
+      }),
+    )
+    const repository = createMaterialsRepository(
+      request as AuthenticatedRequest,
+      rawRequest as AuthenticatedRawRequest,
+    )
+
+    await expect(repository.getFile('10')).resolves.toHaveProperty('size', 4)
+    expect(rawRequest).toHaveBeenCalledWith('/api/materials/10/file', {
+      headers: { Accept: 'application/pdf' },
+      signal: undefined,
+    })
+  })
+
+  it('parses session SSE content events', async () => {
+    const encoder = new TextEncoder()
+    const rawRequest = vi.fn().mockResolvedValue(
+      new Response(
+        encoder.encode(
+          'event: status\ndata: {"stage":"GENERATING"}\n\nevent: content_delta\ndata: {"text":"실시간 답변"}\n\nevent: ui_action\ndata: {"action":{"type":"MOVE_NEXT_PAGE","content":"다음 쪽으로 이동"}}\n\nevent: completed\ndata: {}\n\n',
+        ),
+        { headers: { 'Content-Type': 'text/event-stream' } },
+      ),
+    )
+    const repository = createSessionsRepository(
+      vi.fn() as AuthenticatedRequest,
+      rawRequest as AuthenticatedRawRequest,
+    )
+    const handlers = {
+      onCompleted: vi.fn(),
+      onContentDelta: vi.fn(),
+      onStatus: vi.fn(),
+      onUiAction: vi.fn(),
+    }
+
+    await repository.stream('100', handlers)
+
+    expect(handlers.onStatus).toHaveBeenCalledWith('GENERATING')
+    expect(handlers.onContentDelta).toHaveBeenCalledWith('실시간 답변')
+    expect(handlers.onUiAction).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: 'MOVE_NEXT_PAGE',
+        label: '다음 쪽으로 이동',
+      }),
+    )
+    expect(handlers.onCompleted).toHaveBeenCalledOnce()
   })
 
   it('sends session page moves and learning turns using the contract paths', async () => {

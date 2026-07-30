@@ -1,4 +1,4 @@
-import { LogOut, UserX } from 'lucide-react'
+import { UserX } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 
@@ -13,7 +13,7 @@ type SettingsSection = 'account' | 'assistant' | 'notification' | 'profile'
 
 const SECTIONS: Array<{ id: SettingsSection; label: string }> = [
   { id: 'profile', label: '프로필' },
-  { id: 'account', label: '계정 · 보안' },
+  { id: 'account', label: '회원 탈퇴' },
   { id: 'notification', label: '알림' },
   { id: 'assistant', label: 'AI 학습 도우미' },
 ]
@@ -30,7 +30,7 @@ const PENDING_API_NOTICE = '백엔드 연동 대기 중인 항목입니다. 저�
 
 export function SettingsPage() {
   usePageTitle('설정')
-  const { logout, user, withdraw } = useAuth()
+  const { user, withdraw } = useAuth()
   const { show: showToast } = useToast()
   const navigate = useNavigate()
   const [section, setSection] = useState<SettingsSection>('profile')
@@ -42,11 +42,6 @@ export function SettingsPage() {
   const [password, setPassword] = useState('')
   const [passwordError, setPasswordError] = useState<string | undefined>()
   const [isWithdrawing, setIsWithdrawing] = useState(false)
-
-  async function handleLogout() {
-    await logout()
-    navigate(routes.login, { replace: true })
-  }
 
   async function handleWithdraw(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -109,14 +104,6 @@ export function SettingsPage() {
               {item.label}
             </button>
           ))}
-          <button
-            className="mt-1 flex h-9 shrink-0 items-center rounded-lg px-3 text-[13.5px] font-medium text-rose-700 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 lg:mt-2.5"
-            onClick={() => void handleLogout()}
-            type="button"
-          >
-            <LogOut aria-hidden="true" className="mr-2" size={15} />
-            로그아웃
-          </button>
         </nav>
 
         <div className="min-w-0 flex-1 space-y-4 lg:max-w-[720px]">
@@ -154,6 +141,7 @@ export function SettingsPage() {
                 />
                 <div className="flex justify-end">
                   <Button
+                    aria-label="회원 탈퇴 실행"
                     className="border-rose-700 bg-rose-700 hover:bg-rose-800"
                     disabled={isWithdrawing}
                     type="submit"

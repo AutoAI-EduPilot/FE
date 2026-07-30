@@ -10,6 +10,7 @@ import {
   type LoginFormErrors,
   type LoginFormValues,
 } from '../../features/auth'
+import { ServiceStatusIndicator } from '../../features/health'
 import { Button, TextInput } from '../../shared/ui'
 import { routes } from '../routes'
 import { usePageTitle } from '../../shared/lib/usePageTitle'
@@ -82,30 +83,6 @@ export function LoginPage() {
         </p>
       ) : null}
 
-      <button
-        className="mt-6 flex h-11 w-full items-center justify-center gap-2.5 rounded-[10px] border border-stone-200 text-sm font-semibold text-stone-800 hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
-        onClick={() =>
-          setPendingNotice('소셜 로그인은 백엔드 연동 대기 중입니다.')
-        }
-        type="button"
-      >
-        <span
-          aria-hidden="true"
-          className="size-4.5 rounded-full"
-          style={{
-            background:
-              'conic-gradient(#ea4335 0 25%,#4285f4 0 50%,#34a853 0 75%,#fbbc05 0)',
-          }}
-        />
-        Google로 계속하기
-      </button>
-
-      <div className="mt-6 flex items-center gap-3 text-xs text-stone-400">
-        <span className="h-px flex-1 bg-stone-200" />
-        또는 이메일로
-        <span className="h-px flex-1 bg-stone-200" />
-      </div>
-
       <form className="mt-6 space-y-4" noValidate onSubmit={handleSubmit}>
         <TextInput
           autoComplete="email"
@@ -138,12 +115,6 @@ export function LoginPage() {
           {serverError}
         </p>
       ) : null}
-      {pendingNotice ? (
-        <p className="mt-3 text-sm font-medium text-amber-700" role="status">
-          {pendingNotice}
-        </p>
-      ) : null}
-
       <div className="mt-5 flex items-center justify-between text-[13px]">
         <Link
           className="text-stone-500 hover:text-stone-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
@@ -160,11 +131,45 @@ export function LoginPage() {
         </Link>
       </div>
 
+      <div className="mt-6 flex items-center gap-3 text-xs text-stone-400">
+        <span className="h-px flex-1 bg-stone-200" />
+        또는
+        <span className="h-px flex-1 bg-stone-200" />
+      </div>
+
+      <button
+        className="mt-5 flex h-11 w-full items-center justify-center gap-2.5 rounded-[10px] border border-stone-200 text-sm font-semibold text-stone-800 hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+        onClick={() =>
+          setPendingNotice('소셜 로그인은 백엔드 연동 대기 중입니다.')
+        }
+        type="button"
+      >
+        <span
+          aria-hidden="true"
+          className="size-4.5 rounded-full"
+          style={{
+            background:
+              'conic-gradient(#ea4335 0 25%,#4285f4 0 50%,#34a853 0 75%,#fbbc05 0)',
+          }}
+        />
+        Google로 계속하기
+      </button>
+
+      {pendingNotice ? (
+        <p className="mt-3 text-sm font-medium text-amber-700" role="status">
+          {pendingNotice}
+        </p>
+      ) : null}
+
       <p className="mt-6 text-center text-xs leading-relaxed text-stone-400">
         계속하면 EduPilot의 이용약관과
         <br />
         개인정보 처리방침에 동의하는 것으로 간주합니다
       </p>
+
+      <div className="mt-4 flex justify-center border-t border-stone-100 pt-3">
+        <ServiceStatusIndicator />
+      </div>
     </div>
   )
 }

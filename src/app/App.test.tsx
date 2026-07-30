@@ -78,8 +78,10 @@ describe('AppRoutes', () => {
       await screen.findByRole('heading', { name: '설정' }),
     ).toBeInTheDocument()
 
-    fireEvent.click(screen.getByRole('button', { name: '계정 · 보안' }))
-    expect(screen.getByRole('button', { name: /회원 탈퇴/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '회원 탈퇴' }))
+    expect(
+      screen.getByRole('button', { name: '회원 탈퇴 실행' }),
+    ).toBeInTheDocument()
   })
 
   it('shows entrance requests only to instructors', () => {
@@ -92,7 +94,10 @@ describe('AppRoutes', () => {
     expect(
       screen.getByRole('heading', { name: '입장 요청' }),
     ).toBeInTheDocument()
-    expect(screen.getByText('이서연')).toBeInTheDocument()
+    expect(
+      screen.getByText('표시할 입장 요청이 없습니다.'),
+    ).toBeInTheDocument()
+    expect(screen.queryByText('이서연')).not.toBeInTheDocument()
   })
 
   it('blocks learners from entrance request management', () => {

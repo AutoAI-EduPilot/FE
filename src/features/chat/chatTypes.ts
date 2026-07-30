@@ -1,5 +1,5 @@
 export type ChatMessageRole = 'assistant' | 'user'
-export type ChatMessageStatus = 'sent'
+export type ChatMessageStatus = 'sent' | 'streaming'
 
 export interface ChatMessage {
   content: string

@@ -1,4 +1,3 @@
-export { SessionPageViewer } from './SessionPageViewer'
 export { SessionResourcePanel } from './SessionResourcePanel'
 export { movePage } from './pageActions'
 export { UiActionsRenderer } from './UiActionsRenderer'
@@ -16,6 +15,7 @@ export type {
 } from './sessionTypes'
 export {
   createSessionsRepository,
+  type SessionStreamHandlers,
   type SessionsRepository,
   type SessionTurnRequest,
 } from './sessionsRepository'

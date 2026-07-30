@@ -17,10 +17,6 @@ export const routes = {
   entranceRequests: '/entrance-requests',
 } as const
 
-export function classroomDetailPath(classroomId: string): string {
-  return `/classrooms/${classroomId}`
-}
-
 export function materialDetailPath(materialId: string | number): string {
   return `/materials/${materialId}`
 }

@@ -1,5 +1,8 @@
 import { ApiClientError, type PagedResponse } from '../../shared/api'
-import type { AuthenticatedRequest } from '../auth'
+import type {
+  AuthenticatedRawRequest,
+  AuthenticatedRequest,
+} from '../auth'
 import type {
   MaterialPageText,
   MaterialStatus,
@@ -28,6 +31,10 @@ export interface MaterialsRepository {
     materialId: string,
     signal?: AbortSignal,
   ) => Promise<StudyMaterial | null>
+  getFile: (
+    materialId: string,
+    signal?: AbortSignal,
+  ) => Promise<Blob>
   getPageText: (
     materialId: string,
     pageNumber: number,
@@ -40,6 +47,7 @@ export interface MaterialsRepository {
 
 export function createMaterialsRepository(
   request: AuthenticatedRequest,
+  rawRequest?: AuthenticatedRawRequest,
 ): MaterialsRepository {
   return {
     async delete(materialId, signal) {
@@ -61,6 +69,30 @@ export function createMaterialsRepository(
         }
         throw error
       }
+    },
+    async getFile(materialId, signal) {
+      if (!rawRequest) {
+        throw new ApiClientError({
+          code: 'PDF_UNAVAILABLE',
+          message: 'PDF 원본 요청을 사용할 수 없습니다.',
+        })
+      }
+      const response = await rawRequest(
+        `/api/materials/${encodeURIComponent(materialId)}/file`,
+        {
+          headers: { Accept: 'application/pdf' },
+          signal,
+        },
+      )
+      const contentType = response.headers.get('Content-Type') ?? ''
+      if (!contentType.toLowerCase().includes('application/pdf')) {
+        throw new ApiClientError({
+          code: 'INVALID_PDF_RESPONSE',
+          message: '서버가 PDF 파일을 반환하지 않았습니다.',
+          status: response.status,
+        })
+      }
+      return response.blob()
     },
     async getPageText(materialId, pageNumber, signal) {
       const { data } = await request<MaterialPageDto>(

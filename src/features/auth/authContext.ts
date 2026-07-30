@@ -1,6 +1,10 @@
 import { createContext } from 'react'
 
-import type { ApiRequestOptions, ApiSuccess } from '../../shared/api'
+import type {
+  ApiRequestOptions,
+  ApiSuccess,
+  RawApiRequestOptions,
+} from '../../shared/api'
 import type { LoginFormValues, SignupFormValues } from './authValidation'
 
 export interface AuthUser {
@@ -17,8 +21,14 @@ export type AuthenticatedRequest = <T>(
   options?: ApiRequestOptions,
 ) => Promise<ApiSuccess<T>>
 
+export type AuthenticatedRawRequest = (
+  path: string,
+  options?: RawApiRequestOptions,
+) => Promise<Response>
+
 export interface AuthContextValue {
   apiRequest: AuthenticatedRequest
+  rawApiRequest: AuthenticatedRawRequest
   isAuthenticated: boolean
   isInitializing: boolean
   login: (values: LoginFormValues) => Promise<void>

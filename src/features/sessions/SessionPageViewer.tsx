@@ -6,38 +6,66 @@ import {
   List,
   Minus,
   Plus,
-  Sparkles,
   type LucideIcon,
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Document, Page, pdfjs } from 'react-pdf'
+import 'react-pdf/dist/Page/AnnotationLayer.css'
+import 'react-pdf/dist/Page/TextLayer.css'
 
 import { cx } from '../../shared/lib/cx'
 
+pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+  'pdfjs-dist/build/pdf.worker.min.mjs',
+  import.meta.url,
+).toString()
+
 interface SessionPageViewerProps {
   currentPage: number
+  file?: Blob | null
+  fileError?: string | null
   isPending?: boolean
   materialTitle?: string
-  onAskAboutSelection?: (text: string) => void
   onMovePage: (page: number) => void
-  onSaveSelectionNote?: (text: string) => void
   totalPages: number
 }
 
-/** 시안의 "드래그한 문장" 자리 — 실제 PDF 텍스트 레이어가 붙기 전까지의 대체 문장. */
-const SELECTABLE_SENTENCE = '드래그한 문장'
-
 export function SessionPageViewer({
   currentPage,
+  file,
+  fileError,
   isPending = false,
   materialTitle,
-  onAskAboutSelection,
   onMovePage,
-  onSaveSelectionNote,
   totalPages,
 }: SessionPageViewerProps) {
   const [zoom, setZoom] = useState(100)
-  const [isSelectionOpen, setIsSelectionOpen] = useState(false)
+  const [pageWidth, setPageWidth] = useState(560)
+  const pageContainerRef = useRef<HTMLDivElement | null>(null)
   const progress = totalPages > 0 ? (currentPage / totalPages) * 100 : 0
+
+  useEffect(() => {
+    const container = pageContainerRef.current
+    if (!container || typeof ResizeObserver === 'undefined') return
+
+    const updatePageWidth = () => {
+      setPageWidth(Math.max(240, Math.min(720, container.clientWidth - 48)))
+    }
+    updatePageWidth()
+    const observer = new ResizeObserver(updatePageWidth)
+    observer.observe(container)
+    return () => observer.disconnect()
+  }, [])
+
+  function downloadOriginal() {
+    if (!file) return
+    const objectUrl = URL.createObjectURL(file)
+    const anchor = document.createElement('a')
+    anchor.href = objectUrl
+    anchor.download = getDownloadFileName(materialTitle)
+    anchor.click()
+    URL.revokeObjectURL(objectUrl)
+  }
 
   return (
     <section className="flex min-h-[620px] min-w-0 flex-col overflow-hidden rounded-xl border border-stone-200 bg-white">
@@ -75,11 +103,14 @@ export function SessionPageViewer({
               onClick={() => setZoom((value) => Math.min(200, value + 10))}
             />
           </div>
-          {/* TODO(BE): 목차·형광펜·다운로드는 PDF 파일/하이라이트 API 대기.
-              docs/be-api-requests.md §0-2, §1-2 */}
-          <ToolbarButton icon={List} label="목차" />
-          <ToolbarButton icon={Highlighter} label="형광펜" />
-          <ToolbarButton icon={Download} label="원본 내려받기" />
+          <ToolbarButton disabled icon={List} label="목차" />
+          <ToolbarButton disabled icon={Highlighter} label="형광펜" />
+          <ToolbarButton
+            disabled={!file}
+            icon={Download}
+            label="원본 내려받기"
+            onClick={downloadOriginal}
+          />
         </div>
       </div>
 
@@ -111,69 +142,32 @@ export function SessionPageViewer({
           )}
         </nav>
 
-        <div className="relative flex min-h-0 items-center justify-center bg-stone-100 p-6">
-          <div
-            className="relative flex aspect-[64/74] max-h-full min-h-0 w-full max-w-md items-center justify-center overflow-hidden rounded-sm bg-white shadow-[0_2px_14px_rgba(0,0,0,0.08)] transition-transform"
-            style={{ transform: `scale(${zoom / 100})` }}
-          >
-            <PageCanvas currentPage={currentPage} />
-
-            {/* 시안의 "드래그한 문장" — 실제 PDF 텍스트 레이어가 붙기 전까지의 선택 대상 */}
-            <button
-              aria-pressed={isSelectionOpen}
-              className={cx(
-                'absolute top-[43%] left-1/2 w-[62%] -translate-x-1/2 rounded-sm px-2 py-1 font-mono text-[11px] text-brand-700',
-                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
-                isSelectionOpen
-                  ? 'bg-brand-100 ring-1 ring-brand-600'
-                  : 'bg-brand-100/80 hover:bg-brand-100',
-              )}
-              onClick={() => setIsSelectionOpen((open) => !open)}
-              type="button"
+        <div
+          className="relative flex min-h-0 items-start justify-center overflow-auto bg-stone-100 p-6 pb-16"
+          ref={pageContainerRef}
+        >
+          {file === undefined ? (
+            <ViewerState message="PDF 원본을 불러오는 중입니다." />
+          ) : file === null ? (
+            <ViewerState
+              isError
+              message={fileError ?? 'PDF 원본을 표시할 수 없습니다.'}
+            />
+          ) : (
+            <Document
+              error={<ViewerState isError message="PDF 문서를 열지 못했습니다." />}
+              file={file}
+              loading={<ViewerState message="PDF 문서를 준비하는 중입니다." />}
             >
-              {SELECTABLE_SENTENCE}
-            </button>
-
-            {isSelectionOpen ? (
-              <div className="absolute top-[33%] left-1/2 z-10 flex h-8.5 -translate-x-1/2 items-center gap-2.5 rounded-[9px] bg-stone-900 px-3 text-[12.5px] whitespace-nowrap text-white shadow-[0_4px_14px_rgba(0,0,0,0.2)]">
-                <button
-                  className="flex items-center gap-1.5 rounded hover:text-brand-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-400"
-                  onClick={() => {
-                    setIsSelectionOpen(false)
-                    onAskAboutSelection?.(SELECTABLE_SENTENCE)
-                  }}
-                  type="button"
-                >
-                  <Sparkles aria-hidden="true" size={12} />
-                  AI에게 질문
-                </button>
-                <span aria-hidden="true" className="text-stone-500">
-                  |
-                </span>
-                <button
-                  className="cursor-not-allowed text-stone-400"
-                  disabled
-                  title="백엔드 연동 대기 중입니다."
-                  type="button"
-                >
-                  형광펜
-                </button>
-                <span aria-hidden="true" className="text-stone-500">
-                  |
-                </span>
-                <button
-                  className="rounded hover:text-brand-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-400"
-                  onClick={() => {
-                    setIsSelectionOpen(false)
-                    onSaveSelectionNote?.(SELECTABLE_SENTENCE)
-                  }}
-                  type="button"
-                >
-                  노트에 저장
-                </button>
-              </div>
-            ) : null}
-          </div>
+              <Page
+                className="overflow-hidden rounded-sm bg-white shadow-[0_2px_14px_rgba(0,0,0,0.08)]"
+                pageNumber={currentPage}
+                renderAnnotationLayer
+                renderTextLayer
+                width={pageWidth * (zoom / 100)}
+              />
+            </Document>
+          )}
 
           <div className="absolute bottom-4 left-1/2 flex h-9 -translate-x-1/2 items-center gap-2.5 rounded-[10px] border border-stone-200 bg-white px-2.5 shadow-[0_4px_14px_rgba(0,0,0,0.08)]">
             <PageStepButton
@@ -196,49 +190,25 @@ export function SessionPageViewer({
   )
 }
 
-/** 시안의 페이지 캔버스(사선 패턴 + 선택 문장). 실제 PDF가 오면 이 자리를 교체한다. */
-function PageCanvas({ currentPage }: { currentPage: number }) {
+function ViewerState({
+  isError = false,
+  message,
+}: {
+  isError?: boolean
+  message: string
+}) {
   return (
-    <svg
-      className="size-full"
-      preserveAspectRatio="xMidYMid slice"
-      viewBox="0 0 640 740"
+    <div
+      className={cx(
+        'flex min-h-80 w-full max-w-md items-center justify-center rounded-sm border bg-white px-6 text-center text-sm shadow-sm',
+        isError
+          ? 'border-rose-200 text-rose-700'
+          : 'border-stone-200 text-stone-500',
+      )}
+      role={isError ? 'alert' : 'status'}
     >
-      <defs>
-        <pattern
-          height="10"
-          id="page-hatch"
-          patternTransform="rotate(45)"
-          patternUnits="userSpaceOnUse"
-          width="10"
-        >
-          <rect fill="#ffffff" height="10" width="10" />
-          <rect fill="#f2f1ec" height="10" width="5" />
-        </pattern>
-      </defs>
-      <rect fill="url(#page-hatch)" height="740" width="640" />
-
-      <text
-        fill="#9b9a95"
-        fontFamily="monospace"
-        fontSize="14"
-        textAnchor="middle"
-        x="320"
-        y="386"
-      >
-        pdf page {currentPage}
-      </text>
-      <text
-        fill="#c0bfba"
-        fontFamily="monospace"
-        fontSize="12"
-        textAnchor="middle"
-        x="320"
-        y="407"
-      >
-        강의 자료가 여기에 렌더링됩니다
-      </text>
-    </svg>
+      {message}
+    </div>
   )
 }
 
@@ -263,20 +233,34 @@ function ToolbarIconButton({
   )
 }
 
-/** 백엔드 연동 대기 중인 뷰어 도구 — 시안 유지를 위해 노출하되 비활성 상태로 둔다. */
-function ToolbarButton({ icon: Icon, label }: { icon: LucideIcon; label: string }) {
+function ToolbarButton({
+  disabled = false,
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  disabled?: boolean
+  icon: LucideIcon
+  label: string
+  onClick?: () => void
+}) {
   return (
     <button
-      aria-label={`${label} (백엔드 연동 대기)`}
-      className="flex h-8 items-center gap-1.5 rounded-lg border border-stone-200 px-2.5 text-[12.5px] font-medium text-stone-400 disabled:cursor-not-allowed"
-      disabled
-      title="백엔드 연동 대기 중입니다."
+      aria-label={disabled ? `${label} (사용 불가)` : label}
+      className="flex h-8 items-center gap-1.5 rounded-lg border border-stone-200 px-2.5 text-[12.5px] font-medium text-stone-600 hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-400 disabled:hover:bg-transparent"
+      disabled={disabled}
+      onClick={onClick}
       type="button"
     >
       <Icon aria-hidden="true" size={13} />
       <span className="hidden sm:inline">{label}</span>
     </button>
   )
+}
+
+function getDownloadFileName(materialTitle: string | undefined): string {
+  const title = materialTitle?.trim() || 'material.pdf'
+  return title.toLowerCase().endsWith('.pdf') ? title : `${title}.pdf`
 }
 
 function PageStepButton({

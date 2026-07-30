@@ -44,7 +44,11 @@ describe('SessionDetailPage', () => {
     renderSessionDetail()
 
     expect(
-      await screen.findByRole('progressbar', { name: '학습 진행률 1 / 5쪽' }),
+      await screen.findByRole(
+        'progressbar',
+        { name: '학습 진행률 1 / 5쪽' },
+        { timeout: 3_000 },
+      ),
     ).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '다음' }))
     await waitFor(() =>

@@ -7,7 +7,11 @@ import {
   type PropsWithChildren,
 } from 'react'
 
-import { apiRequest as requestApi, ApiClientError } from '../../shared/api'
+import {
+  apiRequest as requestApi,
+  ApiClientError,
+  rawApiRequest as requestRawApi,
+} from '../../shared/api'
 import {
   AuthContext,
   type AuthContextValue,
@@ -222,6 +226,42 @@ export function AuthProvider({
     [clearSession, hasExplicitInitialUser, renewAccessToken],
   )
 
+  const authenticatedRawRequest = useCallback<
+    AuthContextValue['rawApiRequest']
+  >(
+    async (path, options = {}) => {
+      const accessToken = sessionRef.current?.accessToken
+
+      if (!accessToken) {
+        clearSession('session-expired')
+        throw new ApiClientError({
+          code: 'AUTH_REQUIRED',
+          message: '로그인이 필요합니다.',
+          status: 401,
+        })
+      }
+
+      try {
+        return await requestRawApi(path, { ...options, accessToken })
+      } catch (error) {
+        if (error instanceof ApiClientError && error.status === 401) {
+          if (!hasExplicitInitialUser) {
+            const renewedToken = await renewAccessToken()
+            if (renewedToken) {
+              return await requestRawApi(path, {
+                ...options,
+                accessToken: renewedToken,
+              })
+            }
+          }
+          clearSession('session-expired')
+        }
+        throw error
+      }
+    },
+    [clearSession, hasExplicitInitialUser, renewAccessToken],
+  )
+
   const withdraw = useCallback(
     async (password: string) => {
       await authenticatedRequest('/api/users/me', {
@@ -236,6 +276,7 @@ export function AuthProvider({
   const value = useMemo<AuthContextValue>(
     () => ({
       apiRequest: authenticatedRequest,
+      rawApiRequest: authenticatedRawRequest,
       isAuthenticated: session !== null,
       isInitializing,
       login,
@@ -247,6 +288,7 @@ export function AuthProvider({
     }),
     [
       authenticatedRequest,
+      authenticatedRawRequest,
       isInitializing,
       login,
       logout,

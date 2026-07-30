@@ -24,11 +24,9 @@ import { getRoleLabel, isInstructorRole, useAuth } from '../../features/auth'
 import { cx } from '../../shared/lib/cx'
 import { useTheme, type ThemeMode } from '../../shared/theme'
 import { useToast } from '../../shared/ui'
-import { placeholderClassrooms } from '../../features/classrooms'
-import { classroomDetailPath, routes } from '../routes'
+import { routes } from '../routes'
 
 const primaryNavigation: Array<{
-  badgeCount?: number
   icon: LucideIcon
   instructorOnly?: boolean
   label: string
@@ -40,7 +38,6 @@ const primaryNavigation: Array<{
   { icon: CalendarDays, label: '캘린더', to: routes.calendar },
   { icon: NotebookPen, label: '내 노트', to: routes.notes },
   {
-    badgeCount: 3,
     icon: UsersRound,
     instructorOnly: true,
     label: '입장 요청',
@@ -48,14 +45,6 @@ const primaryNavigation: Array<{
   },
   { icon: Settings, label: '설정', to: routes.settings },
 ]
-
-const CLASSROOM_DOT_CLASSES: Record<string, string> = {
-  amber: 'bg-amber-500',
-  emerald: 'bg-emerald-600',
-  indigo: 'bg-brand-600',
-  neutral: 'bg-stone-400',
-  violet: 'bg-violet-500',
-}
 
 export function AppLayout() {
   const { logout, user } = useAuth()
@@ -245,50 +234,9 @@ export function AppLayout() {
               >
                 <item.icon aria-hidden="true" className="shrink-0" size={16} />
                 <span className={cx(isCollapsed && 'lg:sr-only')}>{item.label}</span>
-                {item.badgeCount && !isCollapsed ? (
-                  <span className="ml-auto rounded-full bg-brand-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
-                    {item.badgeCount}
-                  </span>
-                ) : null}
               </NavLink>
             ))}
           </nav>
-
-          {/* 시안 4c 사이드바의 "참여 중인 강의실" — placeholder 데이터 기준 */}
-          <div className={cx('hidden lg:block', isCollapsed && 'lg:hidden')}>
-            <p className="px-3 pt-5 pb-1.5 text-[11.5px] font-semibold tracking-[0.04em] text-stone-400">
-              참여 중인 강의실
-            </p>
-            <ul className="grid gap-0.5">
-              {placeholderClassrooms
-                .filter((classroom) => classroom.status === 'ACTIVE')
-                .map((classroom) => (
-                  <li key={classroom.classroomId}>
-                    <NavLink
-                      className={({ isActive }) =>
-                        cx(
-                          'flex h-8 items-center gap-2 rounded-lg px-3 text-[13px]',
-                          'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
-                          isActive
-                            ? 'bg-white font-semibold text-stone-900 shadow-sm dark:bg-stone-200'
-                            : 'font-medium text-stone-500 hover:bg-white/60 hover:text-stone-800',
-                        )
-                      }
-                      to={classroomDetailPath(classroom.classroomId)}
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={cx(
-                          'size-2 shrink-0 rounded-sm',
-                          CLASSROOM_DOT_CLASSES[classroom.accent],
-                        )}
-                      />
-                      <span className="truncate">{classroom.name}</span>
-                    </NavLink>
-                  </li>
-                ))}
-            </ul>
-          </div>
         </div>
 
         <div className="relative ml-2 shrink-0 lg:hidden" ref={mobileMenuContainerRef}>

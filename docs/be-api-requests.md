@@ -4,34 +4,11 @@
 | --- | --- |
 | 작성 | FE (이감) |
 | 기준 | 디자인 정본 `강의실 레이아웃 시안.dc.html` (4a~4e) |
-| 상태 | 요청 초안 — 우선순위·형태 협의 필요 |
+| 상태 | Swagger 26개 연결 완료 — 아래는 추가 계약 협의 필요 |
 
 FE는 시안 전체를 UI로 구현했습니다. 아래 항목은 **화면은 있으나 API가 없어 placeholder(로컬 상태·고정 데이터)로 동작**하는 부분입니다. 각 항목의 "현재 FE 동작"을 보면 어디까지 임시인지 알 수 있습니다.
 
-기존 계약(`docs/api-spec.md`)에 이미 있는 22개 외부 API는 FE 연동이 끝났으므로 여기 포함하지 않았습니다.
-
----
-
-## P0 — 이미 합의됐지만 미배포/미확정
-
-### 0-1. SSE 스트림 (BE#26)
-
-```
-GET /api/sessions/{sessionId}/stream
-```
-
-계약(`api-spec.md` §9)은 확정. 엔드포인트 미배포 상태입니다. FE는 `useSessionChat.appendMessages`를 연결 지점으로 준비해 두었고 현재는 동기 턴 응답으로 동작합니다. **ai-service 배포와 함께 우선 처리 요청.**
-
-### 0-2. PDF 원본 다운로드 (DEC-005 초안 → 확정 요청)
-
-```
-GET /api/materials/{materialId}/file
-→ application/pdf (인증 필요, Range 지원 권장)
-```
-
-- **현재 FE 동작**: 뷰어 자리에 "원본 PDF를 표시할 수 없습니다" placeholder 카드. 페이지 이동·썸네일·줌 UI는 모두 구현돼 있고 **파일만 오면 즉시 렌더**됩니다(react-pdf 도입 예정).
-- 요청: 배포 여부 확인 + 응답 형식(직접 스트리밍 / presigned URL) 확정.
-- Range 요청을 지원하면 대용량 자료의 페이지 단위 로딩이 가능합니다.
+배포 Swagger에 공개된 26개 API는 FE 연동이 끝났으므로 여기 포함하지 않았습니다.
 
 ---
 
@@ -214,4 +191,3 @@ POST /api/auth/password-reset/confirm    { token, newPassword }
 3. **PPT 지원 여부** (파일 타입 배지·업로드 검증에 영향).
 4. **`lastReadPage`·`progressRate`** — 강의실과 무관하게 먼저 추가 가능한지.
 5. **대화 새로 시작**을 전용 API로 둘지, 턴 payload 플래그로 둘지.
-6. `GET /api/materials/{id}/file` **배포 상태** (프로브로는 401만 확인돼 존재 여부 판별 불가).

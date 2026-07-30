@@ -35,6 +35,23 @@ function renderLogin(path = '/login') {
 }
 
 describe('LoginPage', () => {
+  it('places Google login after local login and shows service health', async () => {
+    renderLogin()
+
+    const localLogin = screen.getByRole('button', { name: '로그인' })
+    const googleLogin = screen.getByRole('button', {
+      name: 'Google로 계속하기',
+    })
+
+    expect(
+      localLogin.compareDocumentPosition(googleLogin) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+    expect(
+      await screen.findByRole('button', { name: '서비스 상태: 정상' }),
+    ).toBeInTheDocument()
+  })
+
   it('validates empty fields before calling the API', () => {
     renderLogin()
 

@@ -21,6 +21,56 @@ export async function handleApiFixtureRequest(
   const url = new URL(request.url)
   const path = `${url.pathname}${url.search}`
 
+  if (request.method === 'GET' && path === '/api/health') {
+    return apiSuccess({ status: 'UP' })
+  }
+
+  if (request.method === 'GET' && path === '/api/health/ready') {
+    return jsonResponse(
+      {
+        checks: { aiService: 'UP', db: 'UP' },
+        status: 'UP',
+      },
+      200,
+    )
+  }
+
+  if (
+    request.method === 'GET' &&
+    /^\/api\/materials\/\d+\/file$/.test(path)
+  ) {
+    return new Response(createFixturePdf(5), {
+      headers: {
+        'Content-Disposition': 'inline; filename="material.pdf"',
+        'Content-Type': 'application/pdf',
+      },
+    })
+  }
+
+  if (
+    request.method === 'GET' &&
+    /^\/api\/sessions\/\d+\/stream$/.test(path)
+  ) {
+    return new Response(
+      [
+        'event: status',
+        'data: {"stage":"GENERATING"}',
+        '',
+        'event: content_delta',
+        'data: {"text":"개념 정의와 "}',
+        '',
+        'event: content_delta',
+        'data: {"text":"적용 사례를 설명합니다."}',
+        '',
+        'event: completed',
+        'data: {"result":{}}',
+        '',
+        '',
+      ].join('\n'),
+      { headers: { 'Content-Type': 'text/event-stream' } },
+    )
+  }
+
   if (options.mode === 'dev') {
     const devResponse = await handleDevRoute(request, url)
     if (devResponse) return devResponse
@@ -347,6 +397,44 @@ function jsonResponse(body: unknown, status: number): Response {
     headers: { 'Content-Type': 'application/json' },
     status,
   })
+}
+
+function createFixturePdf(pageCount: number): Uint8Array {
+  const fontObjectNumber = 3 + pageCount * 2
+  const pageObjectNumbers = Array.from(
+    { length: pageCount },
+    (_, index) => 3 + index * 2,
+  )
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    `<< /Type /Pages /Kids [${pageObjectNumbers.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageCount} >>`,
+  ]
+
+  pageObjectNumbers.forEach((pageObjectNumber, index) => {
+    const contentObjectNumber = pageObjectNumber + 1
+    const stream = `BT /F1 24 Tf 72 720 Td (EduPilot PDF page ${index + 1}) Tj ET`
+    objects.push(
+      `<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents ${contentObjectNumber} 0 R /Resources << /Font << /F1 ${fontObjectNumber} 0 R >> >> >>`,
+      `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    )
+  })
+  objects.push('<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>')
+
+  let pdf = '%PDF-1.4\n'
+  const offsets = [0]
+  objects.forEach((object, index) => {
+    offsets.push(new TextEncoder().encode(pdf).length)
+    pdf += `${index + 1} 0 obj\n${object}\nendobj\n`
+  })
+  const xrefOffset = new TextEncoder().encode(pdf).length
+  pdf += `xref\n0 ${objects.length + 1}\n`
+  pdf += '0000000000 65535 f \n'
+  offsets.slice(1).forEach((offset) => {
+    pdf += `${String(offset).padStart(10, '0')} 00000 n \n`
+  })
+  pdf += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\n`
+  pdf += `startxref\n${xrefOffset}\n%%EOF`
+  return new TextEncoder().encode(pdf)
 }
 
 function turnResponse(body: { eventType?: string }): Response {

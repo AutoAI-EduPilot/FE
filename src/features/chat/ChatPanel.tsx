@@ -232,7 +232,7 @@ export function ChatPanel({
             role="status"
           >
             <p className="text-sm leading-6 text-stone-500">
-              답변을 작성하는 중입니다…
+              {chat.streamNotice ?? '답변을 작성하는 중입니다…'}
             </p>
           </div>
         ) : null}

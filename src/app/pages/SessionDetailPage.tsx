@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { useAuth } from '../../features/auth'
@@ -12,7 +12,6 @@ import type { QuizKind } from '../../features/quiz'
 import {
   createSessionsRepository,
   movePage,
-  SessionPageViewer,
   SessionResourcePanel,
   UiActionsRenderer,
   type LearningSession,
@@ -35,6 +34,11 @@ import {
 } from '../routes'
 import { usePageTitle } from '../../shared/lib/usePageTitle'
 
+const SessionPageViewer = lazy(async () => {
+  const module = await import('../../features/sessions/SessionPageViewer')
+  return { default: module.SessionPageViewer }
+})
+
 const QUIZ_TYPE_OPTIONS: Array<{ kind: QuizKind; label: string }> = [
   { kind: 'MCQ', label: '객관식' },
   { kind: 'OX', label: 'OX' },
@@ -53,14 +57,14 @@ export function SessionDetailPage() {
   usePageTitle('학습 공간')
   const { sessionId } = useParams()
   const navigate = useNavigate()
-  const { apiRequest } = useAuth()
+  const { apiRequest, rawApiRequest } = useAuth()
   const sessionsRepository = useMemo(
-    () => createSessionsRepository(apiRequest),
-    [apiRequest],
+    () => createSessionsRepository(apiRequest, rawApiRequest),
+    [apiRequest, rawApiRequest],
   )
   const materialsRepository = useMemo(
-    () => createMaterialsRepository(apiRequest),
-    [apiRequest],
+    () => createMaterialsRepository(apiRequest, rawApiRequest),
+    [apiRequest, rawApiRequest],
   )
   const [session, setSession] = useState<
     LearningSession | null | undefined
@@ -73,6 +77,8 @@ export function SessionDetailPage() {
   const [reloadKey, setReloadKey] = useState(0)
   const [quizHistory, setQuizHistory] = useState<SessionQuizSummary[]>([])
   const [materials, setMaterials] = useState<StudyMaterial[]>([])
+  const [materialFile, setMaterialFile] = useState<Blob | null | undefined>()
+  const [materialFileError, setMaterialFileError] = useState<string | null>(null)
   const chat = useSessionChat(sessionsRepository, sessionId ?? '')
 
   useEffect(() => {
@@ -143,6 +149,38 @@ export function SessionDetailPage() {
     sessionId,
     sessionsRepository,
   ])
+
+  useEffect(() => {
+    const materialId = session?.materialId
+    const controller = new AbortController()
+
+    const loadMaterialFile = async () => {
+      await Promise.resolve()
+      if (controller.signal.aborted) return
+
+      if (!materialId) {
+        setMaterialFile(null)
+        setMaterialFileError(null)
+        return
+      }
+
+      setMaterialFile(undefined)
+      setMaterialFileError(null)
+      try {
+        setMaterialFile(
+          await materialsRepository.getFile(materialId, controller.signal),
+        )
+      } catch (requestError: unknown) {
+        if (!controller.signal.aborted) {
+          setMaterialFile(null)
+          setMaterialFileError(getRequestErrorMessage(requestError))
+        }
+      }
+    }
+
+    void loadMaterialFile()
+    return () => controller.abort()
+  }, [materialsRepository, session?.materialId])
 
   if (!sessionId) {
     return (
@@ -283,26 +321,6 @@ export function SessionDetailPage() {
     }
   }
 
-  async function askAboutSelection(text: string) {
-    const requestId = createTurnRequestId()
-    const message = `"${text}"에 대해 설명해 줘`
-    chat.appendLocalMessage({
-      content: message,
-      id: `user-${requestId}`,
-      role: 'user',
-      status: 'sent',
-    })
-    try {
-      await chat.submitTurn({
-        eventType: 'USER_QUESTION',
-        payload: { message },
-        requestId,
-      })
-    } catch (requestError) {
-      setError(getRequestErrorMessage(requestError))
-    }
-  }
-
   async function handleQuizTypeSelected(kind: QuizKind) {
     const result = await runTurn('QUIZ_TYPE_SELECTED', { quizType: kind })
     if (!result) return
@@ -361,14 +379,26 @@ export function SessionDetailPage() {
 
         <div className="grid min-w-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
         <div className="grid min-h-0 min-w-0 content-start gap-4">
-          <SessionPageViewer
-            currentPage={currentPage}
-            isPending={isActionPending}
-            materialTitle={activeSession.materialTitle}
-            onAskAboutSelection={(text) => void askAboutSelection(text)}
-            onMovePage={handlePageMove}
-            totalPages={totalPages}
-          />
+          <Suspense
+            fallback={
+              <div
+                className="flex min-h-[32rem] items-center justify-center rounded-xl border border-stone-200 bg-white text-sm text-stone-500"
+                role="status"
+              >
+                PDF 뷰어를 준비하고 있습니다.
+              </div>
+            }
+          >
+            <SessionPageViewer
+              currentPage={currentPage}
+              file={materialFile}
+              fileError={materialFileError}
+              isPending={isActionPending}
+              materialTitle={activeSession.materialTitle}
+              onMovePage={handlePageMove}
+              totalPages={totalPages}
+            />
+          </Suspense>
 
           {quizHistory.length > 0 ? (
             <aside className="rounded-xl border border-stone-200 bg-white px-4 py-3">
@@ -424,7 +454,11 @@ export function SessionDetailPage() {
                 </div>
               ) : (
                 <UiActionsRenderer
-                  actions={activeSession.uiActions ?? []}
+                  actions={
+                    chat.streamUiActions.length > 0
+                      ? chat.streamUiActions
+                      : (activeSession.uiActions ?? [])
+                  }
                   disabled={isActionPending}
                   onEvent={(event) => void handleEvent(event)}
                   onOpenDiagnosis={(diagnosisId) =>

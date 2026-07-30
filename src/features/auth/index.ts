@@ -4,6 +4,7 @@ export { useAuth } from './useAuth'
 export { getRoleLabel, isInstructorRole } from './authRoles'
 export type { AuthContextValue, AuthUser } from './authContext'
 export type {
+  AuthenticatedRawRequest,
   AuthenticatedRequest,
   LogoutReason,
 } from './authContext'

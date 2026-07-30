@@ -126,6 +126,7 @@ function createRepository(
     listMessages: vi.fn().mockResolvedValue([]),
     listQuizzes: vi.fn(),
     movePage: vi.fn(),
+    stream: vi.fn().mockResolvedValue(undefined),
     submitTurn: vi.fn().mockResolvedValue({
       messages: [
         {

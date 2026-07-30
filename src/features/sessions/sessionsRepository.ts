@@ -1,5 +1,9 @@
 import { ApiClientError, type PagedResponse } from '../../shared/api'
-import type { AuthenticatedRequest } from '../auth'
+import type {
+  AuthenticatedRawRequest,
+  AuthenticatedRequest,
+} from '../auth'
+import { consumeSseStream, type SseMessage } from './sseParser'
 import type {
   LearningSession,
   LearningSessionStatus,
@@ -80,6 +84,14 @@ export interface SessionTurnRequest {
   requestId: string
 }
 
+export interface SessionStreamHandlers {
+  onCompleted?: () => void
+  onContentDelta?: (text: string) => void
+  onError?: (message: string) => void
+  onStatus?: (message: string) => void
+  onUiAction?: (action: UiAction) => void
+}
+
 export interface SessionsRepository {
   complete: (
     sessionId: string,
@@ -108,6 +120,11 @@ export interface SessionsRepository {
     pageNumber: number,
     signal?: AbortSignal,
   ) => Promise<{ currentPage: number; uiActions: UiAction[] }>
+  stream: (
+    sessionId: string,
+    handlers: SessionStreamHandlers,
+    signal?: AbortSignal,
+  ) => Promise<void>
   submitTurn: (
     sessionId: string,
     turn: SessionTurnRequest,
@@ -117,6 +134,7 @@ export interface SessionsRepository {
 
 export function createSessionsRepository(
   request: AuthenticatedRequest,
+  rawRequest?: AuthenticatedRawRequest,
 ): SessionsRepository {
   return {
     async complete(sessionId, signal) {
@@ -192,6 +210,33 @@ export function createSessionsRepository(
         uiActions: mapUiActions(data.uiActions),
       }
     },
+    async stream(sessionId, handlers, signal) {
+      if (!rawRequest) {
+        throw new ApiClientError({
+          code: 'STREAM_UNAVAILABLE',
+          message: '실시간 응답 연결을 사용할 수 없습니다.',
+        })
+      }
+
+      const response = await rawRequest(
+        `/api/sessions/${encodeURIComponent(sessionId)}/stream`,
+        {
+          headers: { Accept: 'text/event-stream' },
+          signal,
+        },
+      )
+      if (!response.body) {
+        throw new ApiClientError({
+          code: 'STREAM_EMPTY',
+          message: '실시간 응답 본문이 없습니다.',
+          status: response.status,
+        })
+      }
+
+      await consumeSseStream(response.body, (message) =>
+        handleStreamMessage(message, handlers),
+      )
+    },
     async submitTurn(sessionId, turn, signal) {
       const { data } = await request<SessionTurnDto>(
         `/api/sessions/${encodeURIComponent(sessionId)}/turns`,
@@ -212,6 +257,69 @@ export function createSessionsRepository(
         uiActions: mapUiActions(data.uiActions),
       }
     },
+  }
+}
+
+function handleStreamMessage(
+  message: SseMessage,
+  handlers: SessionStreamHandlers,
+): void {
+  const payload = parseStreamPayload(message.data)
+  const eventType =
+    message.event === 'message' && typeof payload.type === 'string'
+      ? payload.type
+      : message.event
+
+  if (eventType === 'content_delta' && typeof payload.text === 'string') {
+    handlers.onContentDelta?.(payload.text)
+    return
+  }
+
+  if (eventType === 'status' && typeof payload.stage === 'string') {
+    handlers.onStatus?.(payload.stage)
+    return
+  }
+
+  if (
+    eventType === 'thought_summary' &&
+    typeof payload.text === 'string'
+  ) {
+    handlers.onStatus?.(payload.text)
+    return
+  }
+
+  if (eventType === 'completed') {
+    handlers.onCompleted?.()
+    return
+  }
+
+  if (
+    eventType === 'ui_action' &&
+    typeof payload.action === 'object' &&
+    payload.action !== null
+  ) {
+    const [action] = mapUiActions([payload.action as UiActionDto])
+    if (action) handlers.onUiAction?.(action)
+    return
+  }
+
+  if (eventType === 'error') {
+    handlers.onError?.(
+      typeof payload.message === 'string'
+        ? payload.message
+        : '실시간 응답이 중단되었습니다.',
+    )
+  }
+}
+
+function parseStreamPayload(data: string): Record<string, unknown> {
+  try {
+    const payload = JSON.parse(data) as unknown
+    return typeof payload === 'object' && payload !== null
+      ? (payload as Record<string, unknown>)
+      : {}
+  } catch {
+    return { text: data }
   }
 }
 
