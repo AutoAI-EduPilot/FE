@@ -8,6 +8,8 @@ export const routes = {
   materialDetail: '/materials/:materialId',
   sessions: '/sessions',
   sessionDetail: '/sessions/:sessionId',
+  calendar: '/calendar',
+  notes: '/notes',
   settings: '/settings',
   quizDetail: '/quizzes/:quizId',
   diagnosis: '/sessions/:sessionId/diagnosis/:diagnosisId',

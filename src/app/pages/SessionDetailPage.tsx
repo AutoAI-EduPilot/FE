@@ -4,12 +4,16 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../features/auth'
 import { ApiClientError, getRequestErrorMessage } from '../../shared/api'
 import { ChatPanel, useSessionChat } from '../../features/chat'
-import { createMaterialsRepository } from '../../features/materials'
+import {
+  createMaterialsRepository,
+  type StudyMaterial,
+} from '../../features/materials'
 import type { QuizKind } from '../../features/quiz'
 import {
   createSessionsRepository,
   movePage,
   SessionPageViewer,
+  SessionResourcePanel,
   UiActionsRenderer,
   type LearningSession,
   type SessionQuizSummary,
@@ -23,7 +27,12 @@ import {
   LoadingState,
   PageHeader,
 } from '../../shared/ui'
-import { diagnosisPath, quizDetailPath, routes } from '../routes'
+import {
+  diagnosisPath,
+  materialDetailPath,
+  quizDetailPath,
+  routes,
+} from '../routes'
 import { usePageTitle } from '../../shared/lib/usePageTitle'
 
 const QUIZ_TYPE_OPTIONS: Array<{ kind: QuizKind; label: string }> = [
@@ -63,7 +72,19 @@ export function SessionDetailPage() {
   const [isSelectingQuizType, setIsSelectingQuizType] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [quizHistory, setQuizHistory] = useState<SessionQuizSummary[]>([])
+  const [materials, setMaterials] = useState<StudyMaterial[]>([])
   const chat = useSessionChat(sessionsRepository, sessionId ?? '')
+
+  useEffect(() => {
+    const controller = new AbortController()
+    materialsRepository
+      .list(controller.signal)
+      .then(setMaterials)
+      .catch(() => {
+        // 리소스 패널은 부가 정보 — 실패 시 조용히 생략
+      })
+    return () => controller.abort()
+  }, [materialsRepository])
 
   useEffect(() => {
     if (!sessionId) return
@@ -262,6 +283,26 @@ export function SessionDetailPage() {
     }
   }
 
+  async function askAboutSelection(text: string) {
+    const requestId = createTurnRequestId()
+    const message = `"${text}"에 대해 설명해 줘`
+    chat.appendLocalMessage({
+      content: message,
+      id: `user-${requestId}`,
+      role: 'user',
+      status: 'sent',
+    })
+    try {
+      await chat.submitTurn({
+        eventType: 'USER_QUESTION',
+        payload: { message },
+        requestId,
+      })
+    } catch (requestError) {
+      setError(getRequestErrorMessage(requestError))
+    }
+  }
+
   async function handleQuizTypeSelected(kind: QuizKind) {
     const result = await runTurn('QUIZ_TYPE_SELECTED', { quizType: kind })
     if (!result) return
@@ -304,12 +345,27 @@ export function SessionDetailPage() {
         }
       />
 
-      <section className="grid min-h-[calc(100vh-190px)] gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
+      <section className="flex min-h-[calc(100vh-190px)] gap-4">
+        <SessionResourcePanel
+          activeMaterialId={activeSession.materialId}
+          backLabel={activeSession.materialTitle}
+          backTo={
+            activeSession.materialId
+              ? materialDetailPath(activeSession.materialId)
+              : routes.materials
+          }
+          materialDetailPath={materialDetailPath}
+          materials={materials}
+          progressLabel={`${currentPage}/${totalPages}`}
+        />
+
+        <div className="grid min-w-0 flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_400px]">
         <div className="grid min-h-0 min-w-0 content-start gap-4">
           <SessionPageViewer
             currentPage={currentPage}
             isPending={isActionPending}
             materialTitle={activeSession.materialTitle}
+            onAskAboutSelection={(text) => void askAboutSelection(text)}
             onMovePage={handlePageMove}
             totalPages={totalPages}
           />
@@ -396,6 +452,7 @@ export function SessionDetailPage() {
           }
           sessionId={activeSession.id}
         />
+        </div>
       </section>
     </div>
   )

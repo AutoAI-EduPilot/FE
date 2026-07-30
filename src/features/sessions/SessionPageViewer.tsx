@@ -2,15 +2,14 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  FileWarning,
   Highlighter,
   List,
   Minus,
   Plus,
+  Sparkles,
+  type LucideIcon,
 } from 'lucide-react'
 import { useState } from 'react'
-
-import type { LucideIcon } from 'lucide-react'
 
 import { cx } from '../../shared/lib/cx'
 
@@ -18,18 +17,26 @@ interface SessionPageViewerProps {
   currentPage: number
   isPending?: boolean
   materialTitle?: string
+  onAskAboutSelection?: (text: string) => void
   onMovePage: (page: number) => void
+  onSaveSelectionNote?: (text: string) => void
   totalPages: number
 }
+
+/** 시안의 "드래그한 문장" 자리 — 실제 PDF 텍스트 레이어가 붙기 전까지의 대체 문장. */
+const SELECTABLE_SENTENCE = '드래그한 문장'
 
 export function SessionPageViewer({
   currentPage,
   isPending = false,
   materialTitle,
+  onAskAboutSelection,
   onMovePage,
+  onSaveSelectionNote,
   totalPages,
 }: SessionPageViewerProps) {
   const [zoom, setZoom] = useState(100)
+  const [isSelectionOpen, setIsSelectionOpen] = useState(false)
   const progress = totalPages > 0 ? (currentPage / totalPages) * 100 : 0
 
   return (
@@ -106,19 +113,66 @@ export function SessionPageViewer({
 
         <div className="relative flex min-h-0 items-center justify-center bg-stone-100 p-6">
           <div
-            className="flex aspect-[64/74] max-h-full min-h-0 w-full max-w-md flex-col items-center justify-center rounded-sm bg-white px-6 text-center shadow-[0_2px_14px_rgba(0,0,0,0.08)] transition-transform"
+            className="relative flex aspect-[64/74] max-h-full min-h-0 w-full max-w-md items-center justify-center overflow-hidden rounded-sm bg-white shadow-[0_2px_14px_rgba(0,0,0,0.08)] transition-transform"
             style={{ transform: `scale(${zoom / 100})` }}
           >
-            <FileWarning aria-hidden="true" className="text-stone-300" size={26} />
-            <p className="mt-3 text-sm font-semibold text-stone-500">
-              원본 PDF를 표시할 수 없습니다.
-            </p>
-            <p className="mt-1 text-xs text-stone-400">
-              강의 자료가 여기에 렌더링됩니다
-            </p>
-            <p className="mt-4 font-mono text-xs text-stone-300">
-              {currentPage}쪽
-            </p>
+            <PageCanvas currentPage={currentPage} />
+
+            {/* 시안의 "드래그한 문장" — 실제 PDF 텍스트 레이어가 붙기 전까지의 선택 대상 */}
+            <button
+              aria-pressed={isSelectionOpen}
+              className={cx(
+                'absolute top-[43%] left-1/2 w-[62%] -translate-x-1/2 rounded-sm px-2 py-1 font-mono text-[11px] text-brand-700',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
+                isSelectionOpen
+                  ? 'bg-brand-100 ring-1 ring-brand-600'
+                  : 'bg-brand-100/80 hover:bg-brand-100',
+              )}
+              onClick={() => setIsSelectionOpen((open) => !open)}
+              type="button"
+            >
+              {SELECTABLE_SENTENCE}
+            </button>
+
+            {isSelectionOpen ? (
+              <div className="absolute top-[33%] left-1/2 z-10 flex h-8.5 -translate-x-1/2 items-center gap-2.5 rounded-[9px] bg-stone-900 px-3 text-[12.5px] whitespace-nowrap text-white shadow-[0_4px_14px_rgba(0,0,0,0.2)]">
+                <button
+                  className="flex items-center gap-1.5 rounded hover:text-brand-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-400"
+                  onClick={() => {
+                    setIsSelectionOpen(false)
+                    onAskAboutSelection?.(SELECTABLE_SENTENCE)
+                  }}
+                  type="button"
+                >
+                  <Sparkles aria-hidden="true" size={12} />
+                  AI에게 질문
+                </button>
+                <span aria-hidden="true" className="text-stone-500">
+                  |
+                </span>
+                <button
+                  className="cursor-not-allowed text-stone-400"
+                  disabled
+                  title="백엔드 연동 대기 중입니다."
+                  type="button"
+                >
+                  형광펜
+                </button>
+                <span aria-hidden="true" className="text-stone-500">
+                  |
+                </span>
+                <button
+                  className="rounded hover:text-brand-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-400"
+                  onClick={() => {
+                    setIsSelectionOpen(false)
+                    onSaveSelectionNote?.(SELECTABLE_SENTENCE)
+                  }}
+                  type="button"
+                >
+                  노트에 저장
+                </button>
+              </div>
+            ) : null}
           </div>
 
           <div className="absolute bottom-4 left-1/2 flex h-9 -translate-x-1/2 items-center gap-2.5 rounded-[10px] border border-stone-200 bg-white px-2.5 shadow-[0_4px_14px_rgba(0,0,0,0.08)]">
@@ -139,6 +193,52 @@ export function SessionPageViewer({
         </div>
       </div>
     </section>
+  )
+}
+
+/** 시안의 페이지 캔버스(사선 패턴 + 선택 문장). 실제 PDF가 오면 이 자리를 교체한다. */
+function PageCanvas({ currentPage }: { currentPage: number }) {
+  return (
+    <svg
+      className="size-full"
+      preserveAspectRatio="xMidYMid slice"
+      viewBox="0 0 640 740"
+    >
+      <defs>
+        <pattern
+          height="10"
+          id="page-hatch"
+          patternTransform="rotate(45)"
+          patternUnits="userSpaceOnUse"
+          width="10"
+        >
+          <rect fill="#ffffff" height="10" width="10" />
+          <rect fill="#f2f1ec" height="10" width="5" />
+        </pattern>
+      </defs>
+      <rect fill="url(#page-hatch)" height="740" width="640" />
+
+      <text
+        fill="#9b9a95"
+        fontFamily="monospace"
+        fontSize="14"
+        textAnchor="middle"
+        x="320"
+        y="386"
+      >
+        pdf page {currentPage}
+      </text>
+      <text
+        fill="#c0bfba"
+        fontFamily="monospace"
+        fontSize="12"
+        textAnchor="middle"
+        x="320"
+        y="407"
+      >
+        강의 자료가 여기에 렌더링됩니다
+      </text>
+    </svg>
   )
 }
 

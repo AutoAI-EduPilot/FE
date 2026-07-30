@@ -33,6 +33,8 @@ export function LoginPage() {
   const [errors, setErrors] = useState<LoginFormErrors>({})
   const [serverError, setServerError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  // TODO(BE): 소셜 로그인·비밀번호 찾기 API 없음. docs/be-api-requests.md 참고
+  const [pendingNotice, setPendingNotice] = useState<string | null>(null)
   const isSessionExpired = searchParams.get('reason') === 'session-expired'
   const isIdleExpired = searchParams.get('reason') === 'idle'
 
@@ -80,6 +82,30 @@ export function LoginPage() {
         </p>
       ) : null}
 
+      <button
+        className="mt-6 flex h-11 w-full items-center justify-center gap-2.5 rounded-[10px] border border-stone-200 text-sm font-semibold text-stone-800 hover:bg-stone-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+        onClick={() =>
+          setPendingNotice('소셜 로그인은 백엔드 연동 대기 중입니다.')
+        }
+        type="button"
+      >
+        <span
+          aria-hidden="true"
+          className="size-4.5 rounded-full"
+          style={{
+            background:
+              'conic-gradient(#ea4335 0 25%,#4285f4 0 50%,#34a853 0 75%,#fbbc05 0)',
+          }}
+        />
+        Google로 계속하기
+      </button>
+
+      <div className="mt-6 flex items-center gap-3 text-xs text-stone-400">
+        <span className="h-px flex-1 bg-stone-200" />
+        또는 이메일로
+        <span className="h-px flex-1 bg-stone-200" />
+      </div>
+
       <form className="mt-6 space-y-4" noValidate onSubmit={handleSubmit}>
         <TextInput
           autoComplete="email"
@@ -112,9 +138,22 @@ export function LoginPage() {
           {serverError}
         </p>
       ) : null}
+      {pendingNotice ? (
+        <p className="mt-3 text-sm font-medium text-amber-700" role="status">
+          {pendingNotice}
+        </p>
+      ) : null}
 
-      <p className="mt-6 text-center text-sm text-stone-600">
-        계정이 없다면{' '}
+      <div className="mt-5 flex items-center justify-between text-[13px]">
+        <button
+          className="text-stone-500 hover:text-stone-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+          onClick={() =>
+            setPendingNotice('비밀번호 찾기는 백엔드 연동 대기 중입니다.')
+          }
+          type="button"
+        >
+          비밀번호 찾기
+        </button>
         <Link
           to={routes.signup}
           className="inline-flex items-center gap-1 font-semibold text-brand-600 underline-offset-4 hover:underline"
@@ -122,7 +161,7 @@ export function LoginPage() {
           회원가입
           <ArrowRight aria-hidden="true" size={14} />
         </Link>
-      </p>
+      </div>
 
       <p className="mt-6 text-center text-xs leading-relaxed text-stone-400">
         계속하면 EduPilot의 이용약관과

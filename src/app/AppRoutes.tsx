@@ -10,6 +10,7 @@ import { LoginPage } from './pages/LoginPage'
 import { MaterialDetailPage } from './pages/MaterialDetailPage'
 import { MaterialsPage } from './pages/MaterialsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { CalendarPage, NotesPage } from './pages/PlaceholderFeaturePage'
 import { QuizPage } from './pages/QuizPage'
 import { SessionDetailPage } from './pages/SessionDetailPage'
 import { SessionsPage } from './pages/SessionsPage'
@@ -40,6 +41,8 @@ export function AppRoutes() {
           <Route path={routes.sessionDetail} element={<SessionDetailPage />} />
           <Route path={routes.quizDetail} element={<QuizPage />} />
           <Route path={routes.diagnosis} element={<DiagnosisPage />} />
+          <Route path={routes.calendar} element={<CalendarPage />} />
+          <Route path={routes.notes} element={<NotesPage />} />
           <Route path={routes.settings} element={<SettingsPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
