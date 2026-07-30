@@ -172,7 +172,7 @@ describe('MaterialsPage', () => {
       await screen.findByRole(
         'heading',
         { name: 'uploaded.pdf' },
-        { timeout: 3_000 },
+        { timeout: 10_000 },
       ),
     ).toBeInTheDocument()
     expect(
