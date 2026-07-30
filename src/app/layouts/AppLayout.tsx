@@ -43,7 +43,6 @@ const primaryNavigation: Array<{
     label: '입장 요청',
     to: routes.entranceRequests,
   },
-  { icon: Settings, label: '설정', to: routes.settings },
 ]
 
 export function AppLayout() {
@@ -195,7 +194,7 @@ export function AppLayout() {
                 'flex shrink-0 items-center gap-2.5 rounded-lg px-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-brand-600',
                 isCollapsed && 'lg:justify-center lg:px-0',
               )}
-              to={routes.materials}
+              to={routes.classrooms}
             >
               <span className="flex size-7 shrink-0 items-center justify-center rounded-[7px] bg-brand-600 text-white">
                 <BookOpenCheck aria-hidden="true" size={16} />

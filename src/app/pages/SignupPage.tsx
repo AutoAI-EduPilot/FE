@@ -25,7 +25,9 @@ import {
   validateSignupForm,
   type SignupFormErrors,
   type SignupFormValues,
+  type SignupRole,
 } from '../../features/auth'
+import { ApiClientError } from '../../shared/api'
 import { Button } from '../../shared/ui'
 import { routes } from '../routes'
 import { usePageTitle } from '../../shared/lib/usePageTitle'
@@ -34,10 +36,16 @@ const initialValues: SignupFormValues = {
   email: '',
   name: '',
   password: '',
+  role: 'LEARNER',
 }
 
-type SignupRole = 'instructor' | 'learner'
 type SignupStep = 'account' | 'role'
+type EmailAvailabilityStatus =
+  | 'available'
+  | 'checking'
+  | 'idle'
+  | 'taken'
+  | 'unsupported'
 
 const roleOptions: Array<{
   description: string
@@ -50,14 +58,14 @@ const roleOptions: Array<{
       '초대코드로 강의실에 참여하고, 자료를 보며 AI와 학습해요',
     icon: GraduationCap,
     label: '학습자',
-    value: 'learner',
+    value: 'LEARNER',
   },
   {
     description:
       '강의실을 만들어 자료를 올리고, 초대코드로 학습자를 초대해요',
     icon: Presentation,
     label: '강의자',
-    value: 'instructor',
+    value: 'INSTRUCTOR',
   },
 ]
 
@@ -71,22 +79,29 @@ const AFFILIATIONS = [
 
 export function SignupPage() {
   usePageTitle('회원가입')
-  const { signup } = useAuth()
+  const { checkEmailAvailability, signup } = useAuth()
   const navigate = useNavigate()
   const [step, setStep] = useState<SignupStep>('role')
-  // BE SignupRequest에 role이 없어 현재 선택은 가입 흐름 UI 상태로만 유지한다.
-  const [selectedRole, setSelectedRole] = useState<SignupRole>('learner')
   const [values, setValues] = useState<SignupFormValues>(initialValues)
+  const [emailAvailability, setEmailAvailability] =
+    useState<EmailAvailabilityStatus>('idle')
   const [errors, setErrors] = useState<SignupFormErrors>({})
   const [serverError, setServerError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isPasswordVisible, setIsPasswordVisible] = useState(false)
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [confirmPasswordError, setConfirmPasswordError] = useState<
+    string | null
+  >(null)
+  const [isConfirmPasswordVisible, setIsConfirmPasswordVisible] =
+    useState(false)
   const [affiliation, setAffiliation] = useState('')
   const [isAffiliationOpen, setIsAffiliationOpen] = useState(false)
   const [hasAcceptedTerms, setHasAcceptedTerms] = useState(false)
   const [acceptsLearningEmails, setAcceptsLearningEmails] = useState(false)
   const [termsError, setTermsError] = useState<string | null>(null)
   const affiliationContainerRef = useRef<HTMLDivElement | null>(null)
+  const emailAvailabilitySupportedRef = useRef(true)
 
   const filteredAffiliations = useMemo(() => {
     const query = affiliation.trim().toLowerCase()
@@ -111,20 +126,87 @@ export function SignupPage() {
     return () => document.removeEventListener('pointerdown', closeOnOutsidePress)
   }, [isAffiliationOpen])
 
+  const isEmailFormatValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+    values.email.trim(),
+  )
+
+  useEffect(() => {
+    if (
+      step !== 'account' ||
+      !isEmailFormatValid ||
+      !emailAvailabilitySupportedRef.current
+    ) {
+      return
+    }
+
+    const controller = new AbortController()
+    const timeoutId = window.setTimeout(() => {
+      setEmailAvailability('checking')
+      void checkEmailAvailability(values.email, controller.signal)
+        .then((available) => {
+          if (controller.signal.aborted) return
+          setEmailAvailability(available ? 'available' : 'taken')
+          if (!available) {
+            setErrors((current) => ({
+              ...current,
+              email: '이미 가입된 이메일입니다.',
+            }))
+          }
+        })
+        .catch((error: unknown) => {
+          if (
+            (error instanceof ApiClientError &&
+              error.code === 'REQUEST_ABORTED') ||
+            controller.signal.aborted
+          ) {
+            return
+          }
+          emailAvailabilitySupportedRef.current = false
+          setEmailAvailability('unsupported')
+        })
+    }, 400)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+      controller.abort()
+    }
+  }, [
+    checkEmailAvailability,
+    isEmailFormatValid,
+    step,
+    values.email,
+  ])
+
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const nextErrors = validateSignupForm(values)
+    const nextConfirmPasswordError = !confirmPassword
+      ? '비밀번호를 한 번 더 입력하세요.'
+      : confirmPassword !== values.password
+        ? '비밀번호가 일치하지 않습니다.'
+        : null
+    if (emailAvailability === 'taken') {
+      nextErrors.email = '이미 가입된 이메일입니다.'
+    }
     setErrors(nextErrors)
+    setConfirmPasswordError(nextConfirmPasswordError)
     if (!hasAcceptedTerms) {
       setTermsError('필수 약관에 동의해 주세요.')
     }
-    if (hasFormErrors(nextErrors) || !hasAcceptedTerms) return
+    if (
+      hasFormErrors(nextErrors) ||
+      nextConfirmPasswordError ||
+      !hasAcceptedTerms ||
+      emailAvailability === 'taken'
+    ) {
+      return
+    }
 
     setIsSubmitting(true)
     setServerError(null)
     try {
       await signup(values)
-      navigate(routes.materials, { replace: true })
+      navigate(routes.classrooms, { replace: true })
     } catch (error) {
       const formErrors = mapAuthErrorToFormErrors(error)
       if (formErrors) setErrors(formErrors as SignupFormErrors)
@@ -134,17 +216,28 @@ export function SignupPage() {
     }
   }
 
-  function updateValue(field: keyof SignupFormValues, value: string) {
+  function updateValue<Field extends keyof SignupFormValues>(
+    field: Field,
+    value: SignupFormValues[Field],
+  ) {
     setValues((current) => ({ ...current, [field]: value }))
     setErrors((current) => ({ ...current, [field]: undefined }))
+    if (field === 'email') {
+      setEmailAvailability(
+        emailAvailabilitySupportedRef.current ? 'idle' : 'unsupported',
+      )
+    }
+    setServerError(null)
+  }
+
+  function updateConfirmPassword(value: string) {
+    setConfirmPassword(value)
+    setConfirmPasswordError(null)
     setServerError(null)
   }
 
   const selectedRoleLabel =
-    selectedRole === 'instructor' ? '강의자' : '학습자'
-  const isEmailFormatValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-    values.email.trim(),
-  )
+    values.role === 'INSTRUCTOR' ? '강의자' : '학습자'
   const passwordStrength = getPasswordStrength(values.password)
 
   if (step === 'role') {
@@ -166,7 +259,7 @@ export function SignupPage() {
           role="radiogroup"
         >
           {roleOptions.map((option) => {
-            const isSelected = selectedRole === option.value
+            const isSelected = values.role === option.value
 
             return (
               <button
@@ -179,7 +272,7 @@ export function SignupPage() {
                     : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50',
                 ].join(' ')}
                 key={option.value}
-                onClick={() => setSelectedRole(option.value)}
+                onClick={() => updateValue('role', option.value)}
                 role="radio"
                 type="button"
               >
@@ -314,9 +407,18 @@ export function SignupPage() {
               type="email"
               value={values.email}
             />
-            {isEmailFormatValid && !errors.email ? (
-              <span className="pointer-events-none absolute top-1/2 right-3.5 -translate-y-1/2 text-[11px] font-semibold text-emerald-700">
-                ✓ 사용 가능
+            {isEmailFormatValid &&
+            !errors.email &&
+            emailAvailability !== 'idle' ? (
+              <span
+                className={[
+                  'pointer-events-none absolute top-1/2 right-3.5 -translate-y-1/2 text-[11px] font-semibold',
+                  emailAvailability === 'available'
+                    ? 'text-emerald-700'
+                    : 'text-stone-500',
+                ].join(' ')}
+              >
+                {getEmailAvailabilityLabel(emailAvailability)}
               </span>
             ) : null}
           </div>
@@ -393,6 +495,64 @@ export function SignupPage() {
             >
               {passwordStrength.label}
             </span>
+          </div>
+        </div>
+
+        <div>
+          <div className="flex items-baseline justify-between gap-3">
+            <label
+              className="text-[13px] font-semibold text-stone-800"
+              htmlFor="signup-confirm-password"
+            >
+              비밀번호 확인
+            </label>
+            {confirmPasswordError ? (
+              <p
+                className="text-xs font-medium text-rose-700"
+                id="signup-confirm-password-error"
+                role="alert"
+              >
+                {confirmPasswordError}
+              </p>
+            ) : null}
+          </div>
+          <div className="relative mt-1">
+            <input
+              aria-describedby={
+                confirmPasswordError
+                  ? 'signup-confirm-password-error'
+                  : undefined
+              }
+              aria-invalid={confirmPasswordError ? true : undefined}
+              autoComplete="new-password"
+              className={fieldClassName(
+                Boolean(confirmPasswordError),
+                'pr-11',
+              )}
+              id="signup-confirm-password"
+              onChange={(event) => updateConfirmPassword(event.target.value)}
+              placeholder="비밀번호를 다시 입력하세요"
+              type={isConfirmPasswordVisible ? 'text' : 'password'}
+              value={confirmPassword}
+            />
+            <button
+              aria-label={
+                isConfirmPasswordVisible
+                  ? '비밀번호 확인 숨기기'
+                  : '비밀번호 확인 표시'
+              }
+              className="absolute top-1/2 right-3 flex size-7 -translate-y-1/2 items-center justify-center rounded text-stone-400 hover:text-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600"
+              onClick={() =>
+                setIsConfirmPasswordVisible((visible) => !visible)
+              }
+              type="button"
+            >
+              {isConfirmPasswordVisible ? (
+                <EyeOff aria-hidden="true" size={16} />
+              ) : (
+                <Eye aria-hidden="true" size={16} />
+              )}
+            </button>
           </div>
         </div>
 
@@ -507,14 +667,25 @@ export function SignupPage() {
         <div className="flex gap-3 pt-2">
           <Button
             className="h-11 shrink-0 px-5"
-            onClick={() => setStep('role')}
+            onClick={() => {
+              setEmailAvailability('idle')
+              setStep('role')
+            }}
             type="button"
             variant="secondary"
           >
             <ArrowLeft aria-hidden="true" size={15} />
             이전
           </Button>
-          <Button className="h-11 flex-1" disabled={isSubmitting} type="submit">
+          <Button
+            className="h-11 flex-1"
+            disabled={
+              isSubmitting ||
+              emailAvailability === 'checking' ||
+              emailAvailability === 'taken'
+            }
+            type="submit"
+          >
             {isSubmitting ? '가입 중' : '가입 완료'}
           </Button>
         </div>
@@ -528,6 +699,21 @@ export function SignupPage() {
 
     </div>
   )
+}
+
+function getEmailAvailabilityLabel(
+  status: EmailAvailabilityStatus,
+): string {
+  switch (status) {
+    case 'available':
+      return '✓ 사용 가능'
+    case 'checking':
+      return '확인 중'
+    case 'unsupported':
+      return '가입 시 확인'
+    default:
+      return ''
+  }
 }
 
 function fieldClassName(hasError: boolean, spacingClassName: string): string {

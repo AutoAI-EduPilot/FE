@@ -20,4 +20,5 @@ export {
   type LoginFormValues,
   type SignupFormErrors,
   type SignupFormValues,
+  type SignupRole,
 } from './authValidation'

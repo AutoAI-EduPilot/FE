@@ -27,7 +27,7 @@ function renderLogin(path = '/login') {
             path="/forgot-password"
             element={<p>비밀번호 찾기 화면</p>}
           />
-          <Route path="/materials" element={<p>자료 화면</p>} />
+          <Route path="/classrooms" element={<p>내 강의실 화면</p>} />
         </Routes>
       </MemoryRouter>
     </AuthProvider>,
@@ -60,7 +60,7 @@ describe('LoginPage', () => {
     expect(screen.getByText('이메일을 입력하세요.')).toBeInTheDocument()
   })
 
-  it('logs in and redirects to materials on success', async () => {
+  it('logs in and redirects to classrooms on success', async () => {
     renderLogin()
 
     fireEvent.change(screen.getByLabelText('이메일'), {
@@ -71,7 +71,7 @@ describe('LoginPage', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: /로그인/ }))
 
-    expect(await screen.findByText('자료 화면')).toBeInTheDocument()
+    expect(await screen.findByText('내 강의실 화면')).toBeInTheDocument()
   })
 
   it('shows the mapped field error for invalid credentials', async () => {

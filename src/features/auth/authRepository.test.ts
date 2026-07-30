@@ -49,6 +49,7 @@ describe('remote auth repository', () => {
       email: ' Learner@example.com ',
       name: ' 학습자 ',
       password: 'password123',
+      role: 'INSTRUCTOR' as const,
     }
 
     await repository.signup(values)
@@ -66,6 +67,7 @@ describe('remote auth repository', () => {
       email: 'learner@example.com',
       name: '학습자',
       password: 'password123',
+      role: 'INSTRUCTOR',
     })
     expectJsonRequest(fetchMock, 1, '/api/auth/login', {
       email: 'learner@example.com',
@@ -100,6 +102,7 @@ describe('remote auth repository', () => {
         email: 'learner@example.com',
         name: '학습자',
         password: 'password',
+        role: 'LEARNER',
       })
       .catch((error: unknown) => error)
 
@@ -134,6 +137,26 @@ describe('remote auth repository', () => {
     expect(new Headers(init?.headers).get('Authorization')).toBe(
       'Bearer access-token',
     )
+  })
+
+  it('checks normalized email availability while typing', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({
+        data: { available: false },
+        message: '이메일 중복 확인 완료',
+        success: true,
+      }),
+    )
+
+    await expect(
+      getAuthRepository().checkEmailAvailability(' Existing@Example.com '),
+    ).resolves.toBe(false)
+
+    const [url, init] = fetchMock.mock.calls[0] ?? []
+    expect(url).toBe(
+      'http://localhost:8080/api/auth/email-availability?email=existing%40example.com',
+    )
+    expect(init?.method).toBeUndefined()
   })
 })
 

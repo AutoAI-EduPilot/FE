@@ -32,6 +32,18 @@ function ThemeControl() {
 }
 
 describe('ThemeProvider', () => {
+  it('uses the light theme when no preference is stored', () => {
+    render(
+      <ThemeProvider>
+        <ThemeControl />
+      </ThemeProvider>,
+    )
+
+    expect(screen.getByRole('button', { name: 'light' })).toBeInTheDocument()
+    expect(document.documentElement).not.toHaveClass('dark')
+    expect(document.documentElement.dataset.theme).toBe('light')
+  })
+
   it('stores and applies the selected dark theme', () => {
     render(
       <ThemeProvider>
@@ -39,7 +51,7 @@ describe('ThemeProvider', () => {
       </ThemeProvider>,
     )
 
-    fireEvent.click(screen.getByRole('button', { name: 'system' }))
+    fireEvent.click(screen.getByRole('button', { name: 'light' }))
 
     expect(document.documentElement).toHaveClass('dark')
     expect(document.documentElement.dataset.theme).toBe('dark')
