@@ -23,6 +23,7 @@ import { getChatErrorMessage, type SessionChat } from './useSessionChat'
 
 interface ChatPanelProps {
   chat: SessionChat
+  className?: string
   currentPage?: number
   /** 서버 위젯·퀴즈 유형 선택 등 대화 흐름에 붙는 액션 (입력창 바로 위) */
   footer?: ReactNode
@@ -52,6 +53,7 @@ function createRequestId(): string {
 
 export function ChatPanel({
   chat,
+  className,
   currentPage,
   footer,
   onRequestQuiz,
@@ -138,7 +140,12 @@ export function ChatPanel({
   )
 
   return (
-    <section className="flex min-h-[620px] min-w-0 flex-col overflow-hidden rounded-xl border border-stone-200 bg-white">
+    <section
+      className={cx(
+        'flex h-full min-h-0 min-w-0 flex-col overflow-hidden rounded-xl border border-stone-200 bg-white',
+        className,
+      )}
+    >
       <div className="flex h-13 shrink-0 items-center gap-1 border-b border-stone-200 px-3">
         <PanelTab
           isActive={tab === 'chat'}

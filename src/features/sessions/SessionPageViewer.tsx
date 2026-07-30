@@ -2,7 +2,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  Highlighter,
   List,
   Minus,
   Plus,
@@ -41,6 +40,8 @@ export function SessionPageViewer({
 }: SessionPageViewerProps) {
   const [zoom, setZoom] = useState(100)
   const [pageWidth, setPageWidth] = useState(560)
+  const [pageAspectRatio, setPageAspectRatio] = useState(1 / Math.sqrt(2))
+  const [isOutlineVisible, setIsOutlineVisible] = useState(true)
   const pageContainerRef = useRef<HTMLDivElement | null>(null)
   const progress = totalPages > 0 ? (currentPage / totalPages) * 100 : 0
 
@@ -49,13 +50,19 @@ export function SessionPageViewer({
     if (!container || typeof ResizeObserver === 'undefined') return
 
     const updatePageWidth = () => {
-      setPageWidth(Math.max(240, Math.min(720, container.clientWidth - 48)))
+      const availableWidth = Math.max(container.clientWidth - 48, 220)
+      const availableHeight = Math.max(container.clientHeight - 80, 280)
+      const fittedWidth = Math.min(
+        availableWidth,
+        availableHeight * pageAspectRatio,
+      )
+      setPageWidth(Math.max(220, Math.min(760, fittedWidth)))
     }
     updatePageWidth()
     const observer = new ResizeObserver(updatePageWidth)
     observer.observe(container)
     return () => observer.disconnect()
-  }, [])
+  }, [pageAspectRatio])
 
   function downloadOriginal() {
     if (!file) return
@@ -68,9 +75,9 @@ export function SessionPageViewer({
   }
 
   return (
-    <section className="flex min-h-[620px] min-w-0 flex-col overflow-hidden rounded-xl border border-stone-200 bg-white">
+    <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-y-0 border-stone-200 bg-white xl:border-r">
       <div className="flex h-13 shrink-0 items-center gap-3 border-b border-stone-200 px-4">
-        <h2 className="min-w-0 truncate text-[14.5px] font-semibold text-stone-950">
+        <h2 className="hidden min-w-0 truncate text-[14.5px] font-semibold text-stone-950 sm:block">
           {materialTitle ?? '학습 자료'}
         </h2>
         <span className="shrink-0 text-xs text-stone-400">
@@ -78,7 +85,7 @@ export function SessionPageViewer({
         </span>
         <div
           aria-label={`학습 진행률 ${currentPage} / ${totalPages}쪽`}
-          className="h-1 w-24 shrink-0 overflow-hidden rounded-full bg-stone-200"
+          className="hidden h-1 w-24 shrink-0 overflow-hidden rounded-full bg-stone-200 md:block"
           role="progressbar"
         >
           <div
@@ -103,8 +110,12 @@ export function SessionPageViewer({
               onClick={() => setZoom((value) => Math.min(200, value + 10))}
             />
           </div>
-          <ToolbarButton disabled icon={List} label="목차" />
-          <ToolbarButton disabled icon={Highlighter} label="형광펜" />
+          <ToolbarButton
+            icon={List}
+            isActive={isOutlineVisible}
+            label="목차"
+            onClick={() => setIsOutlineVisible((visible) => !visible)}
+          />
           <ToolbarButton
             disabled={!file}
             icon={Download}
@@ -114,36 +125,45 @@ export function SessionPageViewer({
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 grid-cols-[56px_minmax(0,1fr)] sm:grid-cols-[68px_minmax(0,1fr)]">
-        <nav
-          aria-label="자료 페이지"
-          className="grid content-start gap-1.5 overflow-y-auto border-r border-stone-200 bg-stone-50 p-2"
-        >
-          {Array.from({ length: totalPages }, (_, index) => index + 1).map(
-            (pageNumber) => (
-              <button
-                aria-label={`${pageNumber}쪽으로 이동`}
-                className={cx(
-                  'aspect-[3/4] w-full rounded-md border text-[11px] font-semibold transition-colors',
-                  'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600',
-                  'disabled:cursor-not-allowed disabled:opacity-60',
-                  pageNumber === currentPage
-                    ? 'border-brand-600 bg-brand-50 text-brand-800'
-                    : 'border-stone-200 bg-white text-stone-400 hover:border-stone-300 hover:text-stone-600',
-                )}
-                disabled={isPending}
-                key={pageNumber}
-                onClick={() => onMovePage(pageNumber)}
-                type="button"
-              >
-                {pageNumber}
-              </button>
-            ),
-          )}
-        </nav>
+      <div
+        className={cx(
+          'grid min-h-0 flex-1',
+          isOutlineVisible
+            ? 'grid-cols-[56px_minmax(0,1fr)] sm:grid-cols-[68px_minmax(0,1fr)]'
+            : 'grid-cols-[minmax(0,1fr)]',
+        )}
+      >
+        {isOutlineVisible ? (
+          <nav
+            aria-label="자료 페이지"
+            className="grid content-start gap-1.5 overflow-y-auto border-r border-stone-200 bg-stone-50 p-2"
+          >
+            {Array.from({ length: totalPages }, (_, index) => index + 1).map(
+              (pageNumber) => (
+                <button
+                  aria-label={`${pageNumber}쪽으로 이동`}
+                  className={cx(
+                    'aspect-[3/4] w-full rounded-md border text-[11px] font-semibold transition-colors',
+                    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600',
+                    'disabled:cursor-not-allowed disabled:opacity-60',
+                    pageNumber === currentPage
+                      ? 'border-brand-600 bg-brand-50 text-brand-800'
+                      : 'border-stone-200 bg-white text-stone-400 hover:border-stone-300 hover:text-stone-600',
+                  )}
+                  disabled={isPending}
+                  key={pageNumber}
+                  onClick={() => onMovePage(pageNumber)}
+                  type="button"
+                >
+                  {pageNumber}
+                </button>
+              ),
+            )}
+          </nav>
+        ) : null}
 
         <div
-          className="relative flex min-h-0 items-start justify-center overflow-auto bg-stone-100 p-6 pb-16"
+          className="relative flex min-h-0 items-center justify-center overflow-hidden bg-stone-100 p-6 pb-16"
           ref={pageContainerRef}
         >
           {file === undefined ? (
@@ -155,6 +175,7 @@ export function SessionPageViewer({
             />
           ) : (
             <Document
+              className="flex max-h-full max-w-full items-center justify-center"
               error={<ViewerState isError message="PDF 문서를 열지 못했습니다." />}
               file={file}
               loading={<ViewerState message="PDF 문서를 준비하는 중입니다." />}
@@ -162,6 +183,10 @@ export function SessionPageViewer({
               <Page
                 className="overflow-hidden rounded-sm bg-white shadow-[0_2px_14px_rgba(0,0,0,0.08)]"
                 pageNumber={currentPage}
+                onLoadSuccess={(page) => {
+                  const viewport = page.getViewport({ scale: 1 })
+                  setPageAspectRatio(viewport.width / viewport.height)
+                }}
                 renderAnnotationLayer
                 renderTextLayer
                 width={pageWidth * (zoom / 100)}
@@ -200,7 +225,7 @@ function ViewerState({
   return (
     <div
       className={cx(
-        'flex min-h-80 w-full max-w-md items-center justify-center rounded-sm border bg-white px-6 text-center text-sm shadow-sm',
+        'flex h-full max-h-[36rem] min-h-64 w-full max-w-md items-center justify-center rounded-sm border bg-white px-6 text-center text-sm shadow-sm',
         isError
           ? 'border-rose-200 text-rose-700'
           : 'border-stone-200 text-stone-500',
@@ -236,18 +261,26 @@ function ToolbarIconButton({
 function ToolbarButton({
   disabled = false,
   icon: Icon,
+  isActive = false,
   label,
   onClick,
 }: {
   disabled?: boolean
   icon: LucideIcon
+  isActive?: boolean
   label: string
   onClick?: () => void
 }) {
   return (
     <button
       aria-label={disabled ? `${label} (사용 불가)` : label}
-      className="flex h-8 items-center gap-1.5 rounded-lg border border-stone-200 px-2.5 text-[12.5px] font-medium text-stone-600 hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-400 disabled:hover:bg-transparent"
+      aria-pressed={disabled ? undefined : isActive}
+      className={cx(
+        'flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12.5px] font-medium hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-400 disabled:hover:bg-transparent',
+        isActive
+          ? 'border-brand-200 bg-brand-50 text-brand-700'
+          : 'border-stone-200 text-stone-600',
+      )}
       disabled={disabled}
       onClick={onClick}
       type="button"
@@ -260,7 +293,7 @@ function ToolbarButton({
 
 function getDownloadFileName(materialTitle: string | undefined): string {
   const title = materialTitle?.trim() || 'material.pdf'
-  return title.toLowerCase().endsWith('.pdf') ? title : `${title}.pdf`
+  return /\.(pdf|pptx?)$/i.test(title) ? title : `${title}.pdf`
 }
 
 function PageStepButton({
