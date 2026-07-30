@@ -3,8 +3,11 @@ export interface LoginFormValues {
   password: string
 }
 
+export type SignupRole = 'INSTRUCTOR' | 'LEARNER'
+
 export interface SignupFormValues extends LoginFormValues {
   name: string
+  role: SignupRole
 }
 
 export type LoginFormErrors = Partial<Record<keyof LoginFormValues, string>>

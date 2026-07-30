@@ -176,7 +176,7 @@ export function LoginPage() {
 
 function getRedirectPath(state: unknown): string {
   if (isLoginLocationState(state) && state.from?.startsWith('/')) return state.from
-  return routes.materials
+  return routes.classrooms
 }
 
 function isLoginLocationState(state: unknown): state is LoginLocationState {

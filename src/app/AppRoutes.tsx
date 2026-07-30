@@ -23,7 +23,10 @@ import { routes } from './routes'
 export function AppRoutes() {
   return (
     <Routes>
-      <Route path={routes.root} element={<Navigate to={routes.materials} replace />} />
+      <Route
+        path={routes.root}
+        element={<Navigate to={routes.classrooms} replace />}
+      />
 
       <Route element={<AuthLayout />}>
         <Route path={routes.login} element={<LoginPage />} />

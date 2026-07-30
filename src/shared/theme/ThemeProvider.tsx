@@ -42,7 +42,7 @@ function readThemeMode(): ThemeMode {
   const stored = window.localStorage.getItem(THEME_STORAGE_KEY)
   return stored === 'dark' || stored === 'light' || stored === 'system'
     ? stored
-    : 'system'
+    : 'light'
 }
 
 function applyTheme(mode: ThemeMode, systemPrefersDark: boolean) {

@@ -64,6 +64,10 @@ src/
 
 EduPilot FE는 운영형 SaaS 학습 도구 방향을 기본으로 합니다. 외부 디자인 skill을 참고할 때는 [MengTo/Skills 적용 가이드](docs/mengto-skills-guide.md)를 따릅니다.
 
+회원가입 소속 자동완성에 사용할 수 있는 공식 데이터와 권장 연동
+구조는 [소속 기관 데이터 연동 검토](docs/affiliation-data-sources.md)에
+정리합니다.
+
 ## API 호출 원칙
 
 - 배포 Swagger와 FE 연결 상태는

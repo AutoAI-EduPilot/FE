@@ -178,6 +178,12 @@ export function AuthProvider({
     [beginSession, repository],
   )
 
+  const checkEmailAvailability = useCallback(
+    (email: string, signal?: AbortSignal) =>
+      repository.checkEmailAvailability(email, signal),
+    [repository],
+  )
+
   const signup = useCallback(
     async (values: SignupFormValues) => {
       await repository.signup(values)
@@ -277,6 +283,7 @@ export function AuthProvider({
     () => ({
       apiRequest: authenticatedRequest,
       rawApiRequest: authenticatedRawRequest,
+      checkEmailAvailability,
       isAuthenticated: session !== null,
       isInitializing,
       login,
@@ -289,6 +296,7 @@ export function AuthProvider({
     [
       authenticatedRequest,
       authenticatedRawRequest,
+      checkEmailAvailability,
       isInitializing,
       login,
       logout,
