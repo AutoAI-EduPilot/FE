@@ -65,7 +65,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[400px]">
+    <div>
       <div className="flex flex-col gap-1.5">
         <h1 className="text-2xl font-bold text-stone-900">로그인</h1>
         <p className="text-sm text-stone-400">다시 오신 걸 환영해요</p>
@@ -127,7 +127,7 @@ export function LoginPage() {
           type="password"
           value={values.password}
         />
-        <Button className="w-full" disabled={isSubmitting} type="submit">
+        <Button className="h-11 w-full" disabled={isSubmitting} type="submit">
           <LogIn aria-hidden="true" size={15} />
           {isSubmitting ? '로그인 중' : '로그인'}
         </Button>
