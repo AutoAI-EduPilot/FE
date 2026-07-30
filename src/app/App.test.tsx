@@ -91,30 +91,19 @@ describe('AppRoutes', () => {
     ).toBeInTheDocument()
   })
 
-  it('shows entrance requests only to instructors', () => {
-    renderRoute('/entrance-requests', {
-      email: 'instructor@example.com',
-      name: '강의자',
-      role: 'ADMIN',
-    })
+  it('does not expose menus without a backend API contract', () => {
+    renderRoute('/')
 
-    expect(
-      screen.getByRole('heading', { name: '입장 요청' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByText('표시할 입장 요청이 없습니다.'),
-    ).toBeInTheDocument()
-    expect(screen.queryByText('이서연')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: '캘린더' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: '내 노트' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: '입장 요청' })).not.toBeInTheDocument()
   })
 
-  it('blocks learners from entrance request management', () => {
-    renderRoute('/entrance-requests', {
-      ...authenticatedUser,
-      role: 'USER',
-    })
+  it('does not route to a feature without a backend API contract', () => {
+    renderRoute('/entrance-requests')
 
     expect(
-      screen.getByText('강의자 전용 화면입니다.'),
+      screen.getByRole('heading', { name: '페이지를 찾을 수 없습니다.' }),
     ).toBeInTheDocument()
   })
 

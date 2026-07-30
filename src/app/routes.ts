@@ -4,17 +4,13 @@ export const routes = {
   forgotPassword: '/forgot-password',
   signup: '/signup',
   classrooms: '/classrooms',
-  classroomDetail: '/classrooms/:classroomId',
   materials: '/materials',
   materialDetail: '/materials/:materialId',
   sessions: '/sessions',
   sessionDetail: '/sessions/:sessionId',
-  calendar: '/calendar',
-  notes: '/notes',
   settings: '/settings',
   quizDetail: '/quizzes/:quizId',
   diagnosis: '/sessions/:sessionId/diagnosis/:diagnosisId',
-  entranceRequests: '/entrance-requests',
 } as const
 
 export function materialDetailPath(materialId: string | number): string {
