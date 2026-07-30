@@ -14,6 +14,21 @@ export default defineConfig(({ mode }) => {
   const useMockApi = proxyTarget === 'mock'
 
   return {
+    build: {
+      rollupOptions: {
+        output: {
+          assetFileNames(assetInfo) {
+            const pattern = 'assets/[name]-[hash][extname]'
+
+            // The dev Nginx serves .mjs as application/octet-stream, which
+            // browsers reject for PDF.js module workers.
+            return assetInfo.name?.endsWith('.mjs')
+              ? 'assets/[name]-[hash].js'
+              : pattern
+          },
+        },
+      },
+    },
     plugins: [react(), tailwindcss(), ...(useMockApi ? [mockApiPlugin()] : [])],
     server: {
       port: 5173,
