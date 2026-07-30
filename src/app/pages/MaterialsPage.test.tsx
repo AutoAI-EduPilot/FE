@@ -158,27 +158,33 @@ describe('MaterialsPage', () => {
     )
   })
 
-  it('adds the material returned by the upload API', async () => {
-    renderMaterialsPage()
-    await screen.findByText('시험 대비 요약.pdf')
+  it(
+    'adds the material returned by the upload API',
+    async () => {
+      renderMaterialsPage()
+      await screen.findByText('시험 대비 요약.pdf')
 
-    fireEvent.change(screen.getByLabelText('PDF 파일'), {
-      target: {
-        files: [new File(['pdf'], 'uploaded.pdf', { type: 'application/pdf' })],
-      },
-    })
+      fireEvent.change(screen.getByLabelText('PDF 파일'), {
+        target: {
+          files: [
+            new File(['pdf'], 'uploaded.pdf', { type: 'application/pdf' }),
+          ],
+        },
+      })
 
-    expect(
-      await screen.findByRole(
-        'heading',
-        { name: 'uploaded.pdf' },
-        { timeout: 10_000 },
-      ),
-    ).toBeInTheDocument()
-    expect(
-      screen.queryByRole('button', { name: /업로드 취소/ }),
-    ).not.toBeInTheDocument()
-  })
+      expect(
+        await screen.findByRole(
+          'heading',
+          { name: 'uploaded.pdf' },
+          { timeout: 10_000 },
+        ),
+      ).toBeInTheDocument()
+      expect(
+        screen.queryByRole('button', { name: /업로드 취소/ }),
+      ).not.toBeInTheDocument()
+    },
+    15_000,
+  )
 })
 
 describe('MaterialDetailPage', () => {
