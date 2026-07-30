@@ -1,6 +1,7 @@
 export const routes = {
   root: '/',
   login: '/login',
+  forgotPassword: '/forgot-password',
   signup: '/signup',
   classrooms: '/classrooms',
   classroomDetail: '/classrooms/:classroomId',
@@ -13,6 +14,7 @@ export const routes = {
   settings: '/settings',
   quizDetail: '/quizzes/:quizId',
   diagnosis: '/sessions/:sessionId/diagnosis/:diagnosisId',
+  entranceRequests: '/entrance-requests',
 } as const
 
 export function classroomDetailPath(classroomId: string): string {

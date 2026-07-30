@@ -6,6 +6,8 @@ import { AuthLayout } from './layouts/AuthLayout'
 import { ClassroomDetailPage } from './pages/ClassroomDetailPage'
 import { ClassroomsPage } from './pages/ClassroomsPage'
 import { DiagnosisPage } from './pages/DiagnosisPage'
+import { EntranceRequestsPage } from './pages/EntranceRequestsPage'
+import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { LoginPage } from './pages/LoginPage'
 import { MaterialDetailPage } from './pages/MaterialDetailPage'
 import { MaterialsPage } from './pages/MaterialsPage'
@@ -25,6 +27,10 @@ export function AppRoutes() {
 
       <Route element={<AuthLayout />}>
         <Route path={routes.login} element={<LoginPage />} />
+        <Route
+          path={routes.forgotPassword}
+          element={<ForgotPasswordPage />}
+        />
         <Route path={routes.signup} element={<SignupPage />} />
       </Route>
 
@@ -44,6 +50,10 @@ export function AppRoutes() {
           <Route path={routes.calendar} element={<CalendarPage />} />
           <Route path={routes.notes} element={<NotesPage />} />
           <Route path={routes.settings} element={<SettingsPage />} />
+          <Route
+            path={routes.entranceRequests}
+            element={<EntranceRequestsPage />}
+          />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
       </Route>

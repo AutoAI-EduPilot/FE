@@ -4,28 +4,48 @@ import {
   CalendarDays,
   ChevronsLeft,
   ChevronsRight,
+  CircleHelp,
   FileText,
   GraduationCap,
   LayoutGrid,
   LogOut,
+  Monitor,
+  Moon,
   NotebookPen,
   Settings,
+  Sun,
+  UsersRound,
   type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
 
-import { useAuth } from '../../features/auth'
+import { getRoleLabel, isInstructorRole, useAuth } from '../../features/auth'
 import { cx } from '../../shared/lib/cx'
+import { useTheme, type ThemeMode } from '../../shared/theme'
+import { useToast } from '../../shared/ui'
 import { placeholderClassrooms } from '../../features/classrooms'
 import { classroomDetailPath, routes } from '../routes'
 
-const primaryNavigation: Array<{ icon: LucideIcon; label: string; to: string }> = [
+const primaryNavigation: Array<{
+  badgeCount?: number
+  icon: LucideIcon
+  instructorOnly?: boolean
+  label: string
+  to: string
+}> = [
   { icon: LayoutGrid, label: '내 강의실', to: routes.classrooms },
   { icon: FileText, label: '자료', to: routes.materials },
   { icon: GraduationCap, label: '세션', to: routes.sessions },
   { icon: CalendarDays, label: '캘린더', to: routes.calendar },
   { icon: NotebookPen, label: '내 노트', to: routes.notes },
+  {
+    badgeCount: 3,
+    icon: UsersRound,
+    instructorOnly: true,
+    label: '입장 요청',
+    to: routes.entranceRequests,
+  },
   { icon: Settings, label: '설정', to: routes.settings },
 ]
 
@@ -39,11 +59,17 @@ const CLASSROOM_DOT_CLASSES: Record<string, string> = {
 
 export function AppLayout() {
   const { logout, user } = useAuth()
+  const { mode, setMode } = useTheme()
+  const { show: showToast } = useToast()
   const navigate = useNavigate()
   const [isCollapsed, setIsCollapsed] = useState(false)
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const menuContainerRef = useRef<HTMLDivElement | null>(null)
   const mobileMenuContainerRef = useRef<HTMLDivElement | null>(null)
+  const roleLabel = getRoleLabel(user?.role)
+  const navigationItems = primaryNavigation.filter(
+    (item) => !item.instructorOnly || isInstructorRole(user?.role),
+  )
 
   useEffect(() => {
     if (!isMenuOpen) return
@@ -82,14 +108,21 @@ export function AppLayout() {
 
   const profileMenu = (
     <div
-      className="w-48 rounded-lg border border-stone-200 bg-white p-1 shadow-lg"
+      className="w-60 rounded-xl border border-stone-200 bg-white p-1.5 shadow-lg dark:bg-stone-50"
       role="menu"
     >
-      <div className="border-b border-stone-100 px-2.5 py-2">
-        <p className="truncate text-[13px] font-semibold text-stone-800">
-          {user?.name}
-        </p>
-        <p className="truncate text-[11px] text-stone-400">{user?.email}</p>
+      <div className="flex items-center gap-2.5 border-b border-stone-100 px-2.5 py-2.5">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-stone-200 text-xs font-semibold text-stone-600">
+          {user?.name?.slice(0, 1) ?? '?'}
+        </span>
+        <div className="min-w-0">
+          <p className="truncate text-[13px] font-semibold text-stone-800">
+            {user?.name}
+          </p>
+          <p className="truncate text-[11px] text-stone-400">
+            {user?.email} · {roleLabel}
+          </p>
+        </div>
       </div>
       <button
         className="mt-1 flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-[13.5px] font-medium text-stone-700 hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
@@ -102,6 +135,47 @@ export function AppLayout() {
       </button>
       <button
         className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-[13.5px] font-medium text-stone-700 hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+        onClick={() =>
+          showToast('도움말과 피드백 채널은 준비 중입니다.', 'info')
+        }
+        role="menuitem"
+        type="button"
+      >
+        <CircleHelp aria-hidden="true" size={15} />
+        도움말 · 피드백
+      </button>
+      <div className="flex h-10 items-center gap-2.5 px-2.5 text-[13.5px] font-medium text-stone-700">
+        <Monitor aria-hidden="true" size={15} />
+        <span>화면 모드</span>
+        <div
+          aria-label="화면 모드"
+          className="ml-auto inline-flex rounded-lg border border-stone-200 bg-stone-50 p-0.5"
+          role="group"
+        >
+          {themeOptions.map((option) => (
+            <button
+              aria-label={option.label}
+              aria-pressed={mode === option.value}
+              className={cx(
+                'flex size-6 items-center justify-center rounded-md text-stone-400',
+                'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600',
+                mode === option.value
+                  ? 'bg-white text-stone-900 shadow-sm dark:bg-stone-300'
+                  : 'hover:text-stone-700',
+              )}
+              key={option.value}
+              onClick={() => setMode(option.value)}
+              title={option.label}
+              type="button"
+            >
+              <option.icon aria-hidden="true" size={13} />
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="mx-2 my-1 h-px bg-stone-100" />
+      <button
+        className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-[13.5px] font-medium text-rose-700 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
         onClick={() => void handleLogout()}
         role="menuitem"
         type="button"
@@ -113,10 +187,10 @@ export function AppLayout() {
   )
 
   return (
-    <div className="min-h-screen bg-white text-stone-900 lg:flex">
+    <div className="min-h-screen bg-white text-stone-900 dark:bg-[#1b1c20] lg:flex">
       <aside
         className={cx(
-          'flex border-b border-stone-200 bg-stone-100 px-4 py-3 lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:flex-col lg:border-r lg:border-b-0 lg:py-4',
+          'flex border-b border-stone-200 bg-stone-100 px-4 py-3 dark:bg-[#222327] lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:flex-col lg:border-r lg:border-b-0 lg:py-4',
           isCollapsed ? 'lg:w-14 lg:px-2' : 'lg:w-50 lg:px-3',
         )}
       >
@@ -162,7 +236,7 @@ export function AppLayout() {
             aria-label="주요 메뉴"
             className="ml-auto flex gap-1 overflow-x-auto lg:mt-6 lg:ml-0 lg:flex-col lg:gap-0.5"
           >
-            {primaryNavigation.map((item) => (
+            {navigationItems.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -171,6 +245,11 @@ export function AppLayout() {
               >
                 <item.icon aria-hidden="true" className="shrink-0" size={16} />
                 <span className={cx(isCollapsed && 'lg:sr-only')}>{item.label}</span>
+                {item.badgeCount && !isCollapsed ? (
+                  <span className="ml-auto rounded-full bg-brand-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                    {item.badgeCount}
+                  </span>
+                ) : null}
               </NavLink>
             ))}
           </nav>
@@ -191,7 +270,7 @@ export function AppLayout() {
                           'flex h-8 items-center gap-2 rounded-lg px-3 text-[13px]',
                           'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
                           isActive
-                            ? 'bg-white font-semibold text-stone-900 shadow-sm'
+                            ? 'bg-white font-semibold text-stone-900 shadow-sm dark:bg-stone-200'
                             : 'font-medium text-stone-500 hover:bg-white/60 hover:text-stone-800',
                         )
                       }
@@ -253,7 +332,7 @@ export function AppLayout() {
                 {user?.name}
               </span>
               <span className="block truncate text-[11px] text-stone-400">
-                {user?.email}
+                {roleLabel}
               </span>
             </span>
             {/* 시안 사이드바의 알림 벨 — 알림 API 대기(docs/be-api-requests.md §3-2) */}
@@ -291,7 +370,17 @@ function navLinkClassName(isActive: boolean, isCollapsed: boolean): string {
     isCollapsed && 'lg:w-9 lg:justify-center lg:px-0',
     'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
     isActive
-      ? 'bg-white font-semibold text-stone-900 shadow-sm'
+      ? 'bg-white font-semibold text-stone-900 shadow-sm dark:bg-stone-200'
       : 'font-medium text-stone-500 hover:bg-white/60 hover:text-stone-800',
   )
 }
+
+const themeOptions: Array<{
+  icon: LucideIcon
+  label: string
+  value: ThemeMode
+}> = [
+  { icon: Sun, label: '라이트 모드', value: 'light' },
+  { icon: Moon, label: '다크 모드', value: 'dark' },
+  { icon: Monitor, label: '시스템 설정', value: 'system' },
+]

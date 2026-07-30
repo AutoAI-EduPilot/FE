@@ -143,7 +143,7 @@ function mapRemoteAuthError(
     : error
 }
 
-const FORM_FIELDS = ['email', 'name', 'password', 'passwordConfirm'] as const
+const FORM_FIELDS = ['email', 'name', 'password'] as const
 
 function isFieldDetail(
   detail: unknown,

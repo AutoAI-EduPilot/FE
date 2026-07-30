@@ -41,6 +41,14 @@ function renderRoute(path: string, initialUser: AuthUser | null = authenticatedU
 }
 
 describe('AppRoutes', () => {
+  it('renders the forgot password route', () => {
+    renderRoute('/forgot-password', null)
+
+    expect(
+      screen.getByRole('heading', { name: '비밀번호 찾기' }),
+    ).toBeInTheDocument()
+  })
+
   it('redirects the root route to materials', async () => {
     renderRoute('/')
 
@@ -72,6 +80,30 @@ describe('AppRoutes', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '계정 · 보안' }))
     expect(screen.getByRole('button', { name: /회원 탈퇴/ })).toBeInTheDocument()
+  })
+
+  it('shows entrance requests only to instructors', () => {
+    renderRoute('/entrance-requests', {
+      email: 'instructor@example.com',
+      name: '강의자',
+      role: 'ADMIN',
+    })
+
+    expect(
+      screen.getByRole('heading', { name: '입장 요청' }),
+    ).toBeInTheDocument()
+    expect(screen.getByText('이서연')).toBeInTheDocument()
+  })
+
+  it('blocks learners from entrance request management', () => {
+    renderRoute('/entrance-requests', {
+      ...authenticatedUser,
+      role: 'USER',
+    })
+
+    expect(
+      screen.getByText('강의자 전용 화면입니다.'),
+    ).toBeInTheDocument()
   })
 
   it('renders the not found route for unknown paths', () => {
@@ -242,11 +274,12 @@ describe('AppRoutes', () => {
   it('validates signup form fields', () => {
     renderRoute('/signup', null)
 
-    fireEvent.click(screen.getByRole('button', { name: '회원가입' }))
+    fireEvent.click(screen.getByRole('button', { name: '다음' }))
+    fireEvent.click(screen.getByRole('button', { name: '가입 완료' }))
 
     expect(screen.getByText('이름을 입력하세요.')).toBeInTheDocument()
     expect(screen.getByText('이메일을 입력하세요.')).toBeInTheDocument()
     expect(screen.getByText('비밀번호를 입력하세요.')).toBeInTheDocument()
-    expect(screen.getByText('비밀번호 확인을 입력하세요.')).toBeInTheDocument()
+    expect(screen.getByText('필수 약관에 동의해 주세요.')).toBeInTheDocument()
   })
 })

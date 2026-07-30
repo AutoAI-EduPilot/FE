@@ -23,6 +23,10 @@ function renderLogin(path = '/login') {
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route
+            path="/forgot-password"
+            element={<p>비밀번호 찾기 화면</p>}
+          />
           <Route path="/materials" element={<p>자료 화면</p>} />
         </Routes>
       </MemoryRouter>
@@ -83,5 +87,13 @@ describe('LoginPage', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(
       '10분 동안 활동이 없어 로그아웃되었습니다.',
     )
+  })
+
+  it('opens the forgot password page', () => {
+    renderLogin()
+
+    fireEvent.click(screen.getByRole('link', { name: '비밀번호 찾기' }))
+
+    expect(screen.getByText('비밀번호 찾기 화면')).toBeInTheDocument()
   })
 })

@@ -450,6 +450,7 @@ export function SessionDetailPage() {
               ) : null}
             </div>
           }
+          onRequestQuiz={() => setIsSelectingQuizType(true)}
           sessionId={activeSession.id}
         />
         </div>

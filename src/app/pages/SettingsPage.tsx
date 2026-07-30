@@ -2,7 +2,7 @@ import { LogOut, UserX } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { useAuth } from '../../features/auth'
+import { getRoleLabel, useAuth } from '../../features/auth'
 import { ApiClientError, getRequestErrorMessage } from '../../shared/api'
 import { cx } from '../../shared/lib/cx'
 import { Button, Card, PageHeader, TextInput, useToast } from '../../shared/ui'
@@ -128,7 +128,7 @@ export function SettingsPage() {
               onAffiliationChange={setAffiliation}
               onNameChange={setName}
               onNotice={() => showToast(PENDING_API_NOTICE, 'info')}
-              role={user?.role === 'ADMIN' ? '관리자' : '학습자'}
+              role={getRoleLabel(user?.role)}
             />
           ) : null}
 
@@ -166,50 +166,55 @@ export function SettingsPage() {
             </section>
           ) : null}
 
-          {section === 'notification' ? (
+          {/* 시안 4e는 프로필 화면에 알림·AI 설정 카드가 함께 놓인다.
+              좌측 내비는 같은 컨트롤을 좁혀 보는 필터로 동작한다. */}
+          {section === 'profile' ||
+          section === 'notification' ||
+          section === 'assistant' ? (
             <Card as="section" className="px-6">
-              <ToggleRow
-                checked={newMaterialNotification}
-                description="강의자가 자료를 올리면 알려드려요"
-                label="새 자료 알림"
-                onChange={setNewMaterialNotification}
-              />
-              <ToggleRow
-                checked={studyReminder}
-                description="3일 이상 접속하지 않으면 이메일 발송"
-                isLast
-                label="학습 리마인더"
-                onChange={setStudyReminder}
-              />
-            </Card>
-          ) : null}
-
-          {section === 'assistant' ? (
-            <Card as="section" className="px-6">
-              <div className="flex items-center gap-4 py-4">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-stone-900">
-                    AI 답변 스타일
-                  </p>
-                  <p className="mt-0.5 text-[12.5px] text-stone-400">
-                    채팅 답변의 길이와 난이도를 조절해요
-                  </p>
+              {section !== 'assistant' ? (
+                <>
+                  <ToggleRow
+                    checked={newMaterialNotification}
+                    description="강의자가 자료를 올리면 알려드려요"
+                    label="새 자료 알림"
+                    onChange={setNewMaterialNotification}
+                  />
+                  <ToggleRow
+                    checked={studyReminder}
+                    description="3일 이상 접속하지 않으면 이메일 발송"
+                    isLast={section === 'notification'}
+                    label="학습 리마인더"
+                    onChange={setStudyReminder}
+                  />
+                </>
+              ) : null}
+              {section !== 'notification' ? (
+                <div className="flex items-center gap-4 py-4">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-stone-900">
+                      AI 답변 스타일
+                    </p>
+                    <p className="mt-0.5 text-[12.5px] text-stone-400">
+                      채팅 답변의 길이와 난이도를 조절해요
+                    </p>
+                  </div>
+                  <label className="ml-auto shrink-0">
+                    <span className="sr-only">AI 답변 스타일</span>
+                    <select
+                      className="h-9 rounded-lg border border-stone-200 bg-white px-3 text-[12.5px] font-medium text-stone-700 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                      onChange={(event) => setAnswerStyle(event.target.value)}
+                      value={answerStyle}
+                    >
+                      {ANSWER_STYLES.map((style) => (
+                        <option key={style.value} value={style.value}>
+                          {style.label}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
-                <label className="ml-auto shrink-0">
-                  <span className="sr-only">AI 답변 스타일</span>
-                  <select
-                    className="h-9 rounded-lg border border-stone-200 bg-white px-3 text-[12.5px] font-medium text-stone-700 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                    onChange={(event) => setAnswerStyle(event.target.value)}
-                    value={answerStyle}
-                  >
-                    {ANSWER_STYLES.map((style) => (
-                      <option key={style.value} value={style.value}>
-                        {style.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-              </div>
+              ) : null}
             </Card>
           ) : null}
 

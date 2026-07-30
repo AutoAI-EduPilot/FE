@@ -1,4 +1,11 @@
-import { ArrowUp, FileText, NotebookPen, RotateCcw, Trash2 } from 'lucide-react'
+import {
+  ArrowUp,
+  FileText,
+  NotebookPen,
+  RotateCcw,
+  Trash2,
+  X,
+} from 'lucide-react'
 import {
   useEffect,
   useRef,
@@ -19,6 +26,8 @@ interface ChatPanelProps {
   currentPage?: number
   /** 서버 위젯·퀴즈 유형 선택 등 대화 흐름에 붙는 액션 (입력창 바로 위) */
   footer?: ReactNode
+  /** 시안 빠른 칩의 "퀴즈 내줘" — 세션 화면의 유형 선택(W4)을 연다. */
+  onRequestQuiz?: () => void
   sessionId: string
 }
 
@@ -28,7 +37,12 @@ interface LocalNote {
   pageNumber?: number
 }
 
-const QUICK_PROMPTS = ['쉽게 설명해줘', '핵심만 요약해줘', '예시를 들어줘']
+/** 시안 4d의 빠른 액션 칩 */
+const QUICK_ACTIONS = [
+  { kind: 'note', label: '노트에 저장' },
+  { kind: 'quiz', label: '퀴즈 내줘' },
+  { kind: 'prompt', label: '쉽게 설명해줘' },
+] as const
 
 function createRequestId(): string {
   return typeof crypto.randomUUID === 'function'
@@ -40,6 +54,7 @@ export function ChatPanel({
   chat,
   currentPage,
   footer,
+  onRequestQuiz,
   sessionId,
 }: ChatPanelProps) {
   const [question, setQuestion] = useState('')
@@ -48,6 +63,7 @@ export function ChatPanel({
   // TODO(BE): 노트 API가 없어 화면 메모리에만 저장된다. docs/be-api-requests.md §1-1
   const [notes, setNotes] = useState<LocalNote[]>([])
   const [hiddenMessageCount, setHiddenMessageCount] = useState(0)
+  const [isPageAttached, setIsPageAttached] = useState(true)
   const logEndRef = useRef<HTMLDivElement | null>(null)
 
   useEffect(() => {
@@ -73,6 +89,7 @@ export function ChatPanel({
     })
     setQuestion('')
     setError(null)
+    setIsPageAttached(true)
 
     try {
       await chat.submitTurn({
@@ -88,6 +105,31 @@ export function ChatPanel({
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     void sendQuestion(question)
+  }
+
+  function handleQuickAction(kind: (typeof QUICK_ACTIONS)[number]['kind']) {
+    if (kind === 'quiz') {
+      onRequestQuiz?.()
+      return
+    }
+    if (kind === 'prompt') {
+      void sendQuestion('쉽게 설명해줘')
+      return
+    }
+
+    const lastAnswer = [...visibleMessages]
+      .reverse()
+      .find((message) => message.role === 'assistant')
+    if (!lastAnswer) return
+    setNotes((current) => [
+      ...current,
+      {
+        content: lastAnswer.content,
+        id: `note-${lastAnswer.id}-${current.length}`,
+        pageNumber: lastAnswer.pageNumber,
+      },
+    ])
+    setTab('notes')
   }
 
   const visibleMessages = chat.messages.slice(hiddenMessageCount)
@@ -200,14 +242,14 @@ export function ChatPanel({
 
       {hasAssistantReply && !chat.isTurnPending ? (
         <div className="flex shrink-0 flex-wrap gap-1.5 px-4 pb-2">
-          {QUICK_PROMPTS.map((prompt) => (
+          {QUICK_ACTIONS.map((action) => (
             <button
               className="flex h-7.5 items-center rounded-full border border-stone-200 px-3 text-[12.5px] font-medium text-brand-700 hover:bg-brand-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
-              key={prompt}
-              onClick={() => void sendQuestion(prompt)}
+              key={action.kind}
+              onClick={() => handleQuickAction(action.kind)}
               type="button"
             >
-              {prompt}
+              {action.label}
             </button>
           ))}
         </div>
@@ -216,10 +258,18 @@ export function ChatPanel({
       {footer ? <div className="shrink-0 px-4 pb-1">{footer}</div> : null}
 
       <form className="shrink-0 p-3" onSubmit={handleSubmit}>
-        {currentPage ? (
+        {currentPage && isPageAttached ? (
           <p className="mb-2 inline-flex items-center gap-1.5 rounded-lg bg-stone-100 px-2.5 py-1 text-[11.5px] text-stone-500">
             <FileText aria-hidden="true" size={12} />
             현재 페이지 첨부됨 · {currentPage}쪽
+            <button
+              aria-label="현재 페이지 첨부 해제"
+              className="rounded text-stone-400 hover:text-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+              onClick={() => setIsPageAttached(false)}
+              type="button"
+            >
+              <X aria-hidden="true" size={11} />
+            </button>
           </p>
         ) : null}
 

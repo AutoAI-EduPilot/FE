@@ -5,7 +5,6 @@ export interface LoginFormValues {
 
 export interface SignupFormValues extends LoginFormValues {
   name: string
-  passwordConfirm: string
 }
 
 export type LoginFormErrors = Partial<Record<keyof LoginFormValues, string>>
@@ -51,12 +50,6 @@ export function validateSignupForm(values: SignupFormValues): SignupFormErrors {
     errors.name = '이름을 입력하세요.'
   } else if (values.name.trim().length < 2) {
     errors.name = '이름은 2자 이상이어야 합니다.'
-  }
-
-  if (!values.passwordConfirm) {
-    errors.passwordConfirm = '비밀번호 확인을 입력하세요.'
-  } else if (values.passwordConfirm !== values.password) {
-    errors.passwordConfirm = '비밀번호가 일치하지 않습니다.'
   }
 
   return errors

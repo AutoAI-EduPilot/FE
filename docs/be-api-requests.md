@@ -194,6 +194,17 @@ GET /api/users/me/schedule?from={date}&to={date}
 
 - 시안 사이드바의 "캘린더" 메뉴용. **도메인 정의 자체가 없어 가장 후순위**입니다. 제외해도 무방하면 메뉴에서 빼겠습니다.
 
+### 3-5. 비밀번호 재설정
+
+```
+POST /api/auth/password-reset/request    { email }
+POST /api/auth/password-reset/confirm    { token, newPassword }
+```
+
+- **현재 FE 동작**: `/forgot-password`에서 이메일 형식 검증과 전송 완료 화면까지 구현했지만 실제 메일은 발송하지 않습니다.
+- 요청 API는 계정 존재 여부를 노출하지 않도록 등록 여부와 무관하게 같은 성공 응답을 반환해야 합니다.
+- 재설정 토큰은 일회용, 10분 만료를 권장하며 새 비밀번호는 회원가입과 같은 정책을 사용합니다.
+
 ---
 
 ## 회신이 필요한 결정 사항

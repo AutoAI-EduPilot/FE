@@ -49,7 +49,6 @@ describe('remote auth repository', () => {
       email: ' Learner@example.com ',
       name: ' 학습자 ',
       password: 'password123',
-      passwordConfirm: 'password123',
     }
 
     await repository.signup(values)
@@ -101,7 +100,6 @@ describe('remote auth repository', () => {
         email: 'learner@example.com',
         name: '학습자',
         password: 'password',
-        passwordConfirm: 'password',
       })
       .catch((error: unknown) => error)
 
