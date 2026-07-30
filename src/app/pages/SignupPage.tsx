@@ -240,31 +240,31 @@ export function SignupPage() {
   }
 
   return (
-    <div className="mx-auto max-w-[300px]">
+    <div>
       <div className="flex flex-col gap-1.5">
-        <p className="text-[11px] text-stone-400">
+        <p className="text-[13px] text-stone-400">
           회원가입 2 / 2 ·{' '}
           <strong className="font-semibold text-brand-600">
             {selectedRoleLabel}
           </strong>
         </p>
-        <h1 className="text-xl font-bold text-stone-900">
+        <h1 className="text-2xl font-bold text-stone-900">
           계정 정보를 입력하세요
         </h1>
       </div>
 
-      <form className="mt-4 space-y-2.5" noValidate onSubmit={handleSubmit}>
+      <form className="mt-6 space-y-4" noValidate onSubmit={handleSubmit}>
         <div>
           <div className="flex items-baseline justify-between gap-3">
             <label
-              className="text-xs font-medium text-stone-800"
+              className="text-[13px] font-semibold text-stone-800"
               htmlFor="signup-name"
             >
               이름
             </label>
             {errors.name ? (
               <p
-                className="text-[11px] font-medium text-rose-700"
+                className="text-xs font-medium text-rose-700"
                 id="signup-name-error"
                 role="alert"
               >
@@ -287,14 +287,14 @@ export function SignupPage() {
         <div>
           <div className="flex items-baseline justify-between gap-3">
             <label
-              className="text-xs font-medium text-stone-800"
+              className="text-[13px] font-semibold text-stone-800"
               htmlFor="signup-email"
             >
               이메일
             </label>
             {errors.email ? (
               <p
-                className="text-[11px] font-medium text-rose-700"
+                className="text-xs font-medium text-rose-700"
                 id="signup-email-error"
                 role="alert"
               >
@@ -315,7 +315,7 @@ export function SignupPage() {
               value={values.email}
             />
             {isEmailFormatValid && !errors.email ? (
-              <span className="pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-[10px] font-semibold text-emerald-700">
+              <span className="pointer-events-none absolute top-1/2 right-3.5 -translate-y-1/2 text-[11px] font-semibold text-emerald-700">
                 ✓ 사용 가능
               </span>
             ) : null}
@@ -325,14 +325,14 @@ export function SignupPage() {
         <div>
           <div className="flex items-baseline justify-between gap-3">
             <label
-              className="text-xs font-medium text-stone-800"
+              className="text-[13px] font-semibold text-stone-800"
               htmlFor="signup-password"
             >
               비밀번호
             </label>
             {errors.password ? (
               <p
-                className="text-[11px] font-medium text-rose-700"
+                className="text-xs font-medium text-rose-700"
                 id="signup-password-error"
                 role="alert"
               >
@@ -358,26 +358,26 @@ export function SignupPage() {
               aria-label={
                 isPasswordVisible ? '비밀번호 숨기기' : '비밀번호 표시'
               }
-              className="absolute top-1/2 right-3 flex size-6 -translate-y-1/2 items-center justify-center rounded text-stone-400 hover:text-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600"
+              className="absolute top-1/2 right-3 flex size-7 -translate-y-1/2 items-center justify-center rounded text-stone-400 hover:text-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600"
               onClick={() => setIsPasswordVisible((visible) => !visible)}
               type="button"
             >
               {isPasswordVisible ? (
-                <EyeOff aria-hidden="true" size={14} />
+                <EyeOff aria-hidden="true" size={16} />
               ) : (
-                <Eye aria-hidden="true" size={14} />
+                <Eye aria-hidden="true" size={16} />
               )}
             </button>
           </div>
           <div
             aria-live="polite"
-            className="mt-1 flex items-center gap-1"
+            className="mt-2 flex items-center gap-1.5"
             id="password-strength"
           >
             {Array.from({ length: 4 }, (_, index) => (
               <span
                 className={[
-                  'h-0.5 flex-1 rounded-full',
+                  'h-1 flex-1 rounded-full',
                   index < passwordStrength.score
                     ? passwordStrength.barClassName
                     : 'bg-stone-200',
@@ -387,7 +387,7 @@ export function SignupPage() {
             ))}
             <span
               className={[
-                'ml-1 min-w-6 text-right text-[9px] font-semibold',
+                'ml-1.5 min-w-9 text-right text-[11px] font-semibold',
                 passwordStrength.labelClassName,
               ].join(' ')}
             >
@@ -398,7 +398,7 @@ export function SignupPage() {
 
         <div className="relative" ref={affiliationContainerRef}>
           <label
-            className="text-xs font-medium text-stone-800"
+            className="text-[13px] font-semibold text-stone-800"
             htmlFor="signup-affiliation"
           >
             소속{' '}
@@ -430,7 +430,7 @@ export function SignupPage() {
                 'pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-stone-400 transition-transform',
                 isAffiliationOpen ? '' : 'rotate-180',
               ].join(' ')}
-              size={13}
+              size={15}
             />
           </div>
 
@@ -443,7 +443,7 @@ export function SignupPage() {
               {filteredAffiliations.map((item, index) => (
                 <button
                   className={[
-                    'flex h-8 w-full items-center rounded-md px-2.5 text-left text-xs text-stone-700 hover:bg-stone-50',
+                    'flex h-9 w-full items-center rounded-md px-3 text-left text-[13px] text-stone-700 hover:bg-stone-50',
                     index === 0 ? 'bg-stone-100 font-semibold text-stone-900' : '',
                   ].join(' ')}
                   key={item.name}
@@ -455,14 +455,14 @@ export function SignupPage() {
                   type="button"
                 >
                   {item.name}
-                  <span className="ml-auto text-[10px] font-normal text-stone-400">
+                  <span className="ml-auto text-[11px] font-normal text-stone-400">
                     {item.type}
                   </span>
                 </button>
               ))}
               <div className="mx-2 my-1 h-px bg-stone-100" />
               <button
-                className="flex h-8 w-full items-center rounded-md px-2.5 text-left text-xs font-semibold text-brand-700 hover:bg-brand-50"
+                className="flex h-9 w-full items-center rounded-md px-3 text-left text-[13px] font-semibold text-brand-700 hover:bg-brand-50"
                 onClick={() => setIsAffiliationOpen(false)}
                 type="button"
               >
@@ -472,8 +472,8 @@ export function SignupPage() {
           ) : null}
         </div>
 
-        <div className="grid gap-1 pt-1">
-          <label className="flex cursor-pointer items-start gap-2 text-[11px] leading-4 text-stone-600">
+        <div className="grid gap-2 pt-1">
+          <label className="flex cursor-pointer items-start gap-2.5 text-[13px] leading-5 text-stone-600">
             <input
               checked={hasAcceptedTerms}
               className="size-4 shrink-0 rounded border-stone-300 accent-brand-600"
@@ -488,7 +488,7 @@ export function SignupPage() {
               <span className="font-semibold text-rose-600">*</span>
             </span>
           </label>
-          <label className="flex cursor-pointer items-start gap-2 text-[11px] leading-4 text-stone-600">
+          <label className="flex cursor-pointer items-start gap-2.5 text-[13px] leading-5 text-stone-600">
             <input
               checked={acceptsLearningEmails}
               className="size-4 shrink-0 rounded border-stone-300 accent-brand-600"
@@ -498,29 +498,23 @@ export function SignupPage() {
             학습 소식 이메일 수신 (선택)
           </label>
           {termsError ? (
-            <p className="text-[11px] font-medium text-rose-700" role="alert">
+            <p className="text-xs font-medium text-rose-700" role="alert">
               {termsError}
             </p>
           ) : null}
         </div>
 
-        <div className="flex gap-2 pt-1">
+        <div className="flex gap-3 pt-2">
           <Button
-            className="w-19 shrink-0"
+            className="h-11 shrink-0 px-5"
             onClick={() => setStep('role')}
-            size="sm"
             type="button"
             variant="secondary"
           >
-            <ArrowLeft aria-hidden="true" size={14} />
+            <ArrowLeft aria-hidden="true" size={15} />
             이전
           </Button>
-          <Button
-            className="flex-1"
-            disabled={isSubmitting}
-            size="sm"
-            type="submit"
-          >
+          <Button className="h-11 flex-1" disabled={isSubmitting} type="submit">
             {isSubmitting ? '가입 중' : '가입 완료'}
           </Button>
         </div>
@@ -538,7 +532,7 @@ export function SignupPage() {
 
 function fieldClassName(hasError: boolean, spacingClassName: string): string {
   return [
-    'block h-9 w-full rounded-lg border bg-white px-2.5 text-xs text-stone-950',
+    'block h-11 w-full rounded-[10px] border bg-white px-3.5 text-sm text-stone-950',
     'placeholder:text-stone-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100',
     hasError ? 'border-rose-400' : 'border-stone-300',
     spacingClassName,
