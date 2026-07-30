@@ -57,6 +57,7 @@ export function MaterialsPage() {
     null,
   )
   const fileInputRef = useRef<HTMLInputElement | null>(null)
+  const materialMutationVersionRef = useRef(0)
   const readyCount = useMemo(
     () => materials.filter((material) => material.status === 'READY').length,
     [materials],
@@ -64,10 +65,12 @@ export function MaterialsPage() {
 
   useEffect(() => {
     const controller = new AbortController()
+    const mutationVersion = materialMutationVersionRef.current
 
     repository
       .list(controller.signal)
       .then((nextMaterials) => {
+        if (mutationVersion !== materialMutationVersionRef.current) return
         setMaterials(nextMaterials)
         setLoadError(null)
       })
@@ -120,6 +123,7 @@ export function MaterialsPage() {
 
     try {
       const nextMaterial = await repository.upload(file)
+      materialMutationVersionRef.current += 1
       setSelectedFileName(file.name)
       setMaterials((current) => [nextMaterial, ...current])
       showToast('업로드를 시작했습니다. 처리 상태를 확인하세요.', 'success')
@@ -146,6 +150,7 @@ export function MaterialsPage() {
     setDeletingMaterialId(material.id)
     try {
       await repository.delete(material.id)
+      materialMutationVersionRef.current += 1
       setMaterials((current) =>
         current.filter((item) => item.id !== material.id),
       )
