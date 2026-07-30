@@ -238,7 +238,7 @@ export async function handleApiFixtureRequest(
 
   if (
     request.method === 'GET' &&
-    path === '/api/sessions/100/messages?page=0&size=50'
+    path === '/api/sessions/100/messages?size=50'
   ) {
     return apiSuccess(paged([]))
   }
