@@ -23,7 +23,7 @@ function renderSignup() {
       <MemoryRouter initialEntries={['/signup']}>
         <Routes>
           <Route path="/signup" element={<SignupPage />} />
-          <Route path="/materials" element={<p>자료 화면</p>} />
+          <Route path="/classrooms" element={<p>내 강의실 화면</p>} />
         </Routes>
       </MemoryRouter>
     </AuthProvider>,
@@ -66,6 +66,9 @@ describe('SignupPage', () => {
     expect(screen.getByText('이름을 입력하세요.')).toBeInTheDocument()
     expect(screen.getByText('이메일을 입력하세요.')).toBeInTheDocument()
     expect(screen.getByText('비밀번호를 입력하세요.')).toBeInTheDocument()
+    expect(
+      screen.getByText('비밀번호를 한 번 더 입력하세요.'),
+    ).toBeInTheDocument()
     expect(screen.getByText('필수 약관에 동의해 주세요.')).toBeInTheDocument()
   })
 
@@ -76,6 +79,9 @@ describe('SignupPage', () => {
     fireEvent.change(screen.getByLabelText('비밀번호'), {
       target: { value: 'password-123' },
     })
+    fireEvent.change(screen.getByLabelText('비밀번호 확인'), {
+      target: { value: 'password-123' },
+    })
 
     expect(screen.getByText('안전')).toBeInTheDocument()
     expect(screen.getByLabelText('비밀번호')).toHaveAttribute(
@@ -84,6 +90,10 @@ describe('SignupPage', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: '비밀번호 표시' }))
     expect(screen.getByLabelText('비밀번호')).toHaveAttribute('type', 'text')
+    expect(screen.getByLabelText('비밀번호 확인')).toHaveAttribute(
+      'type',
+      'password',
+    )
 
     fireEvent.change(screen.getByRole('combobox', { name: /소속/ }), {
       target: { value: '서울' },
@@ -95,9 +105,10 @@ describe('SignupPage', () => {
     )
   })
 
-  it('signs up, auto-logs-in, and redirects to materials', async () => {
+  it('signs up, auto-logs-in, and redirects to classrooms', async () => {
     renderSignup()
 
+    fireEvent.click(screen.getByRole('radio', { name: /^강의자/ }))
     fireEvent.click(screen.getByRole('button', { name: '다음' }))
     fireEvent.change(screen.getByLabelText('이름'), {
       target: { value: '학습자' },
@@ -108,6 +119,9 @@ describe('SignupPage', () => {
     fireEvent.change(screen.getByLabelText('비밀번호'), {
       target: { value: 'password-123' },
     })
+    fireEvent.change(screen.getByLabelText('비밀번호 확인'), {
+      target: { value: 'password-123' },
+    })
     fireEvent.click(
       screen.getByRole('checkbox', {
         name: /이용약관 및 개인정보 처리방침 동의/,
@@ -115,6 +129,55 @@ describe('SignupPage', () => {
     )
     fireEvent.click(screen.getByRole('button', { name: '가입 완료' }))
 
-    expect(await screen.findByText('자료 화면')).toBeInTheDocument()
+    expect(await screen.findByText('내 강의실 화면')).toBeInTheDocument()
+
+    const signupCall = vi
+      .mocked(globalThis.fetch)
+      .mock.calls.find(([input]) =>
+        String(input).endsWith('/api/auth/signup'),
+      )
+    expect(JSON.parse(String(signupCall?.[1]?.body))).toMatchObject({
+      email: 'new@example.com',
+      role: 'INSTRUCTOR',
+    })
+    expect(JSON.parse(String(signupCall?.[1]?.body))).not.toHaveProperty(
+      'confirmPassword',
+    )
+  })
+
+  it('blocks signup when the passwords do not match', () => {
+    renderSignup()
+
+    fireEvent.click(screen.getByRole('button', { name: '다음' }))
+    fireEvent.change(screen.getByLabelText('비밀번호'), {
+      target: { value: 'password-123' },
+    })
+    fireEvent.change(screen.getByLabelText('비밀번호 확인'), {
+      target: { value: 'password-456' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '가입 완료' }))
+
+    expect(screen.getByText('비밀번호가 일치하지 않습니다.')).toBeInTheDocument()
+    expect(
+      vi
+        .mocked(globalThis.fetch)
+        .mock.calls.some(([input]) =>
+          String(input).endsWith('/api/auth/signup'),
+        ),
+    ).toBe(false)
+  })
+
+  it('checks duplicate email after the user enters a valid address', async () => {
+    renderSignup()
+
+    fireEvent.click(screen.getByRole('button', { name: '다음' }))
+    fireEvent.change(screen.getByLabelText('이메일'), {
+      target: { value: 'existing@example.com' },
+    })
+
+    expect(
+      await screen.findByText('이미 가입된 이메일입니다.'),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '가입 완료' })).toBeDisabled()
   })
 })

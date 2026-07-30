@@ -49,11 +49,18 @@ describe('AppRoutes', () => {
     ).toBeInTheDocument()
   })
 
-  it('redirects the root route to materials', async () => {
+  it('redirects the root route to classrooms', () => {
     renderRoute('/')
 
-    expect(screen.getByRole('heading', { name: '자료' })).toBeInTheDocument()
-    expect(await screen.findByText('PDF 업로드')).toBeInTheDocument()
+    expect(
+      screen.getByRole('heading', { name: '내 강의실' }),
+    ).toBeInTheDocument()
+    expect(
+      screen.getByText('아직 참여 중인 강의실이 없습니다'),
+    ).toBeInTheDocument()
+    expect(
+      screen.queryByRole('link', { name: '설정' }),
+    ).not.toBeInTheDocument()
   })
 
   it('renders the integrated session detail route', async () => {
@@ -119,9 +126,9 @@ describe('AppRoutes', () => {
         name: '페이지를 찾을 수 없습니다.',
       }),
     ).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '자료 화면으로' })).toHaveAttribute(
+    expect(screen.getByRole('link', { name: '내 강의실로' })).toHaveAttribute(
       'href',
-      '/materials',
+      '/classrooms',
     )
   })
 
@@ -186,7 +193,9 @@ describe('AppRoutes', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: '로그인' }))
 
-    expect(await screen.findByRole('heading', { name: '자료' })).toBeInTheDocument()
+    expect(
+      await screen.findByRole('heading', { name: '내 강의실' }),
+    ).toBeInTheDocument()
     expect(screen.getByText('learner')).toBeInTheDocument()
     expect(setItemSpy).not.toHaveBeenCalled()
     expect(window.localStorage.length).toBe(0)

@@ -13,6 +13,10 @@ export interface AuthSessionResult {
 }
 
 export interface AuthRepository {
+  checkEmailAvailability: (
+    email: string,
+    signal?: AbortSignal,
+  ) => Promise<boolean>
   getMe: (accessToken: string, signal?: AbortSignal) => Promise<AuthUser>
   login: (values: LoginFormValues) => Promise<AuthSessionResult>
   logout: () => Promise<void>
@@ -41,6 +45,17 @@ interface UserResponseDto {
 }
 
 const repository: AuthRepository = {
+  async checkEmailAvailability(email, signal) {
+    const query = new URLSearchParams({
+      email: email.trim().toLowerCase(),
+    })
+    const { data } = await apiRequest<{ available: boolean }>(
+      `/api/auth/email-availability?${query.toString()}`,
+      { signal },
+    )
+    return data.available
+  },
+
   async getMe(accessToken, signal) {
     const { data } = await apiRequest<UserResponseDto>('/api/users/me', {
       accessToken,
@@ -88,6 +103,7 @@ const repository: AuthRepository = {
           email: values.email.trim().toLowerCase(),
           name: values.name.trim(),
           password: values.password,
+          role: values.role,
         },
         method: 'POST',
       })
@@ -143,7 +159,7 @@ function mapRemoteAuthError(
     : error
 }
 
-const FORM_FIELDS = ['email', 'name', 'password'] as const
+const FORM_FIELDS = ['email', 'name', 'password', 'role'] as const
 
 function isFieldDetail(
   detail: unknown,

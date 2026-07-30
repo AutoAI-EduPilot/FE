@@ -59,7 +59,9 @@ POST /api/sessions/{sessionId}/conversations   → { conversationId }
 
 시안의 첫 두 화면은 **강의실(Classroom) → 주차(Week) → 자료(Material)** 3단 구조입니다. 현재 백엔드에는 자료만 있고 상위 두 계층이 없습니다.
 
-> **현재 FE 동작**: `/classrooms`, `/classrooms/:id` 화면을 시안대로 구현했고 **고정 placeholder 데이터**로 렌더합니다. 화면 상단에 `미연동 미리보기` 배지를 노출해 실데이터가 아님을 명시했습니다. 아래 API가 생기면 placeholder 모듈만 교체하면 됩니다.
+> **현재 FE 동작**: `/classrooms`, `/classrooms/:id` 화면과 검색·정렬·초대
+> 코드 입력 UI를 구현했습니다. 데모 데이터는 사용하지 않으며, API가
+> 생기기 전에는 빈 상태로 렌더합니다.
 
 ### 2-1. 강의실 목록·상세
 

@@ -106,6 +106,15 @@ export async function handleApiFixtureRequest(
     return apiSuccess(null)
   }
 
+  if (
+    request.method === 'GET' &&
+    path.startsWith('/api/auth/email-availability?')
+  ) {
+    return apiSuccess({
+      available: url.searchParams.get('email') !== 'existing@example.com',
+    })
+  }
+
   if (request.method === 'DELETE' && path === '/api/users/me') {
     const body = await readJson<{ password: string }>(request)
     if (body.password === 'wrong-password-1') {

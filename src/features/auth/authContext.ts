@@ -29,6 +29,10 @@ export type AuthenticatedRawRequest = (
 export interface AuthContextValue {
   apiRequest: AuthenticatedRequest
   rawApiRequest: AuthenticatedRawRequest
+  checkEmailAvailability: (
+    email: string,
+    signal?: AbortSignal,
+  ) => Promise<boolean>
   isAuthenticated: boolean
   isInitializing: boolean
   login: (values: LoginFormValues) => Promise<void>
