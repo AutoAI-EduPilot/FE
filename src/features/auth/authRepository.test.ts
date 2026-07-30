@@ -1,0 +1,157 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+import { mapAuthErrorToFormErrors } from './authErrors'
+import { getAuthRepository } from './authRepository'
+
+beforeEach(() => {
+  vi.stubEnv('VITE_API_BASE_URL', 'http://localhost:8080')
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
+  vi.unstubAllEnvs()
+})
+
+describe('remote auth repository', () => {
+  it('signs up and logs in with the documented request bodies', async () => {
+    const fetchMock = vi
+      .spyOn(globalThis, 'fetch')
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: {
+            email: 'learner@example.com',
+            name: '학습자',
+            userId: 1,
+          },
+          message: '회원가입 완료',
+          success: true,
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          data: {
+            accessToken: 'access-token',
+            expiresIn: 3600,
+            tokenType: 'Bearer',
+            user: {
+              email: 'learner@example.com',
+              id: 1,
+              name: '학습자',
+              role: 'USER',
+            },
+          },
+          message: '로그인 완료',
+          success: true,
+        }),
+      )
+    const repository = getAuthRepository()
+    const values = {
+      email: ' Learner@example.com ',
+      name: ' 학습자 ',
+      password: 'password123',
+    }
+
+    await repository.signup(values)
+    await expect(repository.login(values)).resolves.toEqual({
+      accessToken: 'access-token',
+      user: {
+        email: 'learner@example.com',
+        id: 1,
+        name: '학습자',
+        role: 'USER',
+      },
+    })
+
+    expectJsonRequest(fetchMock, 0, '/api/auth/signup', {
+      email: 'learner@example.com',
+      name: '학습자',
+      password: 'password123',
+    })
+    expectJsonRequest(fetchMock, 1, '/api/auth/login', {
+      email: 'learner@example.com',
+      password: 'password123',
+    })
+  })
+
+  it('maps VALIDATION_FAILED details onto the matching form fields', async () => {
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse(
+        {
+          error: {
+            code: 'VALIDATION_FAILED',
+            details: [
+              {
+                field: 'password',
+                reason:
+                  '비밀번호는 8~64자이며 영문과 숫자를 각각 하나 이상 포함해야 합니다.',
+              },
+              { field: 'unknownField', reason: '무시되어야 함' },
+            ],
+            message: '요청 값을 확인해 주세요.',
+          },
+          success: false,
+        },
+        400,
+      ),
+    )
+
+    const failure = await getAuthRepository()
+      .signup({
+        email: 'learner@example.com',
+        name: '학습자',
+        password: 'password',
+      })
+      .catch((error: unknown) => error)
+
+    expect(mapAuthErrorToFormErrors(failure)).toEqual({
+      password:
+        '비밀번호는 8~64자이며 영문과 숫자를 각각 하나 이상 포함해야 합니다.',
+    })
+  })
+
+  it('validates a restored token using the bearer header', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({
+        data: {
+          email: 'learner@example.com',
+          name: '학습자',
+          userId: 1,
+        },
+        message: '내 정보',
+        success: true,
+      }),
+    )
+
+    await expect(getAuthRepository().getMe('access-token')).resolves.toEqual({
+      email: 'learner@example.com',
+      id: 1,
+      name: '학습자',
+      role: undefined,
+    })
+
+    const [url, init] = fetchMock.mock.calls[0] ?? []
+    expect(url).toBe('http://localhost:8080/api/users/me')
+    expect(new Headers(init?.headers).get('Authorization')).toBe(
+      'Bearer access-token',
+    )
+  })
+})
+
+function expectJsonRequest(
+  fetchMock: ReturnType<typeof vi.spyOn>,
+  index: number,
+  path: string,
+  body: Record<string, unknown>,
+) {
+  const [url, init] = fetchMock.mock.calls[index] ?? []
+  expect(url).toBe(`http://localhost:8080${path}`)
+  expect(init?.method).toBe('POST')
+  expect(init?.body).toBe(JSON.stringify(body))
+}
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    headers: { 'Content-Type': 'application/json' },
+    status,
+  })
+}
