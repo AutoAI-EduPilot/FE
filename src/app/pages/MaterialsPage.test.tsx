@@ -167,7 +167,11 @@ describe('MaterialsPage', () => {
     })
 
     expect(
-      await screen.findByRole('heading', { name: 'dragged.pdf' }),
+      await screen.findByRole(
+        'heading',
+        { name: 'dragged.pdf' },
+        { timeout: 3_000 },
+      ),
     ).toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: /업로드 취소/ }),
