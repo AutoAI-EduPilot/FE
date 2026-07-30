@@ -160,16 +160,16 @@ describe('MaterialsPage', () => {
   it('adds the material returned by the upload API', async () => {
     renderMaterialsPage()
 
-    fireEvent.drop(screen.getByLabelText('PDF 업로드 드롭 영역'), {
-      dataTransfer: {
-        files: [new File(['pdf'], 'dragged.pdf', { type: 'application/pdf' })],
+    fireEvent.change(screen.getByLabelText('PDF 파일'), {
+      target: {
+        files: [new File(['pdf'], 'uploaded.pdf', { type: 'application/pdf' })],
       },
     })
 
     expect(
       await screen.findByRole(
         'heading',
-        { name: 'dragged.pdf' },
+        { name: 'uploaded.pdf' },
         { timeout: 3_000 },
       ),
     ).toBeInTheDocument()
