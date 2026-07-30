@@ -3,28 +3,28 @@ import { Link } from 'react-router-dom'
 
 import type { StudyMaterial } from '../materials'
 import { cx } from '../../shared/lib/cx'
+import type { SessionQuizSummary } from './sessionTypes'
 
 interface SessionResourcePanelProps {
   activeMaterialId?: string
   backLabel: string
   backTo: string
-  materialDetailPath: (materialId: string) => string
   materials: StudyMaterial[]
   progressLabel?: string
+  quizDetailPath: (quizId: string) => string
+  quizHistory: SessionQuizSummary[]
+  resourcePath: (material: StudyMaterial) => string
 }
 
-/**
- * 시안 4d의 좌측 리소스 패널.
- * 시안은 강의실 주차별 리소스를 나열하지만 해당 도메인이 없어 내 자료 목록으로 채운다.
- * (요청 스펙: docs/be-api-requests.md §2-2)
- */
 export function SessionResourcePanel({
   activeMaterialId,
   backLabel,
   backTo,
-  materialDetailPath,
   materials,
   progressLabel,
+  quizDetailPath,
+  quizHistory,
+  resourcePath,
 }: SessionResourcePanelProps) {
   const readyMaterials = materials.filter(
     (material) => material.status === 'READY',
@@ -34,7 +34,7 @@ export function SessionResourcePanel({
   )
 
   return (
-    <aside className="hidden min-h-0 w-[250px] shrink-0 flex-col overflow-y-auto rounded-xl border border-stone-200 bg-stone-50/60 p-3 xl:flex">
+    <aside className="hidden h-full min-h-0 w-[240px] shrink-0 flex-col overflow-y-auto border-r border-stone-200 bg-stone-50/60 p-3 xl:flex">
       <Link
         className="flex h-8 items-center gap-1.5 rounded-lg px-2 text-[13px] text-stone-500 hover:bg-white hover:text-stone-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
         to={backTo}
@@ -44,7 +44,7 @@ export function SessionResourcePanel({
       </Link>
 
       <p className="px-2 pt-3.5 pb-1.5 text-[11.5px] font-semibold tracking-[0.04em] text-stone-400">
-        학습 가능한 자료
+        내 자료
       </p>
       <ul className="grid gap-0.5">
         {readyMaterials.map((material) => (
@@ -54,7 +54,7 @@ export function SessionResourcePanel({
               progressLabel={
                 material.id === activeMaterialId ? progressLabel : undefined
               }
-              to={materialDetailPath(material.id)}
+              to={resourcePath(material)}
               title={material.title}
             />
           </li>
@@ -76,9 +76,37 @@ export function SessionResourcePanel({
               <li key={material.id}>
                 <ResourceRow
                   isMuted
-                  to={materialDetailPath(material.id)}
+                  to={resourcePath(material)}
                   title={material.title}
                 />
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+
+      {quizHistory.length > 0 ? (
+        <>
+          <p className="px-2 pt-3.5 pb-1.5 text-[11.5px] font-semibold tracking-[0.04em] text-stone-400">
+            퀴즈 기록
+          </p>
+          <ul className="grid gap-0.5">
+            {quizHistory.map((quiz) => (
+              <li key={quiz.quizId}>
+                <Link
+                  className="flex min-h-9 items-center gap-2 rounded-lg px-2 text-[12.5px] text-stone-600 hover:bg-white hover:text-stone-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+                  to={quizDetailPath(quiz.quizId)}
+                >
+                  <span className="min-w-0 flex-1 truncate">{quiz.title}</span>
+                  <span className="shrink-0 text-[11px] text-stone-400">
+                    {getQuizKindLabel(quiz.quizType)}
+                  </span>
+                  {quiz.score !== undefined ? (
+                    <span className="shrink-0 font-semibold text-brand-700">
+                      {quiz.score}점
+                    </span>
+                  ) : null}
+                </Link>
               </li>
             ))}
           </ul>
@@ -119,8 +147,15 @@ function ResourceRow({
       )}
       to={to}
     >
-      <span className="flex h-4.5 w-8 shrink-0 items-center justify-center rounded bg-rose-100 text-[10px] font-bold text-rose-700">
-        PDF
+      <span
+        className={cx(
+          'flex h-4.5 w-8 shrink-0 items-center justify-center rounded text-[10px] font-bold',
+          getMaterialKind(title) === 'PPT'
+            ? 'bg-amber-100 text-amber-700'
+            : 'bg-rose-100 text-rose-700',
+        )}
+      >
+        {getMaterialKind(title)}
       </span>
       <span className="min-w-0 flex-1 truncate">{title}</span>
       {progressLabel ? (
@@ -130,4 +165,18 @@ function ResourceRow({
       ) : null}
     </Link>
   )
+}
+
+function getMaterialKind(title: string): 'PDF' | 'PPT' {
+  return /\.pptx?$/i.test(title.trim()) ? 'PPT' : 'PDF'
+}
+
+function getQuizKindLabel(quizType: string): string {
+  const labels: Record<string, string> = {
+    ESSAY: '서술형',
+    MCQ: '객관식',
+    OX: 'OX',
+    SHORT: '단답형',
+  }
+  return labels[quizType] ?? quizType
 }

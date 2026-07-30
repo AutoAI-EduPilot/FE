@@ -1,7 +1,6 @@
 import {
   Bell,
   BookOpenCheck,
-  CalendarDays,
   ChevronsLeft,
   ChevronsRight,
   CircleHelp,
@@ -11,16 +10,20 @@ import {
   LogOut,
   Monitor,
   Moon,
-  NotebookPen,
   Settings,
   Sun,
-  UsersRound,
   type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom'
+import {
+  Link,
+  NavLink,
+  Outlet,
+  useLocation,
+  useNavigate,
+} from 'react-router-dom'
 
-import { getRoleLabel, isInstructorRole, useAuth } from '../../features/auth'
+import { getRoleLabel, useAuth } from '../../features/auth'
 import { cx } from '../../shared/lib/cx'
 import { useTheme, type ThemeMode } from '../../shared/theme'
 import { useToast } from '../../shared/ui'
@@ -28,21 +31,12 @@ import { routes } from '../routes'
 
 const primaryNavigation: Array<{
   icon: LucideIcon
-  instructorOnly?: boolean
   label: string
   to: string
 }> = [
   { icon: LayoutGrid, label: '내 강의실', to: routes.classrooms },
   { icon: FileText, label: '자료', to: routes.materials },
   { icon: GraduationCap, label: '세션', to: routes.sessions },
-  { icon: CalendarDays, label: '캘린더', to: routes.calendar },
-  { icon: NotebookPen, label: '내 노트', to: routes.notes },
-  {
-    icon: UsersRound,
-    instructorOnly: true,
-    label: '입장 요청',
-    to: routes.entranceRequests,
-  },
 ]
 
 export function AppLayout() {
@@ -50,14 +44,20 @@ export function AppLayout() {
   const { mode, setMode } = useTheme()
   const { show: showToast } = useToast()
   const navigate = useNavigate()
-  const [isCollapsed, setIsCollapsed] = useState(false)
+  const location = useLocation()
+  const isStudyWorkspace = /^\/sessions\/[^/]+\/?$/.test(location.pathname)
+  const [sidebarPreference, setSidebarPreference] = useState<{
+    isCollapsed: boolean
+    pathname: string
+  } | null>(null)
+  const isCollapsed =
+    sidebarPreference?.pathname === location.pathname
+      ? sidebarPreference.isCollapsed
+      : isStudyWorkspace
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const menuContainerRef = useRef<HTMLDivElement | null>(null)
   const mobileMenuContainerRef = useRef<HTMLDivElement | null>(null)
   const roleLabel = getRoleLabel(user?.role)
-  const navigationItems = primaryNavigation.filter(
-    (item) => !item.instructorOnly || isInstructorRole(user?.role),
-  )
 
   useEffect(() => {
     if (!isMenuOpen) return
@@ -175,7 +175,12 @@ export function AppLayout() {
   )
 
   return (
-    <div className="min-h-screen bg-white text-stone-900 dark:bg-[#1b1c20] lg:flex">
+    <div
+      className={cx(
+        'bg-white text-stone-900 dark:bg-[#1b1c20] lg:flex',
+        isStudyWorkspace ? 'h-dvh overflow-hidden' : 'min-h-screen',
+      )}
+    >
       <aside
         className={cx(
           'flex border-b border-stone-200 bg-stone-100 px-4 py-3 dark:bg-[#222327] lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:flex-col lg:border-r lg:border-b-0 lg:py-4',
@@ -208,7 +213,12 @@ export function AppLayout() {
             <button
               aria-label={isCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
               className="hidden size-7 shrink-0 items-center justify-center rounded-lg text-stone-400 hover:bg-white hover:text-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 lg:flex"
-              onClick={() => setIsCollapsed((collapsed) => !collapsed)}
+              onClick={() =>
+                setSidebarPreference({
+                  isCollapsed: !isCollapsed,
+                  pathname: location.pathname,
+                })
+              }
               title={isCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
               type="button"
             >
@@ -224,7 +234,7 @@ export function AppLayout() {
             aria-label="주요 메뉴"
             className="ml-auto flex gap-1 overflow-x-auto lg:mt-6 lg:ml-0 lg:flex-col lg:gap-0.5"
           >
-            {navigationItems.map((item) => (
+            {primaryNavigation.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
@@ -304,7 +314,14 @@ export function AppLayout() {
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 px-4 py-5 sm:px-6 lg:px-10 lg:py-8">
+      <main
+        className={cx(
+          'min-w-0 flex-1',
+          isStudyWorkspace
+            ? 'h-[calc(100dvh-61px)] overflow-hidden p-0 lg:h-dvh'
+            : 'px-4 py-5 sm:px-6 lg:px-10 lg:py-8',
+        )}
+      >
         <Outlet />
       </main>
     </div>

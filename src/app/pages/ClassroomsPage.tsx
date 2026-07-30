@@ -80,7 +80,9 @@ export function ClassroomsPage() {
       <header className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex items-baseline gap-3">
           <h1 className="text-[22px] font-bold text-stone-950">내 강의실</h1>
-          <p className="text-xs text-stone-400">참여 중 0개</p>
+          <p className="text-xs text-stone-400">
+            {getAcademicTermLabel()} · 0개
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -283,4 +285,9 @@ export function ClassroomsPage() {
       ) : null}
     </div>
   )
+}
+
+function getAcademicTermLabel(date = new Date()): string {
+  const semester = date.getMonth() < 8 ? 1 : 2
+  return `${date.getFullYear()}년 ${semester}학기`
 }

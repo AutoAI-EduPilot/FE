@@ -57,6 +57,12 @@ interface SessionMessageDto {
   senderType: 'AI' | 'USER'
 }
 
+interface CursorPage<T> {
+  hasMore?: boolean
+  items: T[]
+  nextCursor?: string | null
+}
+
 interface SessionTurnDto {
   messages?: SessionMessageDto[]
   state?: {
@@ -180,8 +186,8 @@ export function createSessionsRepository(
       return data.items.map(mapSession)
     },
     async listMessages(sessionId, signal) {
-      const { data } = await request<PagedResponse<SessionMessageDto>>(
-        `/api/sessions/${encodeURIComponent(sessionId)}/messages?page=0&size=50`,
+      const { data } = await request<CursorPage<SessionMessageDto>>(
+        `/api/sessions/${encodeURIComponent(sessionId)}/messages?size=50`,
         { signal },
       )
       return data.items.map(mapMessage)
