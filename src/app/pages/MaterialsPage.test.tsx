@@ -159,6 +159,7 @@ describe('MaterialsPage', () => {
 
   it('adds the material returned by the upload API', async () => {
     renderMaterialsPage()
+    await screen.findByText('시험 대비 요약.pdf')
 
     fireEvent.change(screen.getByLabelText('PDF 파일'), {
       target: {
