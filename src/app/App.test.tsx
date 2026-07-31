@@ -91,7 +91,7 @@ describe('AppRoutes', () => {
     ).toBeInTheDocument()
   })
 
-  it('does not expose menus without a backend API contract', () => {
+  it('keeps instructor menus out of learner navigation', () => {
     renderRoute('/')
 
     expect(screen.queryByRole('link', { name: '캘린더' })).not.toBeInTheDocument()
@@ -99,12 +99,29 @@ describe('AppRoutes', () => {
     expect(screen.queryByRole('link', { name: '입장 요청' })).not.toBeInTheDocument()
   })
 
-  it('does not route to a feature without a backend API contract', () => {
+  it('redirects learners away from instructor-only routes', () => {
     renderRoute('/entrance-requests')
 
     expect(
-      screen.getByRole('heading', { name: '페이지를 찾을 수 없습니다.' }),
+      screen.getByRole('heading', { name: '내 강의실' }),
     ).toBeInTheDocument()
+  })
+
+  it('renders instructor navigation and management routes', () => {
+    renderRoute('/entrance-requests', {
+      email: 'instructor@example.com',
+      name: '강의자',
+      role: 'INSTRUCTOR',
+    })
+
+    expect(
+      screen.getByRole('heading', { name: '입장 요청' }),
+    ).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '캘린더' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '학습 현황' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '공지 관리' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '입장 요청' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: '자료' })).not.toBeInTheDocument()
   })
 
   it('renders the not found route for unknown paths', () => {

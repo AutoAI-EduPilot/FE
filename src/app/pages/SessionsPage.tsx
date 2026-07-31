@@ -82,9 +82,7 @@ export function SessionsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Sessions"
         title="학습 세션"
-        description="진행 중인 학습을 시작하거나 이어서 봅니다."
       />
 
       <section className="overflow-hidden rounded-xl border border-stone-200 bg-white">

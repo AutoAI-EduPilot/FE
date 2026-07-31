@@ -153,9 +153,7 @@ export function MaterialDetailPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Material Detail"
         title={material.title}
-        description="자료 처리 상태와 학습 진입 가능 여부를 확인합니다."
         actions={<StatusBadge status={material.status} />}
       />
 

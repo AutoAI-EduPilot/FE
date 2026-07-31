@@ -1,6 +1,8 @@
 import {
+  BarChart3,
   Bell,
   BookOpenCheck,
+  CalendarDays,
   ChevronsLeft,
   ChevronsRight,
   CircleHelp,
@@ -9,9 +11,11 @@ import {
   LayoutGrid,
   LogOut,
   Monitor,
+  Megaphone,
   Moon,
   Settings,
   Sun,
+  UserPlus,
   type LucideIcon,
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
@@ -23,13 +27,13 @@ import {
   useNavigate,
 } from 'react-router-dom'
 
-import { getRoleLabel, useAuth } from '../../features/auth'
+import { getRoleLabel, isInstructorRole, useAuth } from '../../features/auth'
 import { cx } from '../../shared/lib/cx'
 import { useTheme, type ThemeMode } from '../../shared/theme'
 import { useToast } from '../../shared/ui'
 import { routes } from '../routes'
 
-const primaryNavigation: Array<{
+const learnerNavigation: Array<{
   icon: LucideIcon
   label: string
   to: string
@@ -37,6 +41,18 @@ const primaryNavigation: Array<{
   { icon: LayoutGrid, label: '내 강의실', to: routes.classrooms },
   { icon: FileText, label: '자료', to: routes.materials },
   { icon: GraduationCap, label: '세션', to: routes.sessions },
+]
+
+const instructorNavigation: Array<{
+  icon: LucideIcon
+  label: string
+  to: string
+}> = [
+  { icon: LayoutGrid, label: '내 강의실', to: routes.classrooms },
+  { icon: CalendarDays, label: '캘린더', to: routes.calendar },
+  { icon: BarChart3, label: '학습 현황', to: routes.learningStatus },
+  { icon: Megaphone, label: '공지 관리', to: routes.announcements },
+  { icon: UserPlus, label: '입장 요청', to: routes.entranceRequests },
 ]
 
 export function AppLayout() {
@@ -58,6 +74,9 @@ export function AppLayout() {
   const menuContainerRef = useRef<HTMLDivElement | null>(null)
   const mobileMenuContainerRef = useRef<HTMLDivElement | null>(null)
   const roleLabel = getRoleLabel(user?.role)
+  const primaryNavigation = isInstructorRole(user?.role)
+    ? instructorNavigation
+    : learnerNavigation
 
   useEffect(() => {
     if (!isMenuOpen) return
@@ -187,7 +206,7 @@ export function AppLayout() {
           isCollapsed ? 'lg:w-14 lg:px-2' : 'lg:w-50 lg:px-3',
         )}
       >
-        <div className="flex min-w-0 flex-1 items-center gap-4 lg:block lg:flex-none">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 lg:block lg:flex-none">
           <div
             className={cx(
               'flex items-center justify-between gap-2',
@@ -232,7 +251,7 @@ export function AppLayout() {
 
           <nav
             aria-label="주요 메뉴"
-            className="ml-auto flex gap-1 overflow-x-auto lg:mt-6 lg:ml-0 lg:flex-col lg:gap-0.5"
+            className="order-2 mt-3 flex w-full gap-1 overflow-x-auto lg:mt-6 lg:ml-0 lg:w-auto lg:flex-col lg:gap-0.5"
           >
             {primaryNavigation.map((item) => (
               <NavLink
@@ -322,7 +341,15 @@ export function AppLayout() {
             : 'px-4 py-5 sm:px-6 lg:px-10 lg:py-8',
         )}
       >
-        <Outlet />
+        <div
+          className={
+            isStudyWorkspace
+              ? 'h-full min-h-0'
+              : 'mx-auto w-full max-w-[1600px]'
+          }
+        >
+          <Outlet />
+        </div>
       </main>
     </div>
   )

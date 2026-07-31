@@ -13,8 +13,10 @@ import {
   type FormEvent,
 } from 'react'
 
+import { isInstructorRole, useAuth } from '../../features/auth'
 import { usePageTitle } from '../../shared/lib/usePageTitle'
 import { Button, useToast } from '../../shared/ui'
+import { InstructorClassroomsPage } from './instructor/InstructorClassroomsPage'
 
 type ClassroomSort = 'name' | 'progress' | 'recent' | 'unread'
 
@@ -26,6 +28,16 @@ const sortOptions: Array<{ label: string; value: ClassroomSort }> = [
 ]
 
 export function ClassroomsPage() {
+  const { user } = useAuth()
+
+  return isInstructorRole(user?.role) ? (
+    <InstructorClassroomsPage />
+  ) : (
+    <LearnerClassroomsPage />
+  )
+}
+
+function LearnerClassroomsPage() {
   usePageTitle('내 강의실')
   const { show: showToast } = useToast()
   const [sort, setSort] = useState<ClassroomSort>('recent')

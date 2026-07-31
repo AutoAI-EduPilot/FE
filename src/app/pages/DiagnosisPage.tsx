@@ -131,9 +131,7 @@ export function DiagnosisPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Diagnosis"
         title="진단·교정"
-        description={`진단 ${pendingDiagnosis.diagnosisId} 답변을 작성합니다.`}
       />
 
       <section className="flex flex-col gap-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:px-5">

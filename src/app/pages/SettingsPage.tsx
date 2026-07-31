@@ -13,9 +13,9 @@ type SettingsSection = 'account' | 'assistant' | 'notification' | 'profile'
 
 const SECTIONS: Array<{ id: SettingsSection; label: string }> = [
   { id: 'profile', label: '프로필' },
-  { id: 'account', label: '회원 탈퇴' },
   { id: 'notification', label: '알림' },
   { id: 'assistant', label: 'AI 학습 도우미' },
+  { id: 'account', label: '회원 탈퇴' },
 ]
 
 const ANSWER_STYLES = [
@@ -80,9 +80,7 @@ export function SettingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Settings"
         title="설정"
-        description="계정 정보와 학습 도우미 동작을 관리합니다."
       />
 
       <div className="flex flex-col gap-7 lg:flex-row">
@@ -93,9 +91,14 @@ export function SettingsPage() {
               className={cx(
                 'flex h-9 shrink-0 items-center rounded-lg px-3 text-[13.5px]',
                 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
+                item.id === 'account' && 'text-rose-700 lg:mt-4 lg:border-t lg:border-stone-200 lg:pt-px',
                 section === item.id
-                  ? 'bg-stone-100 font-semibold text-stone-900'
-                  : 'font-medium text-stone-500 hover:bg-stone-50 hover:text-stone-800',
+                  ? item.id === 'account'
+                    ? 'bg-rose-50 font-semibold text-rose-700'
+                    : 'bg-stone-100 font-semibold text-stone-900'
+                  : item.id === 'account'
+                    ? 'font-medium hover:bg-rose-50'
+                    : 'font-medium text-stone-500 hover:bg-stone-50 hover:text-stone-800',
               )}
               key={item.id}
               onClick={() => setSection(item.id)}

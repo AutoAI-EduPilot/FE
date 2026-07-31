@@ -1,16 +1,16 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 
-import { ToastProvider } from '../../shared/ui'
+import { TestAuthProvider } from '../../test/TestAuthProvider'
 import { ClassroomsPage } from './ClassroomsPage'
 
 afterEach(cleanup)
 
 function renderPage() {
   return render(
-    <ToastProvider>
+    <TestAuthProvider>
       <ClassroomsPage />
-    </ToastProvider>,
+    </TestAuthProvider>,
   )
 }
 
