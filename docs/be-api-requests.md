@@ -6,7 +6,9 @@
 | 기준 | 디자인 정본 `강의실 레이아웃 시안.dc.html` (4a~4e) |
 | 상태 | 배포 Swagger 27개 operation 연결 완료 — 아래는 추가 계약 협의 필요 |
 
-아래 항목은 현재 API 계약만으로 완성할 수 없는 기능입니다. API가 없는 메뉴와 라우트는 노출하지 않고, 시안상 반드시 필요한 일부 기능만 로컬 상태 또는 빈 화면으로 유지합니다.
+아래 항목은 현재 API 계약만으로 완성할 수 없는 기능입니다. 강의자 계정에는
+시안상 필요한 메뉴와 라우트를 노출하되, 서버 데이터가 필요한 목록과 지표는 빈
+상태로 유지합니다. 저장 동작은 가짜 성공 처리하지 않습니다.
 
 배포 Swagger에 공개된 27개 operation은 FE 연동이 끝났으므로 여기 포함하지 않았습니다.
 
@@ -69,9 +71,10 @@ GET /api/materials/{materialId}/file
 
 시안의 첫 두 화면은 **강의실(Classroom) → 주차(Week) → 자료(Material)** 3단 구조입니다. 현재 백엔드에는 자료만 있고 상위 두 계층이 없습니다.
 
-> **현재 FE 동작**: 제품의 기본 진입 화면인 `/classrooms`만 유지하고 검색·정렬·초대
-> 코드 입력 UI를 빈 상태로 렌더합니다. 계약이 없는 `/classrooms/:id` 라우트는
-> 비활성화했습니다.
+> **현재 FE 동작**: `/classrooms`는 역할에 따라 학습자 참여 화면과 강의자 운영
+> 화면으로 분기합니다. 강의자는 검색·강의 생성 모달과 `/classrooms/:id` 자료 관리
+> 화면을 사용할 수 있지만, 생성·조회 계약이 없어 실제 레코드는 표시하거나
+> 저장하지 않습니다.
 
 ### 2-1. 강의실 목록·상세
 
@@ -133,6 +136,29 @@ GET /api/users/me/continue → { sessionId, materialId, materialTitle, pageNumbe
 - 시안 4b 상단의 "이어서 학습하기 — 연결 리스트.pdf · 어제 12쪽까지 봤어요" 배너용입니다.
 - `GET /api/sessions?size=1&sort=updatedAt`으로 대체 가능하면 그렇게 쓰겠습니다 — **정렬·필터 지원 여부**만 알려주세요.
 
+### 2-6. 강의자 운영
+
+```
+POST   /api/classrooms
+PATCH  /api/classrooms/{classroomId}
+POST   /api/classrooms/{classroomId}/weeks
+POST   /api/classrooms/{classroomId}/weeks/{weekNumber}/materials
+
+GET    /api/classrooms/{classroomId}/join-requests
+POST   /api/classrooms/{classroomId}/join-requests/{requestId}/approve
+POST   /api/classrooms/{classroomId}/join-requests/{requestId}/reject
+
+GET    /api/classrooms/{classroomId}/analytics
+POST   /api/classrooms/{classroomId}/notices
+PATCH  /api/classrooms/{classroomId}/notices/{noticeId}
+DELETE /api/classrooms/{classroomId}/notices/{noticeId}
+```
+
+- 강의 생성: 이름, 학기, 주차 수, 색상, 설명을 저장하고 초대 코드를 반환해야 합니다.
+- 입장 요청: 대기·처리 내역 조회와 개별/전체 승인이 필요합니다.
+- 학습 현황: 학습자 수, 평균 진도, 최근 질문 수, 미접속 인원과 자료별 열람 집계가 필요합니다.
+- 공지: 게시·예약·종료 상태와 열람 인원을 반환해야 합니다.
+
 ---
 
 ## P3 — 시안 4e(설정) 및 공통
@@ -181,8 +207,9 @@ GET /api/users/me/schedule?from={date}&to={date}
 → { items: [{ date, type, title, classroomId? }] }
 ```
 
-- 시안 사이드바의 "캘린더" 메뉴용. **도메인 정의 자체가 없어 가장 후순위**입니다. 제외해도 무방하면 메뉴에서 빼겠습니다.
-- **현재 FE 동작**: API 계약이 없어 사이드바 메뉴와 라우트에서 제거했습니다.
+- 시안 사이드바의 "캘린더" 메뉴용입니다.
+- **현재 FE 동작**: 강의자 계정에 월·주·목록 보기를 제공하며 일정은 빈 상태로
+  표시합니다.
 
 ### 3-5. 비밀번호 재설정
 

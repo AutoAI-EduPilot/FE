@@ -175,9 +175,7 @@ export function MaterialsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Materials"
         title="자료"
-        description="PDF 자료를 추가하고 처리 상태를 확인합니다."
         actions={
           <>
             <Badge tone="success">준비 완료 {readyCount}</Badge>

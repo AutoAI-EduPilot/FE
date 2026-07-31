@@ -48,9 +48,15 @@ src/
 
 | Route | 목적 |
 | --- | --- |
-| `/` | `/materials`로 이동 |
+| `/` | `/classrooms`로 이동 |
 | `/login` | 로그인 및 저장 세션 복원 |
 | `/signup` | 회원가입 후 자동 로그인 |
+| `/classrooms` | 역할별 내 강의실 |
+| `/classrooms/:classroomId` | 강의자 강의실 자료 관리 |
+| `/calendar` | 강의자 강의 일정 |
+| `/learning-status` | 강의자 학습 현황 |
+| `/announcements` | 강의자 공지 관리 |
+| `/entrance-requests` | 강의자 입장 요청 관리 |
 | `/materials` | 자료 목록과 PDF 업로드 |
 | `/materials/:materialId` | 자료 상세와 학습 세션 생성 |
 | `/sessions` | 세션 목록과 재진입 |

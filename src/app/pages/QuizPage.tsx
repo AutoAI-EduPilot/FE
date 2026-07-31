@@ -173,9 +173,7 @@ export function QuizPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        eyebrow="Quiz"
         title="퀴즈"
-        description={`퀴즈 ${quizId ?? '-'} 풀이와 피드백을 확인합니다.`}
       />
 
       <section className="overflow-hidden rounded-xl border border-stone-200 bg-white">
