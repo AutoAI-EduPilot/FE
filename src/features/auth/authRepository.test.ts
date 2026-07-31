@@ -37,7 +37,7 @@ describe('remote auth repository', () => {
               email: 'learner@example.com',
               id: 1,
               name: '학습자',
-              role: 'USER',
+              role: 'LEARNER',
             },
           },
           message: '로그인 완료',
@@ -59,7 +59,7 @@ describe('remote auth repository', () => {
         email: 'learner@example.com',
         id: 1,
         name: '학습자',
-        role: 'USER',
+        role: 'LEARNER',
       },
     })
 

@@ -10,18 +10,15 @@ import type {
 } from './quizTypes'
 
 interface QuizChoiceDto {
-  id?: number | string
-  label?: string
-  text?: string
+  optionId: number | string
+  text: string
 }
 
 interface QuizQuestionDto {
-  choices?: QuizChoiceDto[]
-  id?: number | string
-  kind?: QuizKind
-  prompt: string
-  questionId?: number | string
-  questionType?: QuizKind
+  maxScore?: number
+  options?: QuizChoiceDto[]
+  questionId: number | string
+  questionText: string
 }
 
 interface PublicQuizDto {
@@ -134,25 +131,30 @@ function mapQuiz(quiz: PublicQuizDto): PublicQuiz {
     id: String(quiz.quizId),
     kind: quiz.quizType,
     page: quiz.page,
-    questions: quiz.questions.map(mapQuestion),
+    questions: quiz.questions.map((question) =>
+      mapQuestion(question, quiz.quizType),
+    ),
     sessionId: String(quiz.sessionId),
     submitted: quiz.submitted,
     title: quiz.title,
   }
 }
 
-function mapQuestion(question: QuizQuestionDto): PublicQuizQuestion {
+function mapQuestion(
+  question: QuizQuestionDto,
+  quizKind: QuizKind,
+): PublicQuizQuestion {
   return {
-    choices: question.choices?.map(mapChoice),
-    id: String(question.id ?? question.questionId),
-    kind: question.kind ?? question.questionType ?? 'SHORT',
-    prompt: question.prompt,
+    choices: question.options?.map(mapChoice),
+    id: String(question.questionId),
+    kind: quizKind,
+    prompt: question.questionText,
   }
 }
 
 function mapChoice(choice: QuizChoiceDto): QuizChoice {
   return {
-    id: String(choice.id),
-    label: choice.label ?? choice.text ?? '',
+    id: String(choice.optionId),
+    label: choice.text,
   }
 }

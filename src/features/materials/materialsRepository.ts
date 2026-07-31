@@ -4,7 +4,6 @@ import type {
   AuthenticatedRequest,
 } from '../auth'
 import type {
-  MaterialPageText,
   MaterialStatus,
   StudyMaterial,
 } from './materialTypes'
@@ -20,11 +19,6 @@ interface MaterialDto {
   title: string
 }
 
-interface MaterialPageDto {
-  pageNumber: number
-  text: string
-}
-
 export interface MaterialsRepository {
   delete: (materialId: string, signal?: AbortSignal) => Promise<void>
   getById: (
@@ -35,11 +29,6 @@ export interface MaterialsRepository {
     materialId: string,
     signal?: AbortSignal,
   ) => Promise<Blob>
-  getPageText: (
-    materialId: string,
-    pageNumber: number,
-    signal?: AbortSignal,
-  ) => Promise<MaterialPageText>
   list: (signal?: AbortSignal) => Promise<StudyMaterial[]>
   refreshStatuses: (signal?: AbortSignal) => Promise<StudyMaterial[]>
   upload: (file: File, signal?: AbortSignal) => Promise<StudyMaterial>
@@ -93,13 +82,6 @@ export function createMaterialsRepository(
         })
       }
       return response.blob()
-    },
-    async getPageText(materialId, pageNumber, signal) {
-      const { data } = await request<MaterialPageDto>(
-        `/api/materials/${encodeURIComponent(materialId)}/pages/${pageNumber}`,
-        { signal },
-      )
-      return data
     },
     async list(signal) {
       return requestMaterials(request, signal)

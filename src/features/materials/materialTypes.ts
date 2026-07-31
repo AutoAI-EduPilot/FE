@@ -10,8 +10,3 @@ export interface StudyMaterial {
   status: MaterialStatus
   title: string
 }
-
-export interface MaterialPageText {
-  pageNumber: number
-  text: string
-}
