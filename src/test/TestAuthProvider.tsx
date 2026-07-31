@@ -7,7 +7,7 @@ const testUser: AuthUser = {
   email: 'learner@example.com',
   id: 1,
   name: 'learner',
-  role: 'USER',
+  role: 'LEARNER',
 }
 
 export function TestAuthProvider({ children }: PropsWithChildren) {
