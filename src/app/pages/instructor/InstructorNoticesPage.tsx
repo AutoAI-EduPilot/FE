@@ -19,19 +19,18 @@ export function InstructorNoticesPage() {
           </Button>
         }
         title="공지 관리"
+        titleAccessory={
+          <label>
+            <span className="sr-only">강의실 선택</span>
+            <select
+              className="h-9 min-w-40 rounded-lg border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-500"
+              disabled
+            >
+              <option>강의실 없음</option>
+            </select>
+          </label>
+        }
       />
-
-      <div className="flex">
-        <label>
-          <span className="sr-only">강의실 선택</span>
-          <select
-            className="h-9 min-w-40 rounded-lg border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-500"
-            disabled
-          >
-            <option>강의실 없음</option>
-          </select>
-        </label>
-      </div>
 
       <section className="flex min-h-72 flex-col items-center justify-center rounded-lg border border-stone-200 bg-white px-6 text-center">
         <span className="flex size-10 items-center justify-center rounded-lg bg-stone-100 text-stone-400">

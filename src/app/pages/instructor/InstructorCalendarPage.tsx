@@ -35,36 +35,30 @@ export function InstructorCalendarPage() {
           <SegmentedControl onChange={setView} value={view} />
         }
         title="캘린더"
+        titleAccessory={
+          <div className="flex items-center gap-1.5">
+            <button
+              aria-label="이전 기간"
+              className="flex size-8 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-500 hover:bg-stone-50"
+              onClick={() => move(-1)}
+              type="button"
+            >
+              <ChevronLeft aria-hidden="true" size={15} />
+            </button>
+            <p className="min-w-28 text-center text-sm font-bold text-stone-900 sm:min-w-36">
+              {label}
+            </p>
+            <button
+              aria-label="다음 기간"
+              className="flex size-8 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-500 hover:bg-stone-50"
+              onClick={() => move(1)}
+              type="button"
+            >
+              <ChevronRight aria-hidden="true" size={15} />
+            </button>
+          </div>
+        }
       />
-
-      <div className="flex items-center gap-2">
-        <button
-          aria-label="이전 기간"
-          className="flex size-9 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-500 hover:bg-stone-50"
-          onClick={() => move(-1)}
-          type="button"
-        >
-          <ChevronLeft aria-hidden="true" size={16} />
-        </button>
-        <p className="min-w-28 text-center text-sm font-bold text-stone-900 sm:min-w-36">
-          {label}
-        </p>
-        <button
-          aria-label="다음 기간"
-          className="flex size-9 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-500 hover:bg-stone-50"
-          onClick={() => move(1)}
-          type="button"
-        >
-          <ChevronRight aria-hidden="true" size={16} />
-        </button>
-        <button
-          className="ml-2 h-9 whitespace-nowrap rounded-lg px-3 text-xs font-semibold text-stone-500 hover:bg-stone-100 hover:text-stone-900"
-          onClick={() => setCursor(startOfMonth(today))}
-          type="button"
-        >
-          오늘
-        </button>
-      </div>
 
       {view === 'month' ? <MonthView cursor={cursor} today={today} /> : null}
       {view === 'week' ? <WeekView cursor={cursor} today={today} /> : null}

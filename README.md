@@ -27,9 +27,14 @@ npm run dev
 
 | 이름 | 예시 | 설명 |
 | --- | --- | --- |
-| `VITE_API_BASE_URL` | `http://localhost:8080` | Spring Main Service의 base URL |
+| `VITE_API_BASE_URL` | `/api` | 브라우저가 호출할 Spring Main Service 경로 |
+| `VITE_DEV_PROXY_TARGET` | `https://edu-pilot.duckdns.org` | 로컬 `/api` 요청을 전달할 백엔드 |
 
-저장소에는 가짜 값만 포함된 `.env.example`을 커밋합니다. 토큰과 비밀값이 있는 로컬 환경 파일은 커밋하지 않습니다.
+기본 로컬 서버는 배포된 dev 백엔드를 프록시하므로 역할, 인증 쿠키,
+API 응답이 배포 화면과 같습니다. 로컬 Spring을 사용할 때만
+`VITE_DEV_PROXY_TARGET=http://localhost:8080`으로 변경하고, 화면 QA용
+mock은 `VITE_DEV_PROXY_TARGET=mock`을 명시한 경우에만 사용합니다.
+토큰과 비밀값이 있는 로컬 환경 파일은 커밋하지 않습니다.
 
 ## 프로젝트 구조
 

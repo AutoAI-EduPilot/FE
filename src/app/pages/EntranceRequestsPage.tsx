@@ -1,4 +1,4 @@
-import { Inbox, UserCheck } from 'lucide-react'
+import { Copy, Inbox, Info, UserCheck } from 'lucide-react'
 import { useState } from 'react'
 
 import { usePageTitle } from '../../shared/lib/usePageTitle'
@@ -15,24 +15,32 @@ export function EntranceRequestsPage() {
     <div className="mx-auto w-full max-w-[1600px] space-y-5">
       <PageHeader
         actions={
-          <Button disabled>
-            <UserCheck aria-hidden="true" size={15} />
-            대기 전체 승인
-          </Button>
+          <>
+            <Button disabled variant="secondary">
+              초대 코드 미발급
+              <Copy aria-hidden="true" size={14} />
+            </Button>
+            <Button disabled>
+              <UserCheck aria-hidden="true" size={15} />
+              대기 전체 승인
+            </Button>
+          </>
         }
         title="입장 요청"
+        titleAccessory={
+          <label>
+            <span className="sr-only">강의실 선택</span>
+            <select
+              className="h-9 min-w-40 rounded-lg border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-500"
+              disabled
+            >
+              <option>전체 강의실</option>
+            </select>
+          </label>
+        }
       />
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <label>
-          <span className="sr-only">강의실 선택</span>
-          <select
-            className="h-9 min-w-40 rounded-lg border border-stone-200 bg-white px-3 text-xs font-semibold text-stone-500"
-            disabled
-          >
-            <option>전체 강의실</option>
-          </select>
-        </label>
+      <div className="flex flex-wrap items-center gap-3">
         <div
           aria-label="입장 요청 상태"
           className="inline-flex rounded-lg border border-stone-200 bg-white p-1"
@@ -52,12 +60,15 @@ export function EntranceRequestsPage() {
       </div>
 
       <section className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-        <div className="hidden grid-cols-[40px_1fr_1.2fr_1fr_1fr_120px] border-b border-stone-200 bg-stone-50 px-4 py-3 text-[11px] font-semibold text-stone-400 md:grid">
-          <span />
+        <div className="hidden grid-cols-[40px_1fr_1.2fr_1fr_1fr_120px_120px] border-b border-stone-200 bg-stone-50 px-4 py-3 text-[11px] font-semibold text-stone-400 lg:grid">
+          <span>
+            <input aria-label="전체 요청 선택" disabled type="checkbox" />
+          </span>
           <span>학생</span>
           <span>이메일</span>
-          <span>소속</span>
+          <span>학교</span>
           <span>요청 강의실</span>
+          <span>요청 시각</span>
           <span className="text-right">처리</span>
         </div>
         <div className="flex min-h-64 flex-col items-center justify-center px-6 text-center">
@@ -74,6 +85,12 @@ export function EntranceRequestsPage() {
           </p>
         </div>
       </section>
+
+      <p className="flex w-fit items-start gap-2 rounded-lg bg-stone-50 px-3.5 py-2.5 text-xs leading-5 text-stone-500">
+        <Info aria-hidden="true" className="mt-0.5 shrink-0" size={14} />
+        초대 코드로 참여를 요청한 학습자는 강의자 승인 후 강의실에 입장합니다.
+        승인 시 학습자에게 알림이 전송됩니다.
+      </p>
     </div>
   )
 }

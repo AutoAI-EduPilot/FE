@@ -8,9 +8,10 @@ import { mockApiPlugin } from './dev/mockApiPlugin'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   // 로컬 dev에서 /api 요청을 프록시할 백엔드.
-  // 기본은 로컬 Spring(8080), 원격 dev 서버를 쓰려면 VITE_DEV_PROXY_TARGET으로 지정.
+  // 기본은 배포 dev 서버이며, 로컬 Spring을 쓰려면 VITE_DEV_PROXY_TARGET으로 지정.
   // 'mock'이면 프록시 대신 테스트 픽스처를 그대로 서빙한다(브라우저 QA용).
-  const proxyTarget = env.VITE_DEV_PROXY_TARGET || 'http://localhost:8080'
+  const proxyTarget =
+    env.VITE_DEV_PROXY_TARGET || 'https://edu-pilot.duckdns.org'
   const useMockApi = proxyTarget === 'mock'
 
   return {

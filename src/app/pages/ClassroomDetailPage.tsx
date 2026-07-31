@@ -35,7 +35,7 @@ export function ClassroomDetailPage() {
             </Button>
           </>
         }
-        title="강의실 자료 관리"
+        title={`강의실 ${classroomId} — 자료 관리`}
       />
 
       <section className="flex min-h-72 flex-col items-center justify-center rounded-lg border border-stone-200 bg-white px-6 text-center">
