@@ -2,7 +2,14 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 
-import { Button, ButtonLink, EmptyState, ErrorState, TextInput } from './index'
+import {
+  Button,
+  ButtonLink,
+  EmptyState,
+  ErrorState,
+  PageContainer,
+  TextInput,
+} from './index'
 
 describe('shared ui', () => {
   it('renders button variants and disabled state', () => {
@@ -39,6 +46,19 @@ describe('shared ui', () => {
 
     expect(screen.getByRole('heading', { name: '등록된 자료가 없습니다.' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: '업로드 준비 중' })).toBeInTheDocument()
+  })
+
+  it('applies the shared page layout spacing', () => {
+    render(
+      <PageContainer data-testid="page-container">
+        <h1>페이지 제목</h1>
+      </PageContainer>,
+    )
+
+    expect(screen.getByTestId('page-container')).toHaveClass(
+      'w-full',
+      'space-y-5',
+    )
   })
 
   it('renders error state as an alert', () => {

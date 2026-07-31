@@ -22,6 +22,7 @@ import {
   ButtonLink,
   ErrorState,
   LoadingState,
+  PageContainer,
   PageHeader,
 } from '../../shared/ui'
 import { formatDate, formatFileSize } from '../../shared/lib/format'
@@ -151,7 +152,7 @@ export function MaterialDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <PageContainer>
       <PageHeader
         title={material.title}
         actions={<StatusBadge status={material.status} />}
@@ -267,7 +268,7 @@ export function MaterialDetailPage() {
           ) : null}
         </section>
       )}
-    </div>
+    </PageContainer>
   )
 }
 

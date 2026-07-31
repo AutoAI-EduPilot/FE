@@ -2,7 +2,7 @@ import { BellRing, Plus, X } from 'lucide-react'
 import { useState, type FormEvent } from 'react'
 
 import { usePageTitle } from '../../../shared/lib/usePageTitle'
-import { Button, PageHeader, useToast } from '../../../shared/ui'
+import { Button, PageContainer, PageHeader, useToast } from '../../../shared/ui'
 
 export function InstructorNoticesPage() {
   usePageTitle('공지 관리')
@@ -10,7 +10,7 @@ export function InstructorNoticesPage() {
   const [isComposerOpen, setIsComposerOpen] = useState(false)
 
   return (
-    <div className="mx-auto w-full max-w-[1600px] space-y-5">
+    <PageContainer>
       <PageHeader
         actions={
           <Button onClick={() => setIsComposerOpen(true)}>
@@ -52,7 +52,7 @@ export function InstructorNoticesPage() {
           }
         />
       ) : null}
-    </div>
+    </PageContainer>
   )
 }
 

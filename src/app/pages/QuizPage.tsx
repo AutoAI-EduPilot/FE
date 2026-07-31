@@ -25,6 +25,7 @@ import {
   ButtonLink,
   ErrorState,
   LoadingState,
+  PageContainer,
   PageHeader,
 } from '../../shared/ui'
 import { diagnosisPath, routes } from '../routes'
@@ -171,7 +172,7 @@ export function QuizPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <PageContainer>
       <PageHeader
         title="퀴즈"
       />
@@ -312,7 +313,7 @@ export function QuizPage() {
           </ul>
         </section>
       ) : null}
-    </div>
+    </PageContainer>
   )
 }
 

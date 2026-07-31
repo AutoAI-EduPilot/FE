@@ -1,6 +1,5 @@
 import {
   BarChart3,
-  Bell,
   BookOpenCheck,
   CalendarDays,
   ChevronsLeft,
@@ -311,12 +310,6 @@ export function AppLayout() {
                 {roleLabel}
               </span>
             </span>
-            {/* 시안 사이드바의 알림 벨 — 알림 API 대기(docs/be-api-requests.md §3-2) */}
-            <Bell
-              aria-hidden="true"
-              className={cx('shrink-0 text-stone-400', isCollapsed && 'lg:hidden')}
-              size={14}
-            />
           </button>
           {isMenuOpen ? (
             <div

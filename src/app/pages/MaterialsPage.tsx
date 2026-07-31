@@ -30,6 +30,7 @@ import {
   ButtonLink,
   EmptyState,
   ErrorState,
+  PageContainer,
   SkeletonRows,
   PageHeader,
   useToast,
@@ -173,7 +174,7 @@ export function MaterialsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <PageContainer>
       <PageHeader
         title="자료"
         actions={
@@ -358,7 +359,7 @@ export function MaterialsPage() {
         </div>
         )}
       </section>
-    </div>
+    </PageContainer>
   )
 }
 

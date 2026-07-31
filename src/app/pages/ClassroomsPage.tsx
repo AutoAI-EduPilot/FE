@@ -15,7 +15,7 @@ import {
 
 import { isInstructorRole, useAuth } from '../../features/auth'
 import { usePageTitle } from '../../shared/lib/usePageTitle'
-import { Button, useToast } from '../../shared/ui'
+import { Button, PageContainer, useToast } from '../../shared/ui'
 import { InstructorClassroomsPage } from './instructor/InstructorClassroomsPage'
 
 type ClassroomSort = 'name' | 'progress' | 'recent' | 'unread'
@@ -88,7 +88,7 @@ function LearnerClassroomsPage() {
     '최근 학습순'
 
   return (
-    <div className="mx-auto w-full max-w-[1600px] space-y-5">
+    <PageContainer>
       <header className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex items-baseline gap-3">
           <h1 className="text-[22px] font-bold text-stone-950">내 강의실</h1>
@@ -295,7 +295,7 @@ function LearnerClassroomsPage() {
           </div>
         </div>
       ) : null}
-    </div>
+    </PageContainer>
   )
 }
 

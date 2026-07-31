@@ -2,7 +2,7 @@ import { BookOpen, KeyRound, Plus, Search, X } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 
 import { usePageTitle } from '../../../shared/lib/usePageTitle'
-import { Button, useToast } from '../../../shared/ui'
+import { Button, EmptyState, PageContainer, useToast } from '../../../shared/ui'
 
 const CLASSROOM_COLORS = [
   { className: 'bg-brand-600', label: '파랑', value: 'blue' },
@@ -40,7 +40,7 @@ export function InstructorClassroomsPage() {
   }, [isSearchOpen])
 
   return (
-    <div className="mx-auto w-full max-w-[1600px] space-y-5">
+    <PageContainer>
       <header className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="flex items-baseline gap-3">
           <h1 className="text-[22px] font-bold text-stone-950">내 강의실</h1>
@@ -69,27 +69,10 @@ export function InstructorClassroomsPage() {
         </div>
       </header>
 
-      <section className="grid min-h-48 gap-3 border-t border-stone-100 pt-5 md:grid-cols-2 xl:grid-cols-3">
-        <button
-          className="flex min-h-44 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-stone-300 bg-white px-6 py-8 text-stone-500 hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
-          onClick={() => setIsCreateOpen(true)}
-          type="button"
-        >
-          <span className="flex size-9 items-center justify-center rounded-full bg-stone-100">
-            <Plus aria-hidden="true" size={16} />
-          </span>
-          <span className="text-sm font-semibold">첫 강의실 만들기</span>
-        </button>
-      </section>
-
-      <div className="border-t border-stone-100 pt-7 text-center">
-        <h2 className="text-base font-bold text-stone-900">
-          아직 운영 중인 강의실이 없습니다
-        </h2>
-        <p className="mt-1.5 text-sm text-stone-500">
-          새 강의실을 만들면 운영 현황과 초대 코드를 확인할 수 있습니다.
-        </p>
-      </div>
+      <EmptyState
+        description="새 강의실을 만들면 운영 현황과 초대 코드를 확인할 수 있습니다."
+        title="아직 운영 중인 강의실이 없습니다"
+      />
 
       {isSearchOpen ? (
         <div
@@ -152,7 +135,7 @@ export function InstructorClassroomsPage() {
           }
         />
       ) : null}
-    </div>
+    </PageContainer>
   )
 }
 
