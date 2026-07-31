@@ -3,7 +3,7 @@ import { useState } from 'react'
 
 import { usePageTitle } from '../../shared/lib/usePageTitle'
 import { cx } from '../../shared/lib/cx'
-import { Button, PageHeader } from '../../shared/ui'
+import { Button, PageContainer, PageHeader } from '../../shared/ui'
 
 type RequestTab = 'pending' | 'processed'
 
@@ -12,7 +12,7 @@ export function EntranceRequestsPage() {
   const [tab, setTab] = useState<RequestTab>('pending')
 
   return (
-    <div className="mx-auto w-full max-w-[1600px] space-y-5">
+    <PageContainer>
       <PageHeader
         actions={
           <>
@@ -91,7 +91,7 @@ export function EntranceRequestsPage() {
         초대 코드로 참여를 요청한 학습자는 강의자 승인 후 강의실에 입장합니다.
         승인 시 학습자에게 알림이 전송됩니다.
       </p>
-    </div>
+    </PageContainer>
   )
 }
 

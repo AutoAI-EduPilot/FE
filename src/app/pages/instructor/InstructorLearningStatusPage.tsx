@@ -1,7 +1,7 @@
 import { ArrowRight, BarChart3, HelpCircle, Users } from 'lucide-react'
 
 import { usePageTitle } from '../../../shared/lib/usePageTitle'
-import { PageHeader } from '../../../shared/ui'
+import { PageContainer, PageHeader } from '../../../shared/ui'
 
 const SUMMARY_ITEMS = [
   { label: '학습자', suffix: '명', value: 0 },
@@ -14,7 +14,7 @@ export function InstructorLearningStatusPage() {
   usePageTitle('학습 현황')
 
   return (
-    <div className="mx-auto w-full max-w-[1600px] space-y-5">
+    <PageContainer>
       <PageHeader
         actions={
           <p className="text-xs font-medium text-stone-400">
@@ -72,7 +72,7 @@ export function InstructorLearningStatusPage() {
           title="AI 질문 많은 주제"
         />
       </section>
-    </div>
+    </PageContainer>
   )
 }
 

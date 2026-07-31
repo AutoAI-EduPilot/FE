@@ -15,6 +15,7 @@ import {
   EmptyState,
   ErrorState,
   LoadingState,
+  PageContainer,
   PageHeader,
 } from '../../shared/ui'
 import { formatDateTime } from '../../shared/lib/format'
@@ -80,7 +81,7 @@ export function SessionsPage() {
   }, [repository])
 
   return (
-    <div className="space-y-6">
+    <PageContainer>
       <PageHeader
         title="학습 세션"
       />
@@ -145,7 +146,7 @@ export function SessionsPage() {
           <ArrowRight aria-hidden="true" size={15} />
         </ButtonLink>
       </section>
-    </div>
+    </PageContainer>
   )
 }
 

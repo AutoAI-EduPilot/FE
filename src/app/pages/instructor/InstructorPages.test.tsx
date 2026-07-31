@@ -17,6 +17,9 @@ describe('instructor pages', () => {
       </ToastProvider>,
     )
 
+    expect(
+      screen.getAllByRole('button', { name: '강의실 만들기' }),
+    ).toHaveLength(1)
     fireEvent.click(screen.getByRole('button', { name: '강의실 만들기' }))
 
     expect(
@@ -58,6 +61,30 @@ describe('instructor pages', () => {
 
     fireEvent.click(screen.getByRole('button', { name: '주' }))
     expect(screen.queryByText('예정된 일정이 없습니다')).not.toBeInTheDocument()
+  })
+
+  it('moves directly to a selected year and month', () => {
+    render(<InstructorCalendarPage />)
+    const targetYear = new Date().getFullYear() + 2
+
+    fireEvent.click(
+      screen.getByRole('button', { name: '연도와 월 선택' }),
+    )
+    expect(
+      screen.getByRole('dialog', { name: '연도와 월 선택' }),
+    ).toBeInTheDocument()
+
+    fireEvent.change(screen.getByLabelText('연도 선택'), {
+      target: { value: String(targetYear) },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '12월' }))
+
+    expect(
+      screen.getByRole('button', { name: '연도와 월 선택' }),
+    ).toHaveTextContent(`${targetYear}년 12월`)
+    expect(
+      screen.queryByRole('dialog', { name: '연도와 월 선택' }),
+    ).not.toBeInTheDocument()
   })
 
   it('shows the instructor learning status header actions', () => {

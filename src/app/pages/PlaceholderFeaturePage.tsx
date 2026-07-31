@@ -1,11 +1,11 @@
-import { EmptyState, PageHeader } from '../../shared/ui'
+import { EmptyState, PageContainer, PageHeader } from '../../shared/ui'
 import { usePageTitle } from '../../shared/lib/usePageTitle'
 
 export function CalendarPage() {
   usePageTitle('캘린더')
 
   return (
-    <div className="space-y-5">
+    <PageContainer>
       <PageHeader
         title="캘린더"
       />
@@ -13,7 +13,7 @@ export function CalendarPage() {
         title="표시할 일정이 없습니다."
         description="캘린더 API가 연결되면 실제 강의 일정과 공지가 이곳에 표시됩니다."
       />
-    </div>
+    </PageContainer>
   )
 }
 
@@ -21,7 +21,7 @@ export function NotesPage() {
   usePageTitle('내 노트')
 
   return (
-    <div className="space-y-5">
+    <PageContainer>
       <PageHeader
         title="내 노트"
       />
@@ -29,6 +29,6 @@ export function NotesPage() {
         title="저장된 노트가 없습니다."
         description="노트 API가 연결되면 실제 학습 노트가 이곳에 표시됩니다."
       />
-    </div>
+    </PageContainer>
   )
 }

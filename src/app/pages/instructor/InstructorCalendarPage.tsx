@@ -1,9 +1,14 @@
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
-import { useMemo, useState } from 'react'
+import {
+  CalendarDays,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 import { usePageTitle } from '../../../shared/lib/usePageTitle'
 import { cx } from '../../../shared/lib/cx'
-import { PageHeader } from '../../../shared/ui'
+import { PageContainer, PageHeader } from '../../../shared/ui'
 
 type CalendarView = 'list' | 'month' | 'week'
 
@@ -14,11 +19,31 @@ export function InstructorCalendarPage() {
   const today = useMemo(() => startOfDay(new Date()), [])
   const [cursor, setCursor] = useState(() => startOfMonth(today))
   const [view, setView] = useState<CalendarView>('month')
+  const [isPickerOpen, setIsPickerOpen] = useState(false)
+  const [pickerYear, setPickerYear] = useState(cursor.getFullYear())
+  const pickerRef = useRef<HTMLDivElement | null>(null)
 
-  const label =
-    view === 'week'
-      ? getWeekLabel(cursor)
-      : `${cursor.getFullYear()}년 ${cursor.getMonth() + 1}월`
+  const label = `${cursor.getFullYear()}년 ${cursor.getMonth() + 1}월`
+
+  useEffect(() => {
+    if (!isPickerOpen) return
+
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!pickerRef.current?.contains(event.target as Node)) {
+        setIsPickerOpen(false)
+      }
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsPickerOpen(false)
+    }
+
+    document.addEventListener('pointerdown', closeOnOutsidePress)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePress)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [isPickerOpen])
 
   function move(direction: -1 | 1) {
     setCursor((current) =>
@@ -28,15 +53,25 @@ export function InstructorCalendarPage() {
     )
   }
 
+  function togglePicker() {
+    setPickerYear(cursor.getFullYear())
+    setIsPickerOpen((open) => !open)
+  }
+
+  function selectMonth(month: number) {
+    setCursor(new Date(pickerYear, month, 1))
+    setIsPickerOpen(false)
+  }
+
   return (
-    <div className="mx-auto w-full max-w-[1600px] space-y-5">
+    <PageContainer>
       <PageHeader
         actions={
           <SegmentedControl onChange={setView} value={view} />
         }
         title="캘린더"
         titleAccessory={
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5" ref={pickerRef}>
             <button
               aria-label="이전 기간"
               className="flex size-8 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-500 hover:bg-stone-50"
@@ -45,9 +80,28 @@ export function InstructorCalendarPage() {
             >
               <ChevronLeft aria-hidden="true" size={15} />
             </button>
-            <p className="min-w-28 text-center text-sm font-bold text-stone-900 sm:min-w-36">
-              {label}
-            </p>
+            <div className="relative">
+              <button
+                aria-expanded={isPickerOpen}
+                aria-haspopup="dialog"
+                aria-label="연도와 월 선택"
+                className="flex h-8 min-w-32 items-center justify-center gap-1.5 rounded-lg px-2.5 text-sm font-bold text-stone-900 hover:bg-stone-100 sm:min-w-36"
+                onClick={togglePicker}
+                type="button"
+              >
+                {label}
+                <ChevronDown aria-hidden="true" size={14} />
+              </button>
+              {isPickerOpen ? (
+                <MonthYearPicker
+                  onChangeYear={setPickerYear}
+                  onSelectMonth={selectMonth}
+                  selectedMonth={cursor.getMonth()}
+                  selectedYear={cursor.getFullYear()}
+                  year={pickerYear}
+                />
+              ) : null}
+            </div>
             <button
               aria-label="다음 기간"
               className="flex size-8 items-center justify-center rounded-lg border border-stone-200 bg-white text-stone-500 hover:bg-stone-50"
@@ -63,6 +117,66 @@ export function InstructorCalendarPage() {
       {view === 'month' ? <MonthView cursor={cursor} today={today} /> : null}
       {view === 'week' ? <WeekView cursor={cursor} today={today} /> : null}
       {view === 'list' ? <ListView /> : null}
+    </PageContainer>
+  )
+}
+
+function MonthYearPicker({
+  onChangeYear,
+  onSelectMonth,
+  selectedMonth,
+  selectedYear,
+  year,
+}: {
+  onChangeYear: (year: number) => void
+  onSelectMonth: (month: number) => void
+  selectedMonth: number
+  selectedYear: number
+  year: number
+}) {
+  return (
+    <div
+      aria-label="연도와 월 선택"
+      className="absolute top-[calc(100%+8px)] left-1/2 z-30 w-64 -translate-x-1/2 rounded-lg border border-stone-200 bg-white p-3 shadow-xl"
+      role="dialog"
+    >
+      <label className="flex items-center justify-between gap-3 text-xs font-semibold text-stone-500">
+        연도
+        <select
+          aria-label="연도 선택"
+          className="h-9 flex-1 rounded-lg border border-stone-200 bg-white px-3 text-sm font-bold text-stone-900"
+          onChange={(event) => onChangeYear(Number(event.target.value))}
+          value={year}
+        >
+          {Array.from({ length: 101 }, (_, index) => 2000 + index).map(
+            (optionYear) => (
+              <option key={optionYear} value={optionYear}>
+                {optionYear}년
+              </option>
+            ),
+          )}
+        </select>
+      </label>
+      <div className="mt-3 grid grid-cols-4 gap-1">
+        {Array.from({ length: 12 }, (_, month) => (
+          <button
+            aria-pressed={
+              selectedYear === year && selectedMonth === month
+            }
+            className={cx(
+              'h-9 rounded-md text-xs font-semibold',
+              selectedYear === year && selectedMonth === month
+                ? 'bg-brand-600 text-white'
+                : 'text-stone-600 hover:bg-stone-100 hover:text-stone-950',
+            )}
+            key={month}
+            onClick={() => onSelectMonth(month)}
+            type="button"
+          >
+            {month + 1}월
+          </button>
+        ))}
+      </div>
     </div>
   )
 }
@@ -211,13 +325,6 @@ function getWeek(cursor: Date): Date[] {
   const offset = (cursor.getDay() + 6) % 7
   const monday = addDays(startOfDay(cursor), -offset)
   return Array.from({ length: 7 }, (_, index) => addDays(monday, index))
-}
-
-function getWeekLabel(cursor: Date): string {
-  const week = getWeek(cursor)
-  const first = week[0]
-  const last = week[6]
-  return `${first.getFullYear()}년 ${first.getMonth() + 1}월 ${first.getDate()}일 - ${last.getMonth() + 1}월 ${last.getDate()}일`
 }
 
 function startOfMonth(date: Date): Date {

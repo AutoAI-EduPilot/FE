@@ -2,7 +2,7 @@ import { Copy, FileUp, Plus } from 'lucide-react'
 import { useParams } from 'react-router-dom'
 
 import { usePageTitle } from '../../shared/lib/usePageTitle'
-import { Button, PageHeader, useToast } from '../../shared/ui'
+import { Button, PageContainer, PageHeader, useToast } from '../../shared/ui'
 
 export function ClassroomDetailPage() {
   usePageTitle('강의실 자료 관리')
@@ -14,7 +14,7 @@ export function ClassroomDetailPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1600px] space-y-5">
+    <PageContainer>
       <p className="text-xs font-medium text-stone-400">
         내 강의실 / 강의실 {classroomId}
       </p>
@@ -49,6 +49,6 @@ export function ClassroomDetailPage() {
           강의실에 주차를 추가하면 자료 공개 상태를 관리할 수 있습니다.
         </p>
       </section>
-    </div>
+    </PageContainer>
   )
 }

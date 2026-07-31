@@ -17,6 +17,7 @@ import {
   ButtonLink,
   ErrorState,
   LoadingState,
+  PageContainer,
   PageHeader,
 } from '../../shared/ui'
 import { sessionDetailPath } from '../routes'
@@ -129,7 +130,7 @@ export function DiagnosisPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <PageContainer>
       <PageHeader
         title="진단·교정"
       />
@@ -214,6 +215,6 @@ export function DiagnosisPage() {
           </div>
         </section>
       ) : null}
-    </div>
+    </PageContainer>
   )
 }

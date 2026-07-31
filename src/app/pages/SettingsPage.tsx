@@ -5,7 +5,14 @@ import { useNavigate } from 'react-router-dom'
 import { getRoleLabel, useAuth } from '../../features/auth'
 import { ApiClientError, getRequestErrorMessage } from '../../shared/api'
 import { cx } from '../../shared/lib/cx'
-import { Button, Card, PageHeader, TextInput, useToast } from '../../shared/ui'
+import {
+  Button,
+  Card,
+  PageContainer,
+  PageHeader,
+  TextInput,
+  useToast,
+} from '../../shared/ui'
 import { routes } from '../routes'
 import { usePageTitle } from '../../shared/lib/usePageTitle'
 
@@ -78,7 +85,7 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <PageContainer>
       <PageHeader
         title="설정"
       />
@@ -234,7 +241,7 @@ export function SettingsPage() {
           )}
         </div>
       </div>
-    </div>
+    </PageContainer>
   )
 }
 
