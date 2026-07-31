@@ -1,4 +1,4 @@
-import { BarChart3, HelpCircle, Users } from 'lucide-react'
+import { ArrowRight, BarChart3, HelpCircle, Users } from 'lucide-react'
 
 import { usePageTitle } from '../../../shared/lib/usePageTitle'
 import { PageHeader } from '../../../shared/ui'
@@ -17,6 +17,12 @@ export function InstructorLearningStatusPage() {
     <div className="mx-auto w-full max-w-[1600px] space-y-5">
       <PageHeader
         actions={
+          <p className="text-xs font-medium text-stone-400">
+            마지막 갱신 정보 없음
+          </p>
+        }
+        title="학습 현황"
+        titleAccessory={
           <label>
             <span className="sr-only">강의실 선택</span>
             <select
@@ -27,7 +33,6 @@ export function InstructorLearningStatusPage() {
             </select>
           </label>
         }
-        title="학습 현황"
       />
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -41,6 +46,16 @@ export function InstructorLearningStatusPage() {
               {item.value}
               <span className="ml-0.5 text-base">{item.suffix}</span>
             </p>
+            {item.label === '7일 이상 미접속' ? (
+              <button
+                className="mt-2 inline-flex items-center gap-1 text-xs font-semibold text-brand-700 disabled:cursor-not-allowed disabled:text-stone-300"
+                disabled
+                type="button"
+              >
+                리마인더 보내기
+                <ArrowRight aria-hidden="true" size={13} />
+              </button>
+            ) : null}
           </article>
         ))}
       </section>

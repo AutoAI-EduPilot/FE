@@ -122,6 +122,10 @@ describe('AppRoutes', () => {
     expect(screen.getByRole('link', { name: '공지 관리' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '입장 요청' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: '자료' })).not.toBeInTheDocument()
+    expect(
+      screen.getByRole('button', { name: '대기 전체 승인' }),
+    ).toBeDisabled()
+    expect(screen.getByText('초대 코드 미발급')).toBeInTheDocument()
   })
 
   it('renders the not found route for unknown paths', () => {

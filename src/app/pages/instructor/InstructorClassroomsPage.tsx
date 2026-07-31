@@ -59,7 +59,7 @@ export function InstructorClassroomsPage() {
             <Search aria-hidden="true" size={15} />
             <span className="flex-1">강의실 검색</span>
             <kbd className="rounded border border-stone-200 bg-stone-50 px-1.5 py-0.5 text-[10px]">
-              Ctrl K
+              ⌘K
             </kbd>
           </button>
           <Button className="h-10" onClick={() => setIsCreateOpen(true)}>
@@ -111,11 +111,11 @@ export function InstructorClassroomsPage() {
               />
               <button
                 aria-label="검색 닫기"
-                className="flex size-7 items-center justify-center rounded-md border border-stone-200 text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+                className="flex h-7 items-center justify-center rounded-md border border-stone-200 px-2 text-[10px] font-semibold text-stone-400 hover:bg-stone-100 hover:text-stone-700"
                 onClick={() => setIsSearchOpen(false)}
                 type="button"
               >
-                <X aria-hidden="true" size={14} />
+                esc
               </button>
             </div>
             <div className="min-h-52 px-4 py-4">
@@ -131,6 +131,11 @@ export function InstructorClassroomsPage() {
                   운영 중인 강의실과 등록 자료를 함께 찾습니다.
                 </p>
               </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-stone-100 px-4 py-2.5 text-[10px] font-medium text-stone-400">
+              <span>↑↓ 이동</span>
+              <span>↵ 열기</span>
+              <span className="ml-auto">⌘K로 어디서든 열기</span>
             </div>
           </div>
         </div>
@@ -213,7 +218,7 @@ function CreateClassroomDialog({
             </select>
           </label>
           <label className="text-[13px] font-semibold text-stone-800">
-            주차 수
+            주차 수 <span className="font-normal text-stone-400">(수업 차수)</span>
             <input
               className="mt-1 h-11 w-full rounded-lg border border-stone-300 bg-white px-3.5 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
               max={24}
@@ -255,7 +260,11 @@ function CreateClassroomDialog({
 
         <div className="mt-4 flex items-start gap-3 rounded-lg bg-stone-50 px-4 py-3 text-xs leading-5 text-stone-500">
           <KeyRound aria-hidden="true" className="mt-0.5 shrink-0 text-amber-500" size={15} />
-          초대 코드는 강의실 생성이 완료된 뒤 발급됩니다.
+          <span>
+            초대 코드는 만들기 완료 후 자동 발급돼요.
+            <br />
+            강의실 카드에서 언제든 복사·재발급할 수 있어요.
+          </span>
         </div>
 
         <div className="mt-5 flex justify-end gap-2">
