@@ -178,6 +178,42 @@ describe('remote feature repositories', () => {
     )
   })
 
+  it('maps the non-paged session quiz history response', async () => {
+    const request = vi.fn().mockResolvedValue(
+      success({
+        quizzes: [
+          {
+            createdAt: '2026-07-27T00:00:00Z',
+            maxScore: 100,
+            passed: false,
+            quizId: 50,
+            quizType: 'MCQ',
+            score: 48,
+            submitted: true,
+            title: '학습 확인 퀴즈',
+          },
+        ],
+      }),
+    )
+    const repository = createSessionsRepository(request as AuthenticatedRequest)
+
+    await expect(repository.listQuizzes('100')).resolves.toEqual([
+      {
+        createdAt: '2026-07-27T00:00:00Z',
+        maxScore: 100,
+        passed: false,
+        quizId: '50',
+        quizType: 'MCQ',
+        score: 48,
+        submitted: true,
+        title: '학습 확인 퀴즈',
+      },
+    ])
+    expect(request).toHaveBeenCalledWith('/api/sessions/100/quizzes', {
+      signal: undefined,
+    })
+  })
+
   it('maps every server widget kind and drops malformed ones', async () => {
     const request = vi.fn().mockResolvedValue(
       success({
@@ -236,10 +272,10 @@ describe('remote feature repositories', () => {
         success({
           questions: [
             {
-              choices: [{ id: 'a', label: '선택지' }],
-              id: 'q1',
-              kind: 'MCQ',
-              prompt: '문제',
+              maxScore: 100,
+              options: [{ optionId: 'a', text: '선택지' }],
+              questionId: 'q1',
+              questionText: '문제',
             },
           ],
           quizId: 50,
@@ -267,7 +303,14 @@ describe('remote feature repositories', () => {
 
     expect(quiz).toMatchObject({
       id: '50',
-      questions: [{ id: 'q1', kind: 'MCQ' }],
+      questions: [
+        {
+          choices: [{ id: 'a', label: '선택지' }],
+          id: 'q1',
+          kind: 'MCQ',
+          prompt: '문제',
+        },
+      ],
       sessionId: '100',
     })
     expect(quiz && JSON.stringify(quiz)).not.toMatch(/correctAnswer|rubric/i)

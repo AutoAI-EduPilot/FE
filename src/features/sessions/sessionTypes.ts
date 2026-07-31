@@ -68,9 +68,12 @@ export interface SessionTurnResult {
 }
 
 export interface SessionQuizSummary {
+  createdAt?: string
+  maxScore?: number
+  passed?: boolean
   quizId: string
   quizType: string
   score?: number
-  status?: string
+  submitted?: boolean
   title: string
 }

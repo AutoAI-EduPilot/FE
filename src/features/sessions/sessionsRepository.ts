@@ -73,11 +73,18 @@ interface SessionTurnDto {
 }
 
 interface SessionQuizDto {
+  createdAt?: string
+  maxScore?: number
+  passed?: boolean
   quizId: number | string
   quizType: string
+  submitted?: boolean
   score?: number
-  status?: string
   title: string
+}
+
+interface SessionQuizListDto {
+  quizzes: SessionQuizDto[]
 }
 
 export interface SessionTurnRequest {
@@ -193,13 +200,19 @@ export function createSessionsRepository(
       return data.items.map(mapMessage)
     },
     async listQuizzes(sessionId, signal) {
-      const { data } = await request<PagedResponse<SessionQuizDto>>(
-        `/api/sessions/${encodeURIComponent(sessionId)}/quizzes?page=0&size=20`,
+      const { data } = await request<SessionQuizListDto>(
+        `/api/sessions/${encodeURIComponent(sessionId)}/quizzes`,
         { signal },
       )
-      return data.items.map((quiz) => ({
-        ...quiz,
+      return data.quizzes.map((quiz) => ({
+        createdAt: quiz.createdAt,
+        maxScore: quiz.maxScore,
+        passed: quiz.passed,
         quizId: String(quiz.quizId),
+        quizType: quiz.quizType,
+        score: quiz.score,
+        submitted: quiz.submitted,
+        title: quiz.title,
       }))
     },
     async movePage(sessionId, pageNumber, signal) {
