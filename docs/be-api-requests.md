@@ -4,11 +4,11 @@
 | --- | --- |
 | 작성 | FE (이감) |
 | 기준 | 디자인 정본 `강의실 레이아웃 시안.dc.html` (4a~4e) |
-| 상태 | Swagger 26개 연결 완료 — 아래는 추가 계약 협의 필요 |
+| 상태 | 배포 Swagger 27개 operation 연결 완료 — 아래는 추가 계약 협의 필요 |
 
 아래 항목은 현재 API 계약만으로 완성할 수 없는 기능입니다. API가 없는 메뉴와 라우트는 노출하지 않고, 시안상 반드시 필요한 일부 기능만 로컬 상태 또는 빈 화면으로 유지합니다.
 
-배포 Swagger에 공개된 26개 API는 FE 연동이 끝났으므로 여기 포함하지 않았습니다.
+배포 Swagger에 공개된 27개 operation은 FE 연동이 끝났으므로 여기 포함하지 않았습니다.
 
 ---
 
@@ -53,14 +53,14 @@ POST /api/sessions/{sessionId}/conversations   → { conversationId }
 - **현재 FE 동작**: "대화 새로 시작" 버튼이 화면의 메시지 목록만 비웁니다(서버 이력은 그대로).
 - 기존 `qaThread`의 `START_NEW` 모드로 충분하다면 별도 API 없이 **턴 payload로 처리하는 방법**을 알려주세요. 그 경우 FE가 `USER_QUESTION`에 스레드 리셋 플래그를 실어 보내겠습니다.
 
-### 1-4. 자료 원본 스트리밍 계약 확정
+### 1-4. 자료 원본 스트리밍 계약 문서 동기화
 
 ```
 GET /api/materials/{materialId}/file
 ```
 
-- **현재 FE 동작**: `api-spec.md` 본문에 초안으로 언급된 위 경로를 사용해 인증된 PDF 원본을 뷰어에 전달합니다.
-- 엔드포인트를 정식 계약과 Swagger에 포함하고, 응답 `Content-Type`, `Content-Disposition`, Range 요청 지원 여부를 확정해 주세요.
+- **현재 FE 동작**: 배포 Swagger에 정식 노출된 위 경로를 사용해 인증된 PDF 원본을 뷰어에 전달합니다.
+- GitHub `api-spec.md`에는 아직 초안으로 적혀 있으므로 Swagger와 문서의 상태를 동기화해 주세요. 응답 `Content-Type`, `Content-Disposition`, Range 요청 지원 여부도 문서에 명시가 필요합니다.
 - 현재 업로드 계약은 PDF만 허용하므로 PPT 배지는 파일명 표시까지만 대응합니다. PPT 원본 또는 PDF 변환본을 같은 뷰어에서 제공하려면 변환·다운로드 계약이 추가로 필요합니다.
 
 ---
@@ -204,4 +204,4 @@ POST /api/auth/password-reset/confirm    { token, newPassword }
 3. **PPT 지원 여부** (파일 타입 배지·업로드 검증에 영향).
 4. **`lastReadPage`·`progressRate`** — 강의실과 무관하게 먼저 추가 가능한지.
 5. **대화 새로 시작**을 전용 API로 둘지, 턴 payload 플래그로 둘지.
-6. **자료 원본 스트리밍** 초안 경로를 정식 API로 확정할지.
+6. **자료 원본 스트리밍**의 Swagger 확정 내용을 `api-spec.md`에도 반영할지.

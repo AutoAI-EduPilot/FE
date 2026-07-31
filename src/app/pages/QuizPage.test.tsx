@@ -31,32 +31,14 @@ function renderQuizPage() {
 async function answerAllQuestions() {
   await screen.findByLabelText('개념의 정의를 먼저 확인한다.')
   fireEvent.click(screen.getByLabelText('개념의 정의를 먼저 확인한다.'))
-  fireEvent.click(screen.getByRole('tab', { name: 'OX' }))
-  fireEvent.click(screen.getByLabelText('O'))
-  fireEvent.click(screen.getByRole('tab', { name: '단답형' }))
-  fireEvent.change(
-    screen.getByLabelText(
-      '현재 페이지의 핵심 키워드를 한 단어로 적어 보세요.',
-    ),
-    { target: { value: '메타인지' } },
-  )
-  fireEvent.click(screen.getByRole('tab', { name: '서술형' }))
-  fireEvent.change(
-    screen.getByLabelText(
-      '오늘 학습한 내용을 자신의 말로 설명해 보세요.',
-    ),
-    {
-      target: {
-        value: '핵심 개념을 먼저 정의하고 예시로 이해했습니다.',
-      },
-    },
-  )
+  fireEvent.click(screen.getByRole('button', { name: '다음 문항' }))
+  fireEvent.click(screen.getByLabelText('이해가 낮은 페이지를 다시 읽는다.'))
 }
 
 describe('QuizPage', () => {
   it('validates an empty answer from an API quiz', async () => {
     renderQuizPage()
-    await screen.findByText('문항 1 / 4 · 답변 0 / 4')
+    await screen.findByText('문항 1 / 2 · 답변 0 / 2')
 
     fireEvent.click(screen.getByRole('button', { name: '제출' }))
 
@@ -79,11 +61,11 @@ describe('QuizPage', () => {
     renderQuizPage()
 
     expect(
-      await screen.findByText('문항 1 / 4 · 답변 0 / 4'),
+      await screen.findByText('문항 1 / 2 · 답변 0 / 2'),
     ).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '다음 문항' }))
 
-    expect(screen.getByText('문항 2 / 4 · 답변 0 / 4')).toBeInTheDocument()
+    expect(screen.getByText('문항 2 / 2 · 답변 0 / 2')).toBeInTheDocument()
   })
 
   it('renders the diagnosis action returned by quiz submission', async () => {

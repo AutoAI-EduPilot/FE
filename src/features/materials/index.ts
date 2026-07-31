@@ -4,7 +4,6 @@ export {
   validateMaterialUpload,
 } from './materialUploadValidation'
 export type { MaterialStatus, StudyMaterial } from './materialTypes'
-export type { MaterialPageText } from './materialTypes'
 export {
   createMaterialsRepository,
   type MaterialsRepository,
