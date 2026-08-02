@@ -1,5 +1,6 @@
 import {
   BarChart3,
+  Bell,
   BookOpenCheck,
   CalendarDays,
   ChevronsLeft,
@@ -15,9 +16,10 @@ import {
   Settings,
   Sun,
   UserPlus,
+  X,
   type LucideIcon,
 } from 'lucide-react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import {
   Link,
   NavLink,
@@ -27,7 +29,19 @@ import {
 } from 'react-router-dom'
 
 import { getRoleLabel, isInstructorRole, useAuth } from '../../features/auth'
+import { createFeedbackRepository, type FeedbackCategory } from '../../features/feedback'
+import {
+  createClassroomsRepository,
+  JOIN_REQUESTS_CHANGED_EVENT,
+} from '../../features/classrooms'
+import {
+  getCalendarEventKindLabel,
+  useCalendarEvents,
+  type CalendarEvent,
+} from '../../features/calendar'
 import { cx } from '../../shared/lib/cx'
+import { getRequestErrorMessage } from '../../shared/api'
+import { formatDateTime } from '../../shared/lib/format'
 import { useTheme, type ThemeMode } from '../../shared/theme'
 import { useToast } from '../../shared/ui'
 import { routes } from '../routes'
@@ -55,7 +69,7 @@ const instructorNavigation: Array<{
 ]
 
 export function AppLayout() {
-  const { logout, user } = useAuth()
+  const { apiRequest, logout, user } = useAuth()
   const { mode, setMode } = useTheme()
   const { show: showToast } = useToast()
   const navigate = useNavigate()
@@ -72,10 +86,61 @@ export function AppLayout() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const menuContainerRef = useRef<HTMLDivElement | null>(null)
   const mobileMenuContainerRef = useRef<HTMLDivElement | null>(null)
+  const notificationsRef = useRef<HTMLDivElement | null>(null)
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false)
+  const [pendingJoinRequestCount, setPendingJoinRequestCount] = useState(0)
+  const [notificationReferenceTime, setNotificationReferenceTime] = useState(
+    () => Date.now(),
+  )
   const roleLabel = getRoleLabel(user?.role)
-  const primaryNavigation = isInstructorRole(user?.role)
+  const isInstructor = isInstructorRole(user?.role)
+  const classroomsRepository = useMemo(
+    () => createClassroomsRepository(apiRequest),
+    [apiRequest],
+  )
+  const { events: calendarEvents } = useCalendarEvents(
+    user?.id ?? user?.email,
+    apiRequest,
+  )
+  const upcomingEvents = useMemo(() => {
+    return calendarEvents
+      .filter(
+        (event) =>
+          new Date(event.startsAt).getTime() >= notificationReferenceTime,
+      )
+      .slice(0, 5)
+  }, [calendarEvents, notificationReferenceTime])
+  const primaryNavigation = isInstructor
     ? instructorNavigation
     : learnerNavigation
+
+  useEffect(() => {
+    if (!isInstructor) {
+      return
+    }
+
+    let cancelled = false
+    const refresh = () => {
+      classroomsRepository
+        .list()
+        .then((items) => {
+          if (!cancelled) {
+            setPendingJoinRequestCount(
+              items.reduce((sum, item) => sum + item.pendingRequestCount, 0),
+            )
+          }
+        })
+        .catch(() => undefined)
+    }
+
+    refresh()
+    window.addEventListener(JOIN_REQUESTS_CHANGED_EVENT, refresh)
+    return () => {
+      cancelled = true
+      window.removeEventListener(JOIN_REQUESTS_CHANGED_EVENT, refresh)
+    }
+  }, [classroomsRepository, isInstructor])
 
   useEffect(() => {
     if (!isMenuOpen) return
@@ -100,6 +165,34 @@ export function AppLayout() {
       document.removeEventListener('keydown', closeOnEscape)
     }
   }, [isMenuOpen])
+
+  useEffect(() => {
+    if (!isNotificationsOpen) return
+
+    const closeOnOutsidePress = (event: PointerEvent) => {
+      if (!notificationsRef.current?.contains(event.target as Node)) {
+        setIsNotificationsOpen(false)
+      }
+    }
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsNotificationsOpen(false)
+    }
+
+    document.addEventListener('pointerdown', closeOnOutsidePress)
+    document.addEventListener('keydown', closeOnEscape)
+    return () => {
+      document.removeEventListener('pointerdown', closeOnOutsidePress)
+      document.removeEventListener('keydown', closeOnEscape)
+    }
+  }, [isNotificationsOpen])
+
+  useEffect(() => {
+    const intervalId = window.setInterval(
+      () => setNotificationReferenceTime(Date.now()),
+      60_000,
+    )
+    return () => window.clearInterval(intervalId)
+  }, [])
 
   async function handleLogout() {
     setIsMenuOpen(false)
@@ -141,9 +234,7 @@ export function AppLayout() {
       </button>
       <button
         className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-[13.5px] font-medium text-stone-700 hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
-        onClick={() =>
-          showToast('도움말과 피드백 채널은 준비 중입니다.', 'info')
-        }
+        onClick={() => { setIsMenuOpen(false); setIsFeedbackOpen(true) }}
         role="menuitem"
         type="button"
       >
@@ -228,24 +319,64 @@ export function AppLayout() {
                 EduPilot
               </span>
             </Link>
-            <button
-              aria-label={isCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
-              className="hidden size-7 shrink-0 items-center justify-center rounded-lg text-stone-400 hover:bg-white hover:text-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 lg:flex"
-              onClick={() =>
-                setSidebarPreference({
-                  isCollapsed: !isCollapsed,
-                  pathname: location.pathname,
-                })
-              }
-              title={isCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
-              type="button"
-            >
-              {isCollapsed ? (
-                <ChevronsRight aria-hidden="true" size={15} />
-              ) : (
-                <ChevronsLeft aria-hidden="true" size={15} />
+            <div
+              className={cx(
+                'flex items-center gap-1',
+                isCollapsed && 'lg:flex-col',
               )}
-            </button>
+            >
+              {isInstructor ? (
+              <div className="relative" ref={notificationsRef}>
+                <button
+                  aria-expanded={isNotificationsOpen}
+                  aria-haspopup="dialog"
+                  aria-label={`알림 ${upcomingEvents.length}개`}
+                  className="relative flex size-7 shrink-0 items-center justify-center rounded-lg text-stone-400 hover:bg-white hover:text-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+                  onClick={() => {
+                    setIsNotificationsOpen((open) => !open)
+                    setIsMenuOpen(false)
+                  }}
+                  title="예정 알림"
+                  type="button"
+                >
+                  <Bell aria-hidden="true" size={15} />
+                  {upcomingEvents.length > 0 ? (
+                    <span className="absolute -top-1 -right-1 flex min-w-4 items-center justify-center rounded-full bg-brand-600 px-1 text-[9px] font-bold leading-4 text-white">
+                      {upcomingEvents.length > 9 ? '9+' : upcomingEvents.length}
+                    </span>
+                  ) : null}
+                </button>
+                {isNotificationsOpen ? (
+                  <NotificationPanel
+                    events={upcomingEvents}
+                    isCollapsed={isCollapsed}
+                    onOpenCalendar={() => {
+                      setIsNotificationsOpen(false)
+                      navigate(routes.calendar)
+                    }}
+                  />
+                ) : null}
+              </div>
+              ) : null}
+              <button
+                aria-label={isCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+                className="hidden size-7 shrink-0 items-center justify-center rounded-lg text-stone-400 hover:bg-white hover:text-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 lg:flex"
+                onClick={() =>
+                  setSidebarPreference({
+                    isCollapsed: !isCollapsed,
+                    pathname: location.pathname,
+                  })
+                }
+                title={isCollapsed ? '사이드바 펼치기' : '사이드바 접기'}
+                type="button"
+              >
+                {isCollapsed ? (
+                  <ChevronsRight aria-hidden="true" size={15} />
+                ) : (
+                  <ChevronsLeft aria-hidden="true" size={15} />
+                )}
+              </button>
+            </div>
           </div>
 
           <nav
@@ -261,6 +392,17 @@ export function AppLayout() {
               >
                 <item.icon aria-hidden="true" className="shrink-0" size={16} />
                 <span className={cx(isCollapsed && 'lg:sr-only')}>{item.label}</span>
+                {item.to === routes.entranceRequests && pendingJoinRequestCount > 0 ? (
+                  <span
+                    aria-label={`${pendingJoinRequestCount}개의 대기 요청`}
+                    className={cx(
+                      'ml-auto min-w-5 rounded-full bg-brand-600 px-1.5 text-center text-[10px] font-bold leading-5 text-white',
+                      isCollapsed && 'lg:absolute lg:top-0 lg:right-0 lg:min-w-4 lg:px-1 lg:leading-4',
+                    )}
+                  >
+                    {pendingJoinRequestCount > 99 ? '99+' : pendingJoinRequestCount}
+                  </span>
+                ) : null}
               </NavLink>
             ))}
           </nav>
@@ -331,7 +473,7 @@ export function AppLayout() {
           'min-w-0 flex-1',
           isStudyWorkspace
             ? 'h-[calc(100dvh-61px)] overflow-hidden p-0 lg:h-dvh'
-            : 'px-4 py-5 sm:px-6 lg:px-10 lg:py-8',
+            : 'px-4 py-5 sm:px-6 lg:px-12 lg:py-9',
         )}
       >
         <div
@@ -344,13 +486,80 @@ export function AppLayout() {
           <Outlet />
         </div>
       </main>
+      {isFeedbackOpen ? <FeedbackDialog onClose={() => setIsFeedbackOpen(false)} onSubmit={async (input) => { try { await createFeedbackRepository(apiRequest).create({ ...input, pageUrl: window.location.href }); setIsFeedbackOpen(false); showToast('피드백을 보냈습니다.', 'success') } catch (error) { showToast(getRequestErrorMessage(error), 'danger') } }} /> : null}
+    </div>
+  )
+}
+
+function NotificationPanel({
+  events,
+  isCollapsed,
+  onOpenCalendar,
+}: {
+  events: CalendarEvent[]
+  isCollapsed: boolean
+  onOpenCalendar: () => void
+}) {
+  return (
+    <div
+      aria-label="예정 알림"
+      className={cx(
+        'absolute top-[calc(100%+8px)] right-0 z-40 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-stone-200 bg-white shadow-xl',
+        isCollapsed
+          ? 'lg:top-0 lg:right-auto lg:left-[calc(100%+8px)]'
+          : 'lg:right-auto lg:left-0',
+      )}
+      role="dialog"
+    >
+      <div className="flex h-12 items-center justify-between border-b border-stone-100 px-4">
+        <h2 className="text-sm font-bold text-stone-900">예정 알림</h2>
+        <button
+          className="text-xs font-semibold text-brand-700 hover:text-brand-900"
+          onClick={onOpenCalendar}
+          type="button"
+        >
+          캘린더 열기
+        </button>
+      </div>
+      {events.length > 0 ? (
+        <div className="max-h-80 overflow-y-auto py-1.5">
+          {events.map((event) => (
+            <button
+              className="flex min-h-16 w-full items-start gap-3 px-4 py-3 text-left hover:bg-stone-50"
+              key={event.id}
+              onClick={onOpenCalendar}
+              type="button"
+            >
+              <span className="mt-1 flex size-7 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700">
+                <CalendarDays aria-hidden="true" size={14} />
+              </span>
+              <span className="min-w-0 flex-1">
+                <strong className="block truncate text-[13px] font-semibold text-stone-900">
+                  {event.title}
+                </strong>
+                <span className="mt-0.5 block text-[11px] text-stone-400">
+                  {event.hasTime === false ? new Date(event.startsAt).toLocaleDateString('ko-KR') : formatDateTime(event.startsAt)} ·{' '}
+                  {getCalendarEventKindLabel(event.kind)}
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : (
+        <div className="flex min-h-32 flex-col items-center justify-center px-5 text-center">
+          <Bell aria-hidden="true" className="text-stone-300" size={20} />
+          <p className="mt-2 text-sm font-semibold text-stone-700">
+            예정된 알림이 없습니다
+          </p>
+        </div>
+      )}
     </div>
   )
 }
 
 function navLinkClassName(isActive: boolean, isCollapsed: boolean): string {
   return cx(
-    'inline-flex h-9 shrink-0 items-center gap-2.5 rounded-lg px-3 text-[13.5px]',
+    'relative inline-flex h-9 shrink-0 items-center gap-2.5 rounded-lg px-3 text-[13.5px]',
     isCollapsed && 'lg:w-9 lg:justify-center lg:px-0',
     'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
     isActive
@@ -368,3 +577,11 @@ const themeOptions: Array<{
   { icon: Moon, label: '다크 모드', value: 'dark' },
   { icon: Monitor, label: '시스템 설정', value: 'system' },
 ]
+
+function FeedbackDialog({ onClose, onSubmit }: { onClose: () => void; onSubmit: (input: { category: FeedbackCategory; message: string }) => Promise<void> }) {
+  const [category, setCategory] = useState<FeedbackCategory>('GENERAL')
+  const [message, setMessage] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!message.trim() || isSubmitting) return; setIsSubmitting(true); await onSubmit({ category, message: message.trim() }).finally(() => setIsSubmitting(false)) }
+  return <div aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/35 px-4" role="dialog"><form className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl" onSubmit={submit}><div className="flex items-center justify-between"><h2 className="text-lg font-bold text-stone-950">도움말 · 피드백</h2><button aria-label="닫기" className="p-2 text-stone-400" onClick={onClose} type="button"><X size={16} /></button></div><label className="mt-5 block text-sm font-semibold text-stone-800">분류<select className="mt-1 h-11 w-full rounded-lg border border-stone-300 bg-white px-3" onChange={(event) => setCategory(event.target.value as FeedbackCategory)} value={category}><option value="GENERAL">일반 문의</option><option value="BUG">오류 신고</option><option value="FEATURE_REQUEST">기능 제안</option></select></label><label className="mt-4 block text-sm font-semibold text-stone-800">내용<textarea autoFocus className="mt-1 min-h-36 w-full resize-none rounded-lg border border-stone-300 px-3 py-3" maxLength={2000} onChange={(event) => setMessage(event.target.value)} value={message} /></label><div className="mt-5 flex justify-end gap-2"><button className="h-10 rounded-lg px-4 text-sm font-semibold text-stone-600 hover:bg-stone-100" onClick={onClose} type="button">취소</button><button className="h-10 rounded-lg bg-brand-600 px-4 text-sm font-semibold text-white disabled:bg-stone-300" disabled={!message.trim() || isSubmitting} type="submit">{isSubmitting ? '전송 중' : '보내기'}</button></div></form></div>
+}

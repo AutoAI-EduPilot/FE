@@ -2,6 +2,8 @@ export { AUTH_IDLE_TIMEOUT_MS, AuthProvider } from './AuthProvider'
 export { RequireAuth } from './RequireAuth'
 export { RequireInstructor } from './RequireInstructor'
 export { useAuth } from './useAuth'
+export { createUserSettingsRepository } from './userSettingsRepository'
+export type { AiAnswerStyle, UserPreferences } from './userSettingsRepository'
 export { getRoleLabel, isInstructorRole } from './authRoles'
 export type { AuthContextValue, AuthUser } from './authContext'
 export type {

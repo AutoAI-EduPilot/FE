@@ -3,12 +3,29 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Plus,
+  Trash2,
+  X,
 } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react'
 
+import { useAuth } from '../../../features/auth'
+import {
+  getCalendarEventKindLabel,
+  useCalendarEvents,
+  type CalendarEvent,
+  type CalendarEventKind,
+  type CreateCalendarEventInput,
+} from '../../../features/calendar'
 import { usePageTitle } from '../../../shared/lib/usePageTitle'
 import { cx } from '../../../shared/lib/cx'
-import { PageContainer, PageHeader } from '../../../shared/ui'
+import { Button, PageContainer, PageHeader } from '../../../shared/ui'
 
 type CalendarView = 'list' | 'month' | 'week'
 
@@ -16,10 +33,17 @@ const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일']
 
 export function InstructorCalendarPage() {
   usePageTitle('캘린더')
+  const { apiRequest, user } = useAuth()
+  const { addEvent, events, removeEvent } = useCalendarEvents(
+    user?.id ?? user?.email,
+    apiRequest,
+  )
   const today = useMemo(() => startOfDay(new Date()), [])
   const [cursor, setCursor] = useState(() => startOfMonth(today))
   const [view, setView] = useState<CalendarView>('month')
   const [isPickerOpen, setIsPickerOpen] = useState(false)
+  const [isComposerOpen, setIsComposerOpen] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [pickerYear, setPickerYear] = useState(cursor.getFullYear())
   const pickerRef = useRef<HTMLDivElement | null>(null)
 
@@ -64,10 +88,16 @@ export function InstructorCalendarPage() {
   }
 
   return (
-    <PageContainer>
+    <PageContainer className="lg:flex lg:min-h-[calc(100dvh-4rem)] lg:flex-col">
       <PageHeader
         actions={
-          <SegmentedControl onChange={setView} value={view} />
+          <>
+            <Button onClick={() => setIsComposerOpen(true)} size="sm">
+              <Plus aria-hidden="true" size={14} />
+              일정 추가
+            </Button>
+            <SegmentedControl onChange={setView} value={view} />
+          </>
         }
         title="캘린더"
         titleAccessory={
@@ -114,9 +144,48 @@ export function InstructorCalendarPage() {
         }
       />
 
-      {view === 'month' ? <MonthView cursor={cursor} today={today} /> : null}
-      {view === 'week' ? <WeekView cursor={cursor} today={today} /> : null}
-      {view === 'list' ? <ListView /> : null}
+      {view === 'month' ? (
+        <MonthView
+          cursor={cursor}
+          events={events}
+          onSelectEvent={setSelectedEvent}
+          today={today}
+        />
+      ) : null}
+      {view === 'week' ? (
+        <WeekView
+          cursor={cursor}
+          events={events}
+          onSelectEvent={setSelectedEvent}
+          today={today}
+        />
+      ) : null}
+      {view === 'list' ? (
+        <ListView events={events} onSelectEvent={setSelectedEvent} />
+      ) : null}
+
+      {isComposerOpen ? (
+        <ScheduleComposer
+          initialDate={getInitialScheduleDate(cursor, today)}
+          onClose={() => setIsComposerOpen(false)}
+          onSubmit={(input) => {
+            const event = addEvent(input)
+            setCursor(startOfMonth(new Date(event.startsAt)))
+            setIsComposerOpen(false)
+          }}
+        />
+      ) : null}
+
+      {selectedEvent ? (
+        <ScheduleDetailDialog
+          event={selectedEvent}
+          onClose={() => setSelectedEvent(null)}
+          onRemove={() => {
+            removeEvent(selectedEvent.id)
+            setSelectedEvent(null)
+          }}
+        />
+      ) : null}
     </PageContainer>
   )
 }
@@ -218,42 +287,78 @@ function SegmentedControl({
   )
 }
 
-function MonthView({ cursor, today }: { cursor: Date; today: Date }) {
+function MonthView({
+  cursor,
+  events,
+  onSelectEvent,
+  today,
+}: {
+  cursor: Date
+  events: CalendarEvent[]
+  onSelectEvent: (event: CalendarEvent) => void
+  today: Date
+}) {
   const cells = getMonthCells(cursor)
 
   return (
-    <section className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+    <section className="overflow-hidden rounded-lg border border-stone-200 bg-white lg:flex lg:flex-1 lg:flex-col">
       <div className="grid grid-cols-7 border-b border-stone-200 bg-stone-50">
-        {WEEKDAY_LABELS.map((label) => (
+        {WEEKDAY_LABELS.map((label, index) => (
           <div
-            className="px-2 py-2 text-center text-[11px] font-semibold text-stone-500"
+            className={cx(
+              'px-2 py-2 text-center text-[11px] font-semibold',
+              index === 5
+                ? 'text-sky-700'
+                : index === 6
+                  ? 'text-rose-600'
+                  : 'text-stone-500',
+            )}
             key={label}
           >
             {label}
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-7">
+      <div
+        className="grid grid-cols-7 lg:flex-1"
+        style={{
+          gridTemplateRows: `repeat(${cells.length / 7}, minmax(8rem, 1fr))`,
+        }}
+      >
         {cells.map((date) => {
           const isCurrentMonth = date.getMonth() === cursor.getMonth()
           const isToday = isSameDay(date, today)
+          const dayEvents = getEventsForDay(events, date)
           return (
             <div
-              className="min-h-28 border-r border-b border-stone-100 p-2 last:border-r-0 sm:min-h-32"
+              aria-label={`${formatCalendarDate(date)} 일정 ${dayEvents.length}개`}
+              className="min-h-28 min-w-0 border-r border-b border-stone-100 p-2.5 last:border-r-0 sm:min-h-32 lg:min-h-0"
               key={date.toISOString()}
             >
               <span
                 className={cx(
-                  'flex size-6 items-center justify-center rounded-full text-[11px] font-medium',
+                  'flex size-7 items-center justify-center rounded-full text-sm font-semibold',
                   isToday
                     ? 'bg-brand-600 font-bold text-white'
-                    : isCurrentMonth
-                      ? 'text-stone-800'
-                      : 'text-stone-300',
+                    : getWeekendDateClassName(date, isCurrentMonth),
                 )}
               >
                 {date.getDate()}
               </span>
+              <div className="mt-1 grid gap-1">
+                {dayEvents.slice(0, 2).map((event) => (
+                  <CalendarEventButton
+                    event={event}
+                    key={event.id}
+                    onClick={() => onSelectEvent(event)}
+                  />
+                ))}
+                {dayEvents.length > 2 ? (
+                  <span className="px-1 text-[10px] font-medium text-stone-400">
+                    +{dayEvents.length - 2}개
+                  </span>
+                ) : null}
+              </div>
             </div>
           )
         })}
@@ -262,37 +367,104 @@ function MonthView({ cursor, today }: { cursor: Date; today: Date }) {
   )
 }
 
-function WeekView({ cursor, today }: { cursor: Date; today: Date }) {
+function WeekView({
+  cursor,
+  events,
+  onSelectEvent,
+  today,
+}: {
+  cursor: Date
+  events: CalendarEvent[]
+  onSelectEvent: (event: CalendarEvent) => void
+  today: Date
+}) {
   const week = getWeek(cursor)
   return (
     <section className="grid overflow-hidden rounded-lg border border-stone-200 bg-white md:grid-cols-7">
-      {week.map((date, index) => (
-        <div
-          className="min-h-48 border-b border-stone-100 p-3 last:border-b-0 md:border-r md:border-b-0 md:last:border-r-0"
-          key={date.toISOString()}
-        >
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-stone-400">
-              {WEEKDAY_LABELS[index]}
-            </span>
-            <span
-              className={cx(
-                'flex size-7 items-center justify-center rounded-full text-xs font-semibold',
-                isSameDay(date, today)
-                  ? 'bg-brand-600 text-white'
-                  : 'text-stone-800',
-              )}
-            >
-              {date.getDate()}
-            </span>
+      {week.map((date, index) => {
+        const dayEvents = getEventsForDay(events, date)
+        return (
+          <div
+            aria-label={`${formatCalendarDate(date)} 일정 ${dayEvents.length}개`}
+            className="min-h-48 min-w-0 border-b border-stone-100 p-3 last:border-b-0 md:border-r md:border-b-0 md:last:border-r-0"
+            key={date.toISOString()}
+          >
+            <div className="flex items-center gap-2">
+              <span
+                className={cx(
+                  'text-xs font-semibold',
+                  index === 5
+                    ? 'text-sky-700'
+                    : index === 6
+                      ? 'text-rose-600'
+                      : 'text-stone-400',
+                )}
+              >
+                {WEEKDAY_LABELS[index]}
+              </span>
+              <span
+                className={cx(
+                  'flex size-7 items-center justify-center rounded-full text-xs font-semibold',
+                  isSameDay(date, today)
+                    ? 'bg-brand-600 text-white'
+                    : getWeekendDateClassName(date, true),
+                )}
+              >
+                {date.getDate()}
+              </span>
+            </div>
+            <div className="mt-3 grid gap-1.5">
+              {dayEvents.map((event) => (
+                <CalendarEventButton
+                  event={event}
+                  key={event.id}
+                  onClick={() => onSelectEvent(event)}
+                />
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        )
+      })}
     </section>
   )
 }
 
-function ListView() {
+function ListView({
+  events,
+  onSelectEvent,
+}: {
+  events: CalendarEvent[]
+  onSelectEvent: (event: CalendarEvent) => void
+}) {
+  if (events.length > 0) {
+    return (
+      <section className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+        {events.map((event) => (
+          <button
+            className="flex min-h-16 w-full items-center gap-3 border-b border-stone-100 px-4 text-left last:border-b-0 hover:bg-stone-50"
+            key={event.id}
+            onClick={() => onSelectEvent(event)}
+            type="button"
+          >
+            <span
+              aria-hidden="true"
+              className={cx('size-2 shrink-0 rounded-full', getEventDotClassName(event.kind))}
+            />
+            <span className="min-w-0 flex-1">
+              <strong className="block truncate text-sm font-semibold text-stone-900">
+                {event.title}
+              </strong>
+              <span className="mt-0.5 block text-xs text-stone-400">
+                {formatScheduleDateTime(event.startsAt)} ·{' '}
+                {getCalendarEventKindLabel(event.kind)}
+              </span>
+            </span>
+          </button>
+        ))}
+      </section>
+    )
+  }
+
   return (
     <section className="flex min-h-72 flex-col items-center justify-center rounded-lg border border-stone-200 bg-white px-6 text-center">
       <span className="flex size-10 items-center justify-center rounded-lg bg-stone-100 text-stone-400">
@@ -306,6 +478,335 @@ function ListView() {
       </p>
     </section>
   )
+}
+
+function CalendarEventButton({
+  event,
+  onClick,
+}: {
+  event: CalendarEvent
+  onClick: () => void
+}) {
+  return (
+    <button
+      aria-label={`${event.title}, ${formatScheduleDateTime(event.startsAt)}`}
+      className={cx(
+        'h-6 min-w-0 truncate rounded px-1.5 text-left text-[10px] font-semibold',
+        getEventChipClassName(event.kind),
+      )}
+      onClick={onClick}
+      title={event.title}
+      type="button"
+    >
+      {event.hasTime === false ? '종일' : formatEventTime(event.startsAt)} {event.title}
+    </button>
+  )
+}
+
+function ScheduleComposer({
+  initialDate,
+  onClose,
+  onSubmit,
+}: {
+  initialDate: Date
+  onClose: () => void
+  onSubmit: (input: CreateCalendarEventInput) => void
+}) {
+  const [title, setTitle] = useState('')
+  const [kind, setKind] = useState<CalendarEventKind>('PERSONAL')
+  const [startsAt, setStartsAt] = useState(() => toDateTimeLocal(initialDate))
+  const [endsAt, setEndsAt] = useState(() => toDateTimeLocal(new Date(initialDate.getTime() + 60 * 60 * 1000)))
+  const [hasDuration, setHasDuration] = useState(false)
+  const [hasTime, setHasTime] = useState(true)
+  const rangeError = hasDuration && startsAt && endsAt && endsAt < startsAt
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!title.trim() || !startsAt) return
+    if (rangeError) return
+    const parsedDate = new Date(hasTime ? startsAt : `${startsAt}T00:00:00`)
+    if (Number.isNaN(parsedDate.getTime())) return
+    const parsedEnd = hasDuration
+      ? new Date(hasTime ? endsAt : `${endsAt}T23:59:59`)
+      : undefined
+    onSubmit({
+      endsAt: parsedEnd?.toISOString(),
+      hasTime,
+      kind,
+      startsAt: parsedDate.toISOString(),
+      title: title.trim(),
+    })
+  }
+
+  return (
+    <div
+      aria-labelledby="schedule-composer-title"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/35 px-4"
+      role="dialog"
+    >
+      <form
+        className="w-full max-w-md rounded-xl border border-stone-200 bg-white p-6 shadow-2xl"
+        onSubmit={submit}
+      >
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-lg font-bold text-stone-950" id="schedule-composer-title">
+            일정 추가
+          </h2>
+          <button
+            aria-label="일정 추가 닫기"
+            className="flex size-8 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+            onClick={onClose}
+            type="button"
+          >
+            <X aria-hidden="true" size={16} />
+          </button>
+        </div>
+
+        <label className="mt-5 block text-[13px] font-semibold text-stone-800">
+          일정 이름
+          <input
+            autoFocus
+            className="mt-1 h-11 w-full rounded-lg border border-stone-300 bg-white px-3.5 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+            onChange={(event) => setTitle(event.target.value)}
+            placeholder="일정 이름을 입력하세요"
+            value={title}
+          />
+        </label>
+
+        <div className="mt-4 flex items-center gap-5 rounded-lg bg-stone-50 px-3.5 py-3">
+          <ToggleControl checked={hasDuration} label="기간" onChange={(checked) => { setHasDuration(checked); if (checked && endsAt < startsAt) setEndsAt(startsAt) }} />
+          <ToggleControl checked={hasTime} label="시간" onChange={(checked) => { setHasTime(checked); setStartsAt((value) => checked ? `${value.slice(0, 10)}T09:00` : value.slice(0, 10)); setEndsAt((value) => checked ? `${value.slice(0, 10)}T10:00` : value.slice(0, 10)) }} />
+        </div>
+
+        <div className="mt-4 grid gap-4 sm:grid-cols-2">
+          <label className="text-[13px] font-semibold text-stone-800">
+            {hasDuration ? '시작' : '날짜'}{hasTime ? '와 시간' : ''}
+            <input
+              className="mt-1 h-11 w-full rounded-lg border border-stone-300 bg-white px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+              onChange={(event) => setStartsAt(event.target.value)}
+              type={hasTime ? 'datetime-local' : 'date'}
+              value={startsAt}
+            />
+          </label>
+          {hasDuration ? <label className="text-[13px] font-semibold text-stone-800">종료{hasTime ? ' 날짜와 시간' : '일'}<input aria-invalid={Boolean(rangeError)} className={cx('mt-1 h-11 w-full rounded-lg border bg-white px-3 text-sm outline-none focus:ring-2', rangeError ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-100' : 'border-stone-300 focus:border-brand-600 focus:ring-brand-100')} min={startsAt || undefined} onChange={(event) => setEndsAt(event.target.value)} type={hasTime ? 'datetime-local' : 'date'} value={endsAt} /></label> : null}
+        </div>
+        {rangeError ? <p className="mt-2 text-xs font-medium text-rose-600">종료 시각은 시작 시각보다 빠를 수 없습니다.</p> : null}
+        <div className="mt-4">
+          <label className="text-[13px] font-semibold text-stone-800">
+            일정 유형
+            <select
+              className="mt-1 h-11 w-full rounded-lg border border-stone-300 bg-white px-3 text-sm outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+              onChange={(event) => setKind(event.target.value as CalendarEventKind)}
+              value={kind}
+            >
+              <option value="PERSONAL">개인 일정</option>
+              <option value="MATERIAL">자료 공개</option>
+              <option value="NOTICE">공지</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="mt-6 flex justify-end gap-2">
+          <Button onClick={onClose} variant="ghost">
+            취소
+          </Button>
+          <Button disabled={!title.trim() || !startsAt || Boolean(rangeError)} type="submit">
+            추가
+          </Button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+function ToggleControl({
+  checked,
+  label,
+  onChange,
+}: {
+  checked: boolean
+  label: string
+  onChange: (checked: boolean) => void
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2 text-xs font-semibold text-stone-700">
+      <button
+        aria-checked={checked}
+        className={cx(
+          'relative h-5 w-9 rounded-full transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
+          checked ? 'bg-brand-600' : 'bg-stone-300',
+        )}
+        onClick={() => onChange(!checked)}
+        role="switch"
+        type="button"
+      >
+        <span className={cx('absolute top-0.5 left-0.5 size-4 rounded-full bg-white shadow-sm transition-transform', checked && 'translate-x-4')} />
+      </button>
+      {label}
+    </label>
+  )
+}
+
+function ScheduleDetailDialog({
+  event,
+  onClose,
+  onRemove,
+}: {
+  event: CalendarEvent
+  onClose: () => void
+  onRemove: () => void
+}) {
+  return (
+    <div
+      aria-labelledby="schedule-detail-title"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/35 px-4"
+      role="dialog"
+    >
+      <div className="w-full max-w-sm rounded-xl border border-stone-200 bg-white p-5 shadow-2xl">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-stone-400">
+              {getCalendarEventKindLabel(event.kind)}
+            </p>
+            <h2
+              className="mt-1 break-words text-lg font-bold text-stone-950"
+              id="schedule-detail-title"
+            >
+              {event.title}
+            </h2>
+          </div>
+          <button
+            aria-label="일정 상세 닫기"
+            className="flex size-8 shrink-0 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700"
+            onClick={onClose}
+            type="button"
+          >
+            <X aria-hidden="true" size={16} />
+          </button>
+        </div>
+        <p className="mt-4 rounded-lg bg-stone-50 px-3.5 py-3 text-sm font-medium text-stone-700">
+          {formatEventRange(event)}
+        </p>
+        <div className="mt-5 flex justify-end">
+          {event.source === 'remote' ? (
+            <p className="text-xs text-stone-400">강의실 일정은 주차 또는 공지에서 관리합니다.</p>
+          ) : (
+          <Button
+            className="border-rose-700 bg-rose-700 hover:bg-rose-800"
+            onClick={onRemove}
+          >
+            <Trash2 aria-hidden="true" size={14} />
+            일정 삭제
+          </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function getEventsForDay(
+  events: CalendarEvent[],
+  date: Date,
+): CalendarEvent[] {
+  return events.filter((event) => isSameDay(new Date(event.startsAt), date))
+}
+
+function getWeekendDateClassName(
+  date: Date,
+  isCurrentPeriod: boolean,
+): string {
+  if (date.getDay() === 6) {
+    return isCurrentPeriod ? 'text-sky-700' : 'text-sky-300'
+  }
+  if (date.getDay() === 0) {
+    return isCurrentPeriod ? 'text-rose-600' : 'text-rose-300'
+  }
+  return isCurrentPeriod ? 'text-stone-800' : 'text-stone-300'
+}
+
+function getEventChipClassName(kind: CalendarEventKind): string {
+  switch (kind) {
+    case 'MATERIAL':
+      return 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100'
+    case 'NOTICE':
+      return 'bg-amber-50 text-amber-800 hover:bg-amber-100'
+    case 'PERSONAL':
+      return 'bg-brand-50 text-brand-800 hover:bg-brand-100'
+  }
+}
+
+function getEventDotClassName(kind: CalendarEventKind): string {
+  switch (kind) {
+    case 'MATERIAL':
+      return 'bg-emerald-600'
+    case 'NOTICE':
+      return 'bg-amber-500'
+    case 'PERSONAL':
+      return 'bg-brand-600'
+  }
+}
+
+function getInitialScheduleDate(cursor: Date, today: Date): Date {
+  if (
+    cursor.getFullYear() === today.getFullYear() &&
+    cursor.getMonth() === today.getMonth()
+  ) {
+    const nextHour = new Date()
+    nextHour.setMinutes(0, 0, 0)
+    nextHour.setHours(nextHour.getHours() + 1)
+    return nextHour
+  }
+  return new Date(cursor.getFullYear(), cursor.getMonth(), 1, 9)
+}
+
+function toDateTimeLocal(date: Date): string {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const hours = String(date.getHours()).padStart(2, '0')
+  const minutes = String(date.getMinutes()).padStart(2, '0')
+  return `${year}-${month}-${day}T${hours}:${minutes}`
+}
+
+function formatCalendarDate(date: Date): string {
+  return new Intl.DateTimeFormat('ko-KR', {
+    day: 'numeric',
+    month: 'long',
+    weekday: 'long',
+    year: 'numeric',
+  }).format(date)
+}
+
+function formatScheduleDateTime(iso: string): string {
+  return new Intl.DateTimeFormat('ko-KR', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(iso))
+}
+
+function formatEventRange(event: CalendarEvent): string {
+  const start = new Date(event.startsAt)
+  const dateFormatter = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium' })
+  if (event.hasTime === false) {
+    const startLabel = dateFormatter.format(start)
+    return event.endsAt
+      ? `${startLabel} - ${dateFormatter.format(new Date(event.endsAt))} · 종일`
+      : `${startLabel} · 종일`
+  }
+  const startLabel = formatScheduleDateTime(event.startsAt)
+  return event.endsAt
+    ? `${startLabel} - ${formatScheduleDateTime(event.endsAt)}`
+    : startLabel
+}
+
+function formatEventTime(iso: string): string {
+  return new Intl.DateTimeFormat('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(iso))
 }
 
 function getMonthCells(cursor: Date): Date[] {

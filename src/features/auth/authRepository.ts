@@ -29,16 +29,22 @@ interface LoginResponseDto {
   expiresIn: number
   tokenType: string
   user: {
+    affiliation?: string
+    avatarUrl?: string
     email: string
     id: number
+    learningEmailOptIn?: boolean
     name: string
     role: string
   }
 }
 
 interface UserResponseDto {
+  affiliation?: string
+  avatarUrl?: string
   email: string
   id?: number
+  learningEmailOptIn?: boolean
   name: string
   role?: string
   userId?: number
@@ -100,10 +106,14 @@ const repository: AuthRepository = {
     try {
       await apiRequest<UserResponseDto>('/api/auth/signup', {
         body: {
+          affiliation: values.affiliation?.trim() || undefined,
           email: values.email.trim().toLowerCase(),
+          learningEmailOptIn: values.learningEmailOptIn ?? false,
           name: values.name.trim(),
           password: values.password,
+          privacyVersion: '2026-07-01',
           role: values.role,
+          termsVersion: '2026-07-01',
         },
         method: 'POST',
       })
@@ -119,8 +129,11 @@ export function getAuthRepository(): AuthRepository {
 
 function mapUser(user: UserResponseDto): AuthUser {
   return {
+    affiliation: user.affiliation,
+    avatarUrl: user.avatarUrl,
     email: user.email,
     id: user.id ?? user.userId,
+    learningEmailOptIn: user.learningEmailOptIn,
     name: user.name,
     role: user.role,
   }
@@ -159,7 +172,7 @@ function mapRemoteAuthError(
     : error
 }
 
-const FORM_FIELDS = ['email', 'name', 'password', 'role'] as const
+const FORM_FIELDS = ['affiliation', 'email', 'name', 'password', 'role'] as const
 
 function isFieldDetail(
   detail: unknown,

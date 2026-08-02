@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
@@ -16,8 +17,11 @@ import {
 import Markdown from 'react-markdown'
 
 import { cx } from '../../shared/lib/cx'
+import { getRequestErrorMessage } from '../../shared/api'
 import { formatTime } from '../../shared/lib/format'
 import { Button } from '../../shared/ui'
+import type { AuthenticatedRequest } from '../auth'
+import { createNotesRepository, type Note } from '../notes'
 import type { ChatMessage } from './chatTypes'
 import { getChatErrorMessage, type SessionChat } from './useSessionChat'
 
@@ -29,13 +33,8 @@ interface ChatPanelProps {
   footer?: ReactNode
   /** 시안 빠른 칩의 "퀴즈 내줘" — 세션 화면의 유형 선택(W4)을 연다. */
   onRequestQuiz?: () => void
+  request?: AuthenticatedRequest
   sessionId: string
-}
-
-interface LocalNote {
-  content: string
-  id: string
-  pageNumber?: number
 }
 
 /** 시안 4d의 빠른 액션 칩 */
@@ -57,16 +56,30 @@ export function ChatPanel({
   currentPage,
   footer,
   onRequestQuiz,
+  request,
   sessionId,
 }: ChatPanelProps) {
   const [question, setQuestion] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<'chat' | 'notes'>('chat')
-  // TODO(BE): 노트 API가 없어 화면 메모리에만 저장된다. docs/be-api-requests.md §1-1
-  const [notes, setNotes] = useState<LocalNote[]>([])
+  const [notes, setNotes] = useState<Note[]>([])
+  const [notesError, setNotesError] = useState<string | null>(null)
   const [hiddenMessageCount, setHiddenMessageCount] = useState(0)
   const [isPageAttached, setIsPageAttached] = useState(true)
   const logEndRef = useRef<HTMLDivElement | null>(null)
+  const notesRepository = useMemo(
+    () => request ? createNotesRepository(request) : null,
+    [request],
+  )
+
+  useEffect(() => {
+    if (!notesRepository) return
+    let cancelled = false
+    notesRepository.listForSession(sessionId).then((items) => { if (!cancelled) setNotes(items) }).catch((requestError) => {
+      if (!cancelled) setNotesError(getRequestErrorMessage(requestError))
+    })
+    return () => { cancelled = true }
+  }, [notesRepository, sessionId])
 
   useEffect(() => {
     logEndRef.current?.scrollIntoView({ block: 'end' })
@@ -123,15 +136,27 @@ export function ChatPanel({
       .reverse()
       .find((message) => message.role === 'assistant')
     if (!lastAnswer) return
-    setNotes((current) => [
-      ...current,
-      {
-        content: lastAnswer.content,
-        id: `note-${lastAnswer.id}-${current.length}`,
-        pageNumber: lastAnswer.pageNumber,
-      },
-    ])
-    setTab('notes')
+    void saveNote(lastAnswer.content, lastAnswer.pageNumber)
+  }
+
+  async function saveNote(content: string, pageNumber?: number) {
+    if (!notesRepository) {
+      setNotes((current) => [...current, { content, id: `local-${Date.now()}`, pageNumber }])
+      setTab('notes')
+      return
+    }
+    try {
+      const note = await notesRepository.createForSession(sessionId, { content, pageNumber })
+      setNotes((current) => [...current, note])
+      setNotesError(null)
+      setTab('notes')
+    } catch (requestError) { setNotesError(getRequestErrorMessage(requestError)); setTab('notes') }
+  }
+
+  async function removeNote(id: string) {
+    if (!notesRepository) { setNotes((current) => current.filter((note) => note.id !== id)); return }
+    try { await notesRepository.delete(id); setNotes((current) => current.filter((note) => note.id !== id)); setNotesError(null) }
+    catch (requestError) { setNotesError(getRequestErrorMessage(requestError)) }
   }
 
   const visibleMessages = chat.messages.slice(hiddenMessageCount)
@@ -173,9 +198,8 @@ export function ChatPanel({
       {tab === 'notes' ? (
         <NotesPanel
           notes={notes}
-          onRemove={(id) =>
-            setNotes((current) => current.filter((note) => note.id !== id))
-          }
+          error={notesError}
+          onRemove={(id) => void removeNote(id)}
         />
       ) : (
         <>
@@ -220,14 +244,7 @@ export function ChatPanel({
             onSaveNote={
               message.role === 'assistant'
                 ? () =>
-                    setNotes((current) => [
-                      ...current,
-                      {
-                        content: message.content,
-                        id: `note-${message.id}`,
-                        pageNumber: message.pageNumber,
-                      },
-                    ])
+                    void saveNote(message.content, message.pageNumber)
                 : undefined
             }
           />
@@ -362,15 +379,18 @@ function PanelTab({
 
 function NotesPanel({
   notes,
+  error,
   onRemove,
 }: {
-  notes: LocalNote[]
+  notes: Note[]
+  error: string | null
   onRemove: (id: string) => void
 }) {
   if (notes.length === 0) {
     return (
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 px-6 text-center">
         <NotebookPen aria-hidden="true" className="text-stone-300" size={26} />
+        {error ? <p className="text-xs font-medium text-rose-700" role="alert">{error}</p> : null}
         <p className="text-sm font-semibold text-stone-500">
           저장한 노트가 없습니다.
         </p>
@@ -383,9 +403,7 @@ function NotesPanel({
 
   return (
     <div className="grid min-h-0 flex-1 content-start gap-2.5 overflow-y-auto px-4 py-4">
-      <p className="text-[11.5px] text-stone-400">
-        노트는 아직 서버에 저장되지 않습니다(연동 대기).
-      </p>
+      {error ? <p className="text-[11.5px] font-medium text-rose-700" role="alert">{error}</p> : null}
       {notes.map((note) => (
         <article
           className="rounded-xl border border-stone-200 px-3.5 py-2.5"

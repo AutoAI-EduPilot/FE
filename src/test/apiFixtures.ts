@@ -93,7 +93,7 @@ export async function handleApiFixtureRequest(
         email: body.email,
         id: 1,
         name: 'learner',
-              role: 'LEARNER',
+        role: body.email.startsWith('instructor') ? 'INSTRUCTOR' : 'LEARNER',
       },
     })
   }
@@ -139,6 +139,20 @@ export async function handleApiFixtureRequest(
       name: 'learner',
       role: 'LEARNER',
     })
+  }
+
+  if (
+    request.method === 'GET' &&
+    path === '/api/classrooms?page=0&size=100&sort=RECENT'
+  ) {
+    return apiSuccess(paged([]))
+  }
+
+  if (
+    request.method === 'GET' &&
+    path.startsWith('/api/users/me/schedule?')
+  ) {
+    return apiSuccess({ items: [] })
   }
 
   if (request.method === 'GET' && path === '/api/materials?page=0&size=20') {

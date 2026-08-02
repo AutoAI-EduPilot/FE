@@ -31,7 +31,10 @@ export interface MaterialsRepository {
   ) => Promise<Blob>
   list: (signal?: AbortSignal) => Promise<StudyMaterial[]>
   refreshStatuses: (signal?: AbortSignal) => Promise<StudyMaterial[]>
-  upload: (file: File, signal?: AbortSignal) => Promise<StudyMaterial>
+  upload: (
+    file: File,
+    options?: { classroomId?: string; signal?: AbortSignal; weekNumber?: number },
+  ) => Promise<StudyMaterial>
 }
 
 export function createMaterialsRepository(
@@ -89,15 +92,19 @@ export function createMaterialsRepository(
     async refreshStatuses(signal) {
       return requestMaterials(request, signal)
     },
-    async upload(file, signal) {
+    async upload(file, options) {
       const formData = new FormData()
       formData.append('file', file)
       formData.append('title', file.name)
+      if (options?.classroomId && options.weekNumber) {
+        formData.append('classroomId', options.classroomId)
+        formData.append('weekNumber', String(options.weekNumber))
+      }
 
       const { data } = await request<MaterialDto>('/api/materials', {
         body: formData,
         method: 'POST',
-        signal,
+        signal: options?.signal,
       })
       return mapMaterial(data)
     },

@@ -198,6 +198,14 @@ export function AuthProvider({
     clearSession('manual')
   }, [clearSession, repository])
 
+  const updateUser = useCallback((user: AuthUser) => {
+    const current = sessionRef.current
+    if (!current) return
+    const nextSession = { ...current, user }
+    sessionRef.current = nextSession
+    setSession(nextSession)
+  }, [])
+
   const authenticatedRequest = useCallback<AuthContextValue['apiRequest']>(
     async (path, options = {}) => {
       const accessToken = sessionRef.current?.accessToken
@@ -291,6 +299,7 @@ export function AuthProvider({
       logout,
       signup,
       user: session?.user ?? null,
+      updateUser,
       withdraw,
     }),
     [
@@ -303,6 +312,7 @@ export function AuthProvider({
       logoutReason,
       session,
       signup,
+      updateUser,
       withdraw,
     ],
   )

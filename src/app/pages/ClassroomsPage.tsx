@@ -8,14 +8,19 @@ import {
 } from 'lucide-react'
 import {
   useEffect,
+  useMemo,
   useRef,
   useState,
   type FormEvent,
 } from 'react'
+import { Link } from 'react-router-dom'
 
 import { isInstructorRole, useAuth } from '../../features/auth'
+import { createClassroomsRepository, type Classroom } from '../../features/classrooms'
+import { getRequestErrorMessage } from '../../shared/api'
 import { usePageTitle } from '../../shared/lib/usePageTitle'
-import { Button, PageContainer, useToast } from '../../shared/ui'
+import { Button, EmptyState, PageContainer, PageHeader, useToast } from '../../shared/ui'
+import { classroomDetailPath } from '../routes'
 import { InstructorClassroomsPage } from './instructor/InstructorClassroomsPage'
 
 type ClassroomSort = 'name' | 'progress' | 'recent' | 'unread'
@@ -39,7 +44,12 @@ export function ClassroomsPage() {
 
 function LearnerClassroomsPage() {
   usePageTitle('내 강의실')
+  const { apiRequest } = useAuth()
   const { show: showToast } = useToast()
+  const [classrooms, setClassrooms] = useState<Classroom[]>([])
+  const [error, setError] = useState<string | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
+  const [isJoining, setIsJoining] = useState(false)
   const [sort, setSort] = useState<ClassroomSort>('recent')
   const [isSortOpen, setIsSortOpen] = useState(false)
   const [isSearchOpen, setIsSearchOpen] = useState(false)
@@ -48,6 +58,25 @@ function LearnerClassroomsPage() {
   const [inviteCode, setInviteCode] = useState('')
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const joinInputRef = useRef<HTMLInputElement | null>(null)
+  const repository = useMemo(() => createClassroomsRepository(apiRequest), [apiRequest])
+
+  async function loadClassrooms(search = '') {
+    setIsLoading(true)
+    setError(null)
+    try {
+      setClassrooms(await repository.list(search))
+    } catch (requestError) {
+      setError(getRequestErrorMessage(requestError))
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    repository.list().then((items) => { if (!cancelled) setClassrooms(items) }).catch((requestError) => { if (!cancelled) setError(getRequestErrorMessage(requestError)) }).finally(() => { if (!cancelled) setIsLoading(false) })
+    return () => { cancelled = true }
+  }, [repository])
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -74,13 +103,20 @@ function LearnerClassroomsPage() {
     if (isJoinOpen) joinInputRef.current?.focus()
   }, [isJoinOpen])
 
-  function submitInviteCode(event: FormEvent<HTMLFormElement>) {
+  async function submitInviteCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!inviteCode.trim()) return
-    showToast(
-      '초대 코드 참여 API가 준비되면 이 코드로 참여를 요청합니다.',
-      'info',
-    )
+    if (!inviteCode.trim() || isJoining) return
+    setIsJoining(true)
+    try {
+      await repository.join(inviteCode)
+      setInviteCode('')
+      setIsJoinOpen(false)
+      showToast('강의실 참여 요청을 보냈습니다.', 'success')
+    } catch (requestError) {
+      showToast(getRequestErrorMessage(requestError), 'danger')
+    } finally {
+      setIsJoining(false)
+    }
   }
 
   const selectedSortLabel =
@@ -89,15 +125,10 @@ function LearnerClassroomsPage() {
 
   return (
     <PageContainer>
-      <header className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-[22px] font-bold text-stone-950">내 강의실</h1>
-          <p className="text-xs text-stone-400">
-            {getAcademicTermLabel()} · 0개
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
+      <PageHeader
+        title="내 강의실"
+        titleAccessory={<p className="text-xs text-stone-400">참여 중 {classrooms.length}개</p>}
+        actions={<>
           <button
             aria-label="강의실 검색"
             className="flex h-10 min-w-56 flex-1 items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 text-left text-sm text-stone-400 transition-colors hover:border-stone-300 hover:text-stone-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:min-w-72 xl:flex-none"
@@ -156,10 +187,12 @@ function LearnerClassroomsPage() {
             <Plus aria-hidden="true" size={15} />
             강의실 참여
           </Button>
-        </div>
-      </header>
+        </>}
+      />
 
-      <section
+      {error ? <EmptyState action={<Button onClick={() => void loadClassrooms()} variant="secondary">다시 시도</Button>} description={error} title="강의실을 불러오지 못했습니다" /> : null}
+      {!error && isLoading ? <p className="py-16 text-center text-sm text-stone-500" role="status">강의실을 불러오는 중입니다.</p> : null}
+      {!error && !isLoading ? <section
         aria-labelledby="classroom-list-heading"
         className="border-t border-stone-100 pt-5"
       >
@@ -167,27 +200,24 @@ function LearnerClassroomsPage() {
           참여 중인 강의실
         </h2>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          <button
-            className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-stone-300 bg-white px-6 py-8 text-center text-stone-500 transition-colors hover:border-brand-300 hover:bg-brand-50 hover:text-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
-            onClick={() => setIsJoinOpen(true)}
-            type="button"
-          >
-            <span className="flex size-9 items-center justify-center rounded-full bg-stone-100">
-              <Plus aria-hidden="true" size={16} />
-            </span>
-            <span className="text-sm font-semibold">초대 코드로 참여</span>
-          </button>
+          {classrooms.map((classroom) => (
+            <Link className="rounded-lg border border-stone-200 bg-white p-5 hover:border-brand-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600" key={classroom.id} to={classroomDetailPath(classroom.id)}>
+              <div className="flex items-start justify-between gap-3"><h2 className="font-bold text-stone-950">{classroom.name}</h2><span className="text-xs font-semibold text-brand-700">{classroom.progressRate}%</span></div>
+              <p className="mt-1 text-xs text-stone-400">{classroom.instructorName} · 총 {classroom.weekCount}주</p>
+              <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-stone-100"><span className="block h-full bg-brand-600" style={{ width: `${Math.min(100, classroom.progressRate)}%` }} /></div>
+            </Link>
+          ))}
         </div>
 
-        <div className="mt-10 border-t border-stone-100 pt-7 text-center">
+        {classrooms.length === 0 ? <div className="pt-7 text-center">
           <h2 className="text-base font-bold text-stone-900">
             아직 참여 중인 강의실이 없습니다
           </h2>
           <p className="mt-1.5 text-sm text-stone-500">
             강의자가 전달한 초대 코드를 입력해 첫 강의실에 참여하세요.
           </p>
-        </div>
-      </section>
+        </div> : null}
+      </section> : null}
 
       {isSearchOpen ? (
         <div
@@ -216,16 +246,9 @@ function LearnerClassroomsPage() {
                 <X aria-hidden="true" size={14} />
               </button>
             </div>
-            <div className="flex min-h-44 flex-col items-center justify-center px-6 py-8 text-center">
-              <Search aria-hidden="true" className="text-stone-300" size={22} />
-              <p className="mt-3 text-sm font-semibold text-stone-800">
-                {searchQuery.trim()
-                  ? '일치하는 강의실이 없습니다'
-                  : '검색할 강의실 이름을 입력하세요'}
-              </p>
-              <p className="mt-1 text-xs text-stone-400">
-                참여 중인 강의실이 검색 결과에 표시됩니다.
-              </p>
+            <div className="min-h-44 px-4 py-4">
+              {classrooms.filter((item) => item.name.toLowerCase().includes(searchQuery.trim().toLowerCase())).map((item) => <Link className="block rounded-lg px-3 py-3 text-sm font-semibold text-stone-800 hover:bg-stone-50" key={item.id} onClick={() => setIsSearchOpen(false)} to={classroomDetailPath(item.id)}>{item.name}<span className="ml-2 text-xs font-normal text-stone-400">{item.instructorName}</span></Link>)}
+              {!searchQuery.trim() ? <p className="py-12 text-center text-sm text-stone-500">검색할 강의실 이름을 입력하세요</p> : null}
             </div>
           </div>
         </div>
@@ -287,8 +310,8 @@ function LearnerClassroomsPage() {
                 >
                   취소
                 </Button>
-                <Button disabled={!inviteCode.trim()} type="submit">
-                  참여 요청
+                <Button disabled={!inviteCode.trim() || isJoining} type="submit">
+                  {isJoining ? '요청 중' : '참여 요청'}
                 </Button>
               </div>
             </form>
@@ -297,9 +320,4 @@ function LearnerClassroomsPage() {
       ) : null}
     </PageContainer>
   )
-}
-
-function getAcademicTermLabel(date = new Date()): string {
-  const semester = date.getMonth() < 8 ? 1 : 2
-  return `${date.getFullYear()}년 ${semester}학기`
 }

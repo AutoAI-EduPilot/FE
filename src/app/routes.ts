@@ -5,6 +5,7 @@ export const routes = {
   signup: '/signup',
   classrooms: '/classrooms',
   classroomDetail: '/classrooms/:classroomId',
+  classroomEdit: '/classrooms/:classroomId/edit',
   calendar: '/calendar',
   learningStatus: '/learning-status',
   announcements: '/announcements',
@@ -20,6 +21,10 @@ export const routes = {
 
 export function classroomDetailPath(classroomId: string | number): string {
   return `/classrooms/${classroomId}`
+}
+
+export function classroomEditPath(classroomId: string | number): string {
+  return `/classrooms/${classroomId}/edit`
 }
 
 export function materialDetailPath(materialId: string | number): string {

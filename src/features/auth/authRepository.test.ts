@@ -65,9 +65,12 @@ describe('remote auth repository', () => {
 
     expectJsonRequest(fetchMock, 0, '/api/auth/signup', {
       email: 'learner@example.com',
+      learningEmailOptIn: false,
       name: '학습자',
       password: 'password123',
+      privacyVersion: '2026-07-01',
       role: 'INSTRUCTOR',
+      termsVersion: '2026-07-01',
     })
     expectJsonRequest(fetchMock, 1, '/api/auth/login', {
       email: 'learner@example.com',

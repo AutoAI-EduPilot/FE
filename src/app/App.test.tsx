@@ -49,14 +49,14 @@ describe('AppRoutes', () => {
     ).toBeInTheDocument()
   })
 
-  it('redirects the root route to classrooms', () => {
+  it('redirects the root route to classrooms', async () => {
     renderRoute('/')
 
     expect(
       screen.getByRole('heading', { name: '내 강의실' }),
     ).toBeInTheDocument()
     expect(
-      screen.getByText('아직 참여 중인 강의실이 없습니다'),
+      await screen.findByText('아직 참여 중인 강의실이 없습니다'),
     ).toBeInTheDocument()
     expect(
       screen.queryByRole('link', { name: '설정' }),
@@ -107,7 +107,7 @@ describe('AppRoutes', () => {
     ).toBeInTheDocument()
   })
 
-  it('renders instructor navigation and management routes', () => {
+  it('renders instructor navigation and management routes', async () => {
     renderRoute('/entrance-requests', {
       email: 'instructor@example.com',
       name: '강의자',
@@ -122,10 +122,34 @@ describe('AppRoutes', () => {
     expect(screen.getByRole('link', { name: '공지 관리' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '입장 요청' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: '자료' })).not.toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: '초대 코드' })).toBeDisabled()
+    expect(screen.getByRole('option', { name: '강의실 없음' })).toBeInTheDocument()
+  })
+
+  it('shows upcoming calendar schedules in the notification panel', () => {
+    renderRoute('/calendar', {
+      email: 'instructor@example.com',
+      id: 7,
+      name: '강의자',
+      role: 'INSTRUCTOR',
+    })
+
+    fireEvent.click(screen.getByRole('button', { name: '일정 추가' }))
+    fireEvent.change(screen.getByLabelText('일정 이름'), {
+      target: { value: '자료 공개 확인' },
+    })
+    fireEvent.change(screen.getByLabelText('날짜와 시간'), {
+      target: { value: '2099-08-03T09:00' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '추가' }))
+
+    fireEvent.click(screen.getByRole('button', { name: '알림 1개' }))
+    const notificationPanel = screen.getByRole('dialog', { name: '예정 알림' })
+    expect(notificationPanel).toBeInTheDocument()
+    expect(notificationPanel).toHaveTextContent('자료 공개 확인')
     expect(
-      screen.getByRole('button', { name: '대기 전체 승인' }),
-    ).toBeDisabled()
-    expect(screen.getByText('초대 코드 미발급')).toBeInTheDocument()
+      screen.getByRole('button', { name: '캘린더 열기' }),
+    ).toBeInTheDocument()
   })
 
   it('renders the not found route for unknown paths', () => {

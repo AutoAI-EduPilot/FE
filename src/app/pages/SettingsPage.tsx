@@ -1,8 +1,8 @@
 import { UserX } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { getRoleLabel, useAuth } from '../../features/auth'
+import { createUserSettingsRepository, getRoleLabel, useAuth, type AiAnswerStyle } from '../../features/auth'
 import { ApiClientError, getRequestErrorMessage } from '../../shared/api'
 import { cx } from '../../shared/lib/cx'
 import {
@@ -31,24 +31,59 @@ const ANSWER_STYLES = [
   { label: '자세하게', value: 'DETAILED' },
 ]
 
-// TODO(BE): 프로필 수정·환경설정 API가 없어 로컬 상태로만 동작한다.
-// 요청 스펙은 docs/be-api-requests.md §3-1, §3-2 참고.
-const PENDING_API_NOTICE = '백엔드 연동 대기 중인 항목입니다. 저장되지 않습니다.'
-
 export function SettingsPage() {
   usePageTitle('설정')
-  const { user, withdraw } = useAuth()
+  const { apiRequest, rawApiRequest, updateUser, user, withdraw } = useAuth()
   const { show: showToast } = useToast()
   const navigate = useNavigate()
   const [section, setSection] = useState<SettingsSection>('profile')
   const [name, setName] = useState(user?.name ?? '')
-  const [affiliation, setAffiliation] = useState('')
+  const [affiliation, setAffiliation] = useState(user?.affiliation ?? '')
   const [newMaterialNotification, setNewMaterialNotification] = useState(true)
   const [studyReminder, setStudyReminder] = useState(false)
-  const [answerStyle, setAnswerStyle] = useState('NORMAL')
+  const [answerStyle, setAnswerStyle] = useState<AiAnswerStyle>('NORMAL')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
   const [password, setPassword] = useState('')
   const [passwordError, setPasswordError] = useState<string | undefined>()
   const [isWithdrawing, setIsWithdrawing] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement | null>(null)
+  const repository = useMemo(() => createUserSettingsRepository(apiRequest, rawApiRequest), [apiRequest, rawApiRequest])
+
+  useEffect(() => {
+    repository.getPreferences().then((preferences) => {
+      setNewMaterialNotification(preferences.newMaterialNotification)
+      setStudyReminder(preferences.studyReminder)
+      setAnswerStyle(preferences.aiAnswerStyle)
+    }).catch(() => undefined)
+    if (!user?.avatarUrl) return
+    let objectUrl: string | null = null
+    repository.getAvatar().then((blob) => { objectUrl = URL.createObjectURL(blob); setAvatarUrl(objectUrl) }).catch(() => undefined)
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl) }
+  }, [repository, user?.avatarUrl])
+
+  async function saveSettings() {
+    if (!user || isSaving) return
+    setIsSaving(true)
+    try {
+      const [updatedUser] = await Promise.all([
+        repository.updateProfile({ affiliation: affiliation.trim(), name: name.trim() }),
+        repository.updatePreferences({ aiAnswerStyle: answerStyle, newMaterialNotification, studyReminder }),
+      ])
+      updateUser(updatedUser)
+      showToast('설정을 저장했습니다.', 'success')
+    } catch (error) { showToast(getRequestErrorMessage(error), 'danger') } finally { setIsSaving(false) }
+  }
+
+  async function uploadAvatar(file: File) {
+    try { await repository.uploadAvatar(file); const blob = await repository.getAvatar(); if (avatarUrl) URL.revokeObjectURL(avatarUrl); const next = URL.createObjectURL(blob); setAvatarUrl(next); if (user) updateUser({ ...user, avatarUrl: '/api/users/me/avatar' }); showToast('프로필 사진을 변경했습니다.', 'success') }
+    catch (error) { showToast(getRequestErrorMessage(error), 'danger') }
+  }
+
+  async function deleteAvatar() {
+    try { await repository.deleteAvatar(); if (avatarUrl) URL.revokeObjectURL(avatarUrl); setAvatarUrl(null); if (user) updateUser({ ...user, avatarUrl: undefined }); showToast('프로필 사진을 삭제했습니다.', 'success') }
+    catch (error) { showToast(getRequestErrorMessage(error), 'danger') }
+  }
 
   async function handleWithdraw(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -120,11 +155,13 @@ export function SettingsPage() {
           {section === 'profile' ? (
             <ProfileSection
               affiliation={affiliation}
+              avatarUrl={avatarUrl}
               email={user?.email ?? ''}
               name={name}
               onAffiliationChange={setAffiliation}
               onNameChange={setName}
-              onNotice={() => showToast(PENDING_API_NOTICE, 'info')}
+              onDeleteAvatar={() => void deleteAvatar()}
+              onSelectAvatar={() => avatarInputRef.current?.click()}
               role={getRoleLabel(user?.role)}
             />
           ) : null}
@@ -201,7 +238,7 @@ export function SettingsPage() {
                     <span className="sr-only">AI 답변 스타일</span>
                     <select
                       className="h-9 rounded-lg border border-stone-200 bg-white px-3 text-[12.5px] font-medium text-stone-700 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                      onChange={(event) => setAnswerStyle(event.target.value)}
+                      onChange={(event) => setAnswerStyle(event.target.value as AiAnswerStyle)}
                       value={answerStyle}
                     >
                       {ANSWER_STYLES.map((style) => (
@@ -219,7 +256,7 @@ export function SettingsPage() {
           {section === 'account' ? null : (
             <div className="flex items-center justify-end gap-3">
               <p className="mr-auto text-xs text-stone-400">
-                저장 API 연동 대기 중입니다.
+                변경사항은 계정에 저장됩니다.
               </p>
               <Button
                 onClick={() => {
@@ -232,34 +269,40 @@ export function SettingsPage() {
                 취소
               </Button>
               <Button
-                onClick={() => showToast(PENDING_API_NOTICE, 'info')}
+                disabled={isSaving || !name.trim()}
+                onClick={() => void saveSettings()}
                 type="button"
               >
-                저장
+                {isSaving ? '저장 중' : '저장'}
               </Button>
             </div>
           )}
         </div>
       </div>
+      <input accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadAvatar(file); event.target.value = '' }} ref={avatarInputRef} type="file" />
     </PageContainer>
   )
 }
 
 function ProfileSection({
   affiliation,
+  avatarUrl,
   email,
   name,
   onAffiliationChange,
   onNameChange,
-  onNotice,
+  onDeleteAvatar,
+  onSelectAvatar,
   role,
 }: {
   affiliation: string
+  avatarUrl: string | null
   email: string
   name: string
   onAffiliationChange: (value: string) => void
   onNameChange: (value: string) => void
-  onNotice: () => void
+  onDeleteAvatar: () => void
+  onSelectAvatar: () => void
   role: string
 }) {
   return (
@@ -267,14 +310,12 @@ function ProfileSection({
       <h2 className="text-base font-bold text-stone-950">프로필</h2>
 
       <div className="mt-5 flex items-center gap-4.5">
-        <span className="flex size-16 shrink-0 items-center justify-center rounded-full bg-stone-200 text-[22px] font-bold text-stone-500">
-          {name.slice(0, 1) || '?'}
-        </span>
+        <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-stone-200 text-[22px] font-bold text-stone-500">{avatarUrl ? <img alt="프로필" className="h-full w-full object-cover" src={avatarUrl} /> : name.slice(0, 1) || '?'}</span>
         <div className="flex gap-2">
-          <Button onClick={onNotice} size="sm" type="button" variant="secondary">
+          <Button onClick={onSelectAvatar} size="sm" type="button" variant="secondary">
             사진 변경
           </Button>
-          <Button onClick={onNotice} size="sm" type="button" variant="ghost">
+          <Button disabled={!avatarUrl} onClick={onDeleteAvatar} size="sm" type="button" variant="ghost">
             삭제
           </Button>
         </div>

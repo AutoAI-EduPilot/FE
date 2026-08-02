@@ -372,6 +372,7 @@ export function SessionDetailPage() {
           </Suspense>
 
           <ChatPanel
+            request={apiRequest}
             chat={chat}
             className="rounded-none border-y-0 border-r-0"
             currentPage={currentPage}

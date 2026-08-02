@@ -33,7 +33,9 @@ import { routes } from '../routes'
 import { usePageTitle } from '../../shared/lib/usePageTitle'
 
 const initialValues: SignupFormValues = {
+  affiliation: '',
   email: '',
+  learningEmailOptIn: false,
   name: '',
   password: '',
   role: 'LEARNER',
@@ -205,7 +207,11 @@ export function SignupPage() {
     setIsSubmitting(true)
     setServerError(null)
     try {
-      await signup(values)
+      await signup({
+        ...values,
+        affiliation,
+        learningEmailOptIn: acceptsLearningEmails,
+      })
       navigate(routes.classrooms, { replace: true })
     } catch (error) {
       const formErrors = mapAuthErrorToFormErrors(error)
