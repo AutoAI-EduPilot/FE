@@ -37,7 +37,7 @@ import {
   classroomDetailPath,
   classroomEditPath,
   learningStatusPath,
-  materialDetailPath,
+  materialViewerPath,
 } from '../../routes'
 
 type CreateClassroomDraft = CreateClassroomInput & { weekCount: number }
@@ -161,7 +161,7 @@ export function InstructorClassroomsPage() {
         .map((material) => ({
           id: material.id,
           kind: 'material' as const,
-          path: materialDetailPath(material.id),
+          path: materialViewerPath(material.id),
           subtitle: `${classroom.name} · PDF 자료`,
           title: material.title,
         })),
@@ -225,12 +225,6 @@ export function InstructorClassroomsPage() {
     <PageContainer>
       <PageHeader
         title="내 강의실"
-        titleAccessory={
-          <p className="type-caption text-stone-400">
-            운영 중{' '}
-            {classrooms.filter((item) => item.status === 'ACTIVE').length}개
-          </p>
-        }
         actions={
           <>
             <button
@@ -363,11 +357,11 @@ function ClassroomCard({
 
   return (
     <article
-      className={`flex min-h-56 flex-col rounded-lg border border-stone-200 bg-white p-4 ${isActive ? '' : 'opacity-60'}`}
+      className={`flex min-h-[252px] flex-col rounded-lg border border-stone-200 bg-white p-5 ${isActive ? '' : 'opacity-60'}`}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-4">
         <span
-          className={`flex size-9 shrink-0 items-center justify-center rounded-lg type-body font-bold ${tone}`}
+          className={`flex size-11 shrink-0 items-center justify-center rounded-lg type-body font-bold ${tone}`}
         >
           {classroom.name.slice(0, 1)}
         </span>
@@ -393,7 +387,7 @@ function ClassroomCard({
           {isActive ? '운영 중' : '종료'}
         </span>
       </div>
-      <div className="mt-3 flex min-h-12 items-center gap-3 rounded-lg bg-stone-50 px-3">
+      <div className="mt-4 flex min-h-14 items-center gap-3 rounded-lg bg-stone-50 px-4 py-2.5">
         <div className="min-w-0 flex-1">
           <p className="type-micro text-stone-400">초대코드</p>
           <strong className="block truncate font-mono type-section-title tracking-wide text-stone-900">
@@ -406,7 +400,7 @@ function ClassroomCard({
           <>
             <button
               aria-label={`${classroom.name} 초대 코드 복사`}
-              className="inline-flex h-7 items-center gap-1 rounded-md border border-stone-200 bg-white px-2 type-compact-action font-semibold text-brand-700 hover:bg-brand-50"
+              className="inline-flex h-9 items-center rounded-md border border-stone-200 bg-white px-3 type-compact-action font-semibold text-brand-700 hover:bg-brand-50"
               onClick={onCopy}
               title="초대 코드 복사"
               type="button"
@@ -415,7 +409,7 @@ function ClassroomCard({
             </button>
             <button
               aria-label={`${classroom.name} 초대 코드 재발급`}
-              className="inline-flex h-7 items-center gap-1 rounded-md border border-stone-200 bg-white px-2 type-compact-action font-semibold text-stone-600 hover:bg-stone-100"
+              className="inline-flex h-9 items-center rounded-md border border-stone-200 bg-white px-3 type-compact-action font-semibold text-stone-600 hover:bg-stone-100"
               onClick={onRegenerate}
               title="초대 코드 재발급"
               type="button"
@@ -425,29 +419,34 @@ function ClassroomCard({
           </>
         ) : null}
       </div>
-      <div className="mt-3">
+      <div className="mt-4">
         <div className="flex items-center justify-between type-micro">
           <span className="text-stone-400">평균 진도</span>
           <strong className={isActive ? 'text-brand-700' : 'text-stone-400'}>
             {progress}%
           </strong>
         </div>
-        <div className="mt-1.5 h-1 rounded-full bg-stone-200">
+        <div className="mt-2 h-1.5 rounded-full bg-stone-200">
           <div
             className={`h-full rounded-full ${isActive ? 'bg-brand-600' : 'bg-stone-400'}`}
             style={{ width: `${progress}%` }}
           />
         </div>
       </div>
-      <div className="mt-auto grid grid-cols-[1fr_auto] gap-2 pt-3">
-        <Link
-          className="inline-flex h-8 items-center justify-center rounded-md border border-stone-200 type-micro font-semibold text-stone-700 hover:bg-stone-50"
-          to={isActive ? learningStatusPath(classroom.id) : classroomDetailPath(classroom.id)}
-        >
-          {isActive ? '학습 현황' : '보관된 자료 보기'}
+      <div className={`mt-auto grid gap-2 pt-4 ${isActive ? 'grid-cols-[1fr_1fr_auto]' : 'grid-cols-[1fr_auto]'}`}>
+        <Link className="inline-flex h-9 items-center justify-center rounded-md border border-stone-200 px-3 type-micro font-semibold text-stone-700 hover:bg-stone-50" to={classroomDetailPath(classroom.id)}>
+          {isActive ? '자료 관리' : '보관된 자료 보기'}
         </Link>
+        {isActive ? (
+          <Link
+            className="inline-flex h-9 items-center justify-center rounded-md border border-stone-200 px-3 type-micro font-semibold text-stone-700 hover:bg-stone-50"
+            to={learningStatusPath(classroom.id)}
+          >
+            학습 현황
+          </Link>
+        ) : null}
         <Link
-          className="inline-flex h-8 items-center justify-center rounded-md border border-stone-200 px-3 type-micro font-semibold text-stone-700 hover:bg-stone-50"
+          className="inline-flex h-9 items-center justify-center rounded-md border border-stone-200 px-3 type-micro font-semibold text-stone-700 hover:bg-stone-50"
           to={classroomEditPath(classroom.id)}
         >
           설정

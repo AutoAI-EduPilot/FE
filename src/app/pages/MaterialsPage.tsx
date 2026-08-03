@@ -37,7 +37,7 @@ import {
 } from '../../shared/ui'
 import { formatDate, formatFileSize } from '../../shared/lib/format'
 import { usePolling } from '../../shared/state'
-import { materialDetailPath, sessionDetailPath } from '../routes'
+import { materialViewerPath, sessionDetailPath } from '../routes'
 import { usePageTitle } from '../../shared/lib/usePageTitle'
 
 export function MaterialsPage() {
@@ -338,10 +338,10 @@ export function MaterialsPage() {
               <div className="flex flex-wrap items-center gap-1.5 lg:justify-end">
                 <ButtonLink
                   size="sm"
-                  to={materialDetailPath(material.id)}
+                  to={materialViewerPath(material.id)}
                   variant="secondary"
                 >
-                  상세
+                  PDF 열기
                 </ButtonLink>
                 <Button
                   aria-label={`${material.title} 삭제`}

@@ -1,11 +1,12 @@
 import { Copy, Inbox, Info, Users } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { useAuth } from '../../features/auth'
 import {
   createClassroomsRepository,
   JOIN_REQUESTS_CHANGED_EVENT,
+  rememberClassroomId,
   type Classroom,
   type JoinRequest,
 } from '../../features/classrooms'
@@ -13,19 +14,22 @@ import { getRequestErrorMessage } from '../../shared/api'
 import { cx } from '../../shared/lib/cx'
 import { usePageTitle } from '../../shared/lib/usePageTitle'
 import { Button, EmptyState, PageContainer, PageHeader, useToast } from '../../shared/ui'
+import { classroomEntranceRequestsPath } from '../routes'
 
 type RequestTab = 'pending' | 'processed' | 'students'
 
 export function EntranceRequestsPage() {
   usePageTitle('입장 요청')
   const { apiRequest } = useAuth()
+  const { classroomId: routeClassroomId = '' } = useParams()
+  const navigate = useNavigate()
   const { show: showToast } = useToast()
   const [searchParams, setSearchParams] = useSearchParams()
   const repository = useMemo(() => createClassroomsRepository(apiRequest), [apiRequest])
   const requestedTab = searchParams.get('tab')
   const [tab, setTab] = useState<RequestTab>(requestedTab === 'students' ? 'students' : 'pending')
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
-  const [classroomId, setClassroomId] = useState(searchParams.get('classroomId') ?? '')
+  const [classroomId, setClassroomId] = useState(routeClassroomId || searchParams.get('classroomId') || '')
   const [requests, setRequests] = useState<JoinRequest[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -33,9 +37,11 @@ export function EntranceRequestsPage() {
   useEffect(() => {
     repository.list().then((items) => {
       setClassrooms(items)
-      setClassroomId((current) => items.some((item) => item.id === current) ? current : items[0]?.id ?? '')
+      setClassroomId(items.some((item) => item.id === routeClassroomId) ? routeClassroomId : items[0]?.id ?? '')
     }).catch((requestError) => setError(getRequestErrorMessage(requestError)))
-  }, [repository])
+  }, [repository, routeClassroomId])
+
+  useEffect(() => { if (classroomId) rememberClassroomId(classroomId) }, [classroomId])
 
   async function loadRequests(id: string, selectedTab: RequestTab) {
     if (!id) { setRequests([]); setIsLoading(false); return }
@@ -108,7 +114,7 @@ export function EntranceRequestsPage() {
   const isClassroomCompleted = selectedClassroom?.status === 'COMPLETED'
 
   return <PageContainer>
-    <PageHeader title="입장 요청" titleAccessory={<label><span className="sr-only">강의실 선택</span><select className="h-9 min-w-40 rounded-lg border border-stone-200 bg-white px-3 type-caption font-semibold text-stone-600" onChange={(event) => { setClassroomId(event.target.value); setSearchParams({ classroomId: event.target.value, tab }, { replace: true }) }} value={classroomId}>{classrooms.length === 0 ? <option value="">강의실 없음</option> : classrooms.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>} actions={<Button disabled={!classroomId || isClassroomCompleted} onClick={() => void copyInviteCode()} variant="secondary">초대 코드<Copy aria-hidden="true" size={14} /></Button>} />
+    <PageHeader title="입장 요청" titleAccessory={<label><span className="sr-only">강의실 선택</span><select className="h-9 min-w-40 rounded-lg border border-stone-200 bg-white px-3 type-caption font-semibold text-stone-600" onChange={(event) => navigate(`${classroomEntranceRequestsPath(event.target.value)}?tab=${tab}`, { replace: true })} value={classroomId}>{classrooms.length === 0 ? <option value="">강의실 없음</option> : classrooms.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>} actions={<Button disabled={!classroomId || isClassroomCompleted} onClick={() => void copyInviteCode()} variant="secondary">초대 코드<Copy aria-hidden="true" size={14} /></Button>} />
     {isClassroomCompleted ? <p className="flex w-fit items-start gap-2 rounded-lg border border-stone-200 bg-stone-50 px-3.5 py-2.5 type-caption leading-5 text-stone-600" role="status"><Info className="mt-0.5 shrink-0" size={14} />종료된 강의실에는 새 학습자를 추가하거나 입장 요청을 승인할 수 없습니다.</p> : null}
     <div aria-label="입장 요청 상태" className="inline-flex w-fit rounded-lg border border-stone-200 bg-white p-1" role="tablist"><TabButton active={tab === 'pending'} label={`대기 중${tab === 'pending' ? ` ${requests.length}` : ''}`} onClick={() => selectTab('pending')} /><TabButton active={tab === 'students'} label="수강생 관리" onClick={() => selectTab('students')} /><TabButton active={tab === 'processed'} label="처리 내역" onClick={() => selectTab('processed')} /></div>
     {isLoading ? <p className="py-16 text-center type-body text-stone-500" role="status">입장 정보를 불러오는 중입니다.</p> : null}

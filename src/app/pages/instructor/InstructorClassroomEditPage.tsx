@@ -2,7 +2,6 @@ import {
   Archive,
   GripVertical,
   MoreHorizontal,
-  Minus,
   Plus,
   Search,
   Trash2,
@@ -14,6 +13,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useAuth } from '../../../features/auth'
 import {
   createClassroomsRepository,
+  rememberClassroomId,
   type Classroom,
   type ClassroomWeek,
   type JoinRequest,
@@ -32,7 +32,7 @@ import { routes } from '../../routes'
 type WeekDisplayStatus = 'PUBLISHED' | 'PRIVATE' | 'BREAK'
 
 export function InstructorClassroomEditPage() {
-  usePageTitle('강의실 수정')
+  usePageTitle('강의실 삭제')
   const { classroomId = '' } = useParams()
   const { apiRequest } = useAuth()
   const { show: showToast } = useToast()
@@ -41,6 +41,10 @@ export function InstructorClassroomEditPage() {
     () => createClassroomsRepository(apiRequest),
     [apiRequest],
   )
+
+  useEffect(() => {
+    if (classroomId) rememberClassroomId(classroomId)
+  }, [classroomId])
   const [classroom, setClassroom] = useState<Classroom | null>(null)
   const [weeks, setWeeks] = useState<ClassroomWeek[]>([])
   const [weekTitles, setWeekTitles] = useState<Record<number, string>>({})
@@ -114,28 +118,12 @@ export function InstructorClassroomEditPage() {
     () => new Map(weeks.map((week) => [week.weekNumber, week])),
     [weeks],
   )
-  const lastVisibleWeekNumber = weekOrder.at(-1) ?? weekCount
-  const lastVisibleWeek = weekByNumber.get(lastVisibleWeekNumber)
-  const canRemoveWeek =
-    weekCount > 1 && (!lastVisibleWeek || lastVisibleWeek.materials.length === 0)
-
   function addWeek() {
     if (weekCount >= 52) return
     const nextWeekNumber = Math.max(0, ...weekOrder) + 1
     setWeekCount((value) => value + 1)
     setWeekOrder((current) => [...current, nextWeekNumber])
     setWeekStatuses((current) => ({ ...current, [nextWeekNumber]: 'PRIVATE' }))
-  }
-
-  function removeLastWeek() {
-    if (!canRemoveWeek) return
-    const removedWeekNumber = weekOrder.at(-1)
-    setWeekCount((value) => Math.max(1, value - 1))
-    setWeekOrder((current) => current.slice(0, -1))
-    if (removedWeekNumber !== undefined) {
-      setWeekTitles((current) => omitNumericKey(current, removedWeekNumber))
-      setWeekStatuses((current) => omitNumericKey(current, removedWeekNumber))
-    }
   }
 
   function moveWeekTo(sourceWeekNumber: number, targetWeekNumber: number) {
@@ -308,7 +296,7 @@ export function InstructorClassroomEditPage() {
   if (isLoading) {
     return (
       <PageContainer>
-        <PageHeader title="강의실 수정" />
+        <PageHeader title="강의실 삭제" />
         <p className="py-16 text-center type-body text-stone-500" role="status">
           강의실 정보를 불러오는 중입니다.
         </p>
@@ -319,7 +307,7 @@ export function InstructorClassroomEditPage() {
   if (error || !classroom) {
     return (
       <PageContainer>
-        <PageHeader title="강의실 수정" />
+        <PageHeader title="강의실 삭제" />
         <EmptyState
           action={<Button onClick={() => navigate(routes.classrooms)} variant="secondary">내 강의실로 이동</Button>}
           description={error ?? '강의실 정보를 확인할 수 없습니다.'}
@@ -340,7 +328,7 @@ export function InstructorClassroomEditPage() {
             </Button>
           </>
         }
-        title="강의실 수정"
+        title="강의실 삭제"
       />
 
       <form
@@ -362,93 +350,67 @@ export function InstructorClassroomEditPage() {
           />
 
           <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-stone-200 bg-white">
-          <div className="flex min-h-12 items-center border-b border-stone-200 bg-stone-50 px-4">
-            <h2 className="type-body font-bold text-stone-950">주차 구성</h2>
-            <div className="ml-auto flex h-8 items-center rounded-lg border border-stone-200 bg-white p-0.5">
+            <div className="flex min-h-12 items-center border-b border-stone-200 bg-stone-50 px-4">
+              <h2 className="type-body font-bold text-stone-950">주차 구성</h2>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">
+              {weekOrder.map((weekNumber, index) => {
+                const displayWeekNumber = index + 1
+                const week = weekByNumber.get(weekNumber)
+                return (
+                  <div
+                    aria-label={`${displayWeekNumber}주차 항목`}
+                    className={`grid min-h-11 grid-cols-[22px_42px_minmax(0,1fr)_auto] items-center gap-1.5 border-b border-stone-100 px-2.5 transition-colors last:border-0 ${draggedWeek === weekNumber ? 'bg-brand-50/70 opacity-60' : 'bg-white'}`}
+                    key={weekNumber}
+                    onDragEnter={(event) => enterWeekDropTarget(event, weekNumber)}
+                    onDragOver={(event) => { if (draggedWeek !== null) event.preventDefault() }}
+                  >
+                    <div>
+                      <button
+                        aria-label={`${displayWeekNumber}주차 순서 이동`}
+                        className="flex size-6 cursor-grab items-center justify-center rounded text-stone-400 hover:bg-stone-100 hover:text-stone-700 active:cursor-grabbing"
+                        draggable
+                        onDragEnd={() => setDraggedWeek(null)}
+                        onDragStart={(event) => startWeekDrag(event, weekNumber)}
+                        title="잡아서 원하는 주차 위치로 이동"
+                        type="button"
+                      >
+                        <GripVertical aria-hidden="true" size={14} />
+                      </button>
+                    </div>
+                    <span className="type-caption text-stone-500">{displayWeekNumber}주차</span>
+                    <input
+                      aria-label={`${displayWeekNumber}주차 이름`}
+                      className="h-8 min-w-0 rounded-md border border-transparent px-2 type-caption font-semibold text-stone-800 hover:border-stone-200 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                      onChange={(event) => setWeekTitles((current) => ({
+                        ...current,
+                        [weekNumber]: event.target.value,
+                      }))}
+                      placeholder="주차 이름 (선택)"
+                      value={weekTitles[weekNumber] ?? week?.title ?? ''}
+                    />
+                    <WeekStatusMenu
+                      displayWeekNumber={displayWeekNumber}
+                      isOpen={openWeekMenu === weekNumber}
+                      onDelete={() => void deleteWeek(weekNumber)}
+                      onOpenChange={() => setOpenWeekMenu((current) => current === weekNumber ? null : weekNumber)}
+                      onStatusChange={(status) => void changeWeekStatus(weekNumber, status)}
+                      status={weekStatuses[weekNumber] ?? getWeekDisplayStatus(week)}
+                    />
+                  </div>
+                )
+              })}
               <button
-                aria-label="주차 수 줄이기"
-                className="flex size-7 items-center justify-center rounded-md text-stone-500 hover:bg-stone-100 disabled:text-stone-300"
-                disabled={!canRemoveWeek}
-                onClick={removeLastWeek}
-                title={lastVisibleWeek?.materials.length ? '자료가 있는 마지막 주차는 삭제할 수 없습니다.' : undefined}
-                type="button"
-              >
-                <Minus size={13} />
-              </button>
-              <output className="min-w-12 text-center type-caption font-bold">{weekCount}주</output>
-              <button
-                aria-label="주차 수 늘리기"
-                className="flex size-7 items-center justify-center rounded-md text-stone-500 hover:bg-stone-100 disabled:text-stone-300"
+                aria-label="주차 추가"
+                className="flex min-h-11 w-full items-center justify-center gap-1.5 border-t border-stone-100 bg-stone-50 type-caption font-semibold text-brand-700 hover:bg-brand-50 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-stone-50"
                 disabled={weekCount >= 52}
                 onClick={addWeek}
                 type="button"
               >
-                <Plus size={13} />
+                <Plus aria-hidden="true" size={14} />
+                주차 추가
               </button>
             </div>
-          </div>
-          <p className="border-b border-stone-100 px-4 py-2.5 type-micro leading-5 text-stone-500">
-            6점 핸들을 끌어 순서를 바꿀 수 있습니다. 주차 이름 변경은 저장 시 반영됩니다.
-          </p>
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            {weekOrder.map((weekNumber, index) => {
-              const displayWeekNumber = index + 1
-              const week = weekByNumber.get(weekNumber)
-              return (
-                <div
-                  aria-label={`${displayWeekNumber}주차 항목`}
-                  className={`grid min-h-11 grid-cols-[22px_42px_minmax(0,1fr)_auto] items-center gap-1.5 border-b border-stone-100 px-2.5 transition-colors last:border-0 ${draggedWeek === weekNumber ? 'bg-brand-50/70 opacity-60' : 'bg-white'}`}
-                  key={weekNumber}
-                  onDragEnter={(event) => enterWeekDropTarget(event, weekNumber)}
-                  onDragOver={(event) => { if (draggedWeek !== null) event.preventDefault() }}
-                >
-                  <div>
-                    <button
-                      aria-label={`${displayWeekNumber}주차 순서 이동`}
-                      className="flex size-6 cursor-grab items-center justify-center rounded text-stone-400 hover:bg-stone-100 hover:text-stone-700 active:cursor-grabbing"
-                      draggable
-                      onDragEnd={() => setDraggedWeek(null)}
-                      onDragStart={(event) => startWeekDrag(event, weekNumber)}
-                      title="잡아서 원하는 주차 위치로 이동"
-                      type="button"
-                    >
-                      <GripVertical aria-hidden="true" size={14} />
-                    </button>
-                  </div>
-                  <span className="type-caption text-stone-500">{displayWeekNumber}주차</span>
-                  <input
-                    aria-label={`${displayWeekNumber}주차 이름`}
-                    className="h-8 min-w-0 rounded-md border border-transparent px-2 type-caption font-semibold text-stone-800 hover:border-stone-200 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                    onChange={(event) => setWeekTitles((current) => ({
-                      ...current,
-                      [weekNumber]: event.target.value,
-                    }))}
-                    placeholder="주차 이름 (선택)"
-                    value={weekTitles[weekNumber] ?? week?.title ?? ''}
-                  />
-                  <WeekStatusMenu
-                    displayWeekNumber={displayWeekNumber}
-                    isOpen={openWeekMenu === weekNumber}
-                    onDelete={() => void deleteWeek(weekNumber)}
-                    onOpenChange={() => setOpenWeekMenu((current) => current === weekNumber ? null : weekNumber)}
-                    onStatusChange={(status) => void changeWeekStatus(weekNumber, status)}
-                    status={weekStatuses[weekNumber] ?? getWeekDisplayStatus(week)}
-                  />
-                </div>
-              )
-            })}
-          </div>
-          <div className="flex min-h-10 items-center justify-center gap-2 border-t border-stone-100 bg-stone-50 type-micro text-stone-500">
-            <span>전체 {weekCount}주</span>
-            <button
-              className="font-semibold text-brand-700 disabled:text-stone-300"
-              disabled={weekCount >= 52}
-              onClick={addWeek}
-              type="button"
-            >
-              + 주차 추가
-            </button>
-          </div>
           </section>
 
           <LearnerSection
@@ -685,10 +647,4 @@ function formatEntryTime(value: string): string {
     timeZone: 'Asia/Seoul',
     year: 'numeric',
   }).format(new Date(value))
-}
-
-function omitNumericKey<T>(record: Record<number, T>, key: number): Record<number, T> {
-  return Object.fromEntries(
-    Object.entries(record).filter(([entryKey]) => Number(entryKey) !== key),
-  )
 }

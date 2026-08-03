@@ -2,7 +2,9 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 
 import { RequireAuth, RequireInstructor } from '../features/auth'
 import { AppLayout } from './layouts/AppLayout'
+import { LegacyClassroomRouteRedirect, LegacyClassroomSettingsRedirect, LegacyExamDetailRedirect, LegacyReportDetailRedirect } from './LegacyRouteRedirects'
 import { AuthLayout } from './layouts/AuthLayout'
+import { AuthCallbackPage, ResetPasswordPage } from './pages/AuthCapabilityPages'
 import { ClassroomsPage } from './pages/ClassroomsPage'
 import { ClassroomDetailPage } from './pages/ClassroomDetailPage'
 import { DiagnosisPage } from './pages/DiagnosisPage'
@@ -14,10 +16,11 @@ import { InstructorCalendarPage } from './pages/instructor/InstructorCalendarPag
 import { InstructorClassroomEditPage } from './pages/instructor/InstructorClassroomEditPage'
 import { InstructorLearningStatusPage } from './pages/instructor/InstructorLearningStatusPage'
 import { InstructorNoticesPage } from './pages/instructor/InstructorNoticesPage'
+import { InstructorReportCriteriaPage, InstructorReportDetailPage, InstructorReportsPage, InstructorStudentReportsPage } from './pages/instructor/InstructorReportsPage'
 import { LoginPage } from './pages/LoginPage'
 import { LearnerNotesPage } from './pages/learner/LearnerNotesPage'
 import { LearnerReviewQuizzesPage } from './pages/learner/LearnerReviewQuizzesPage'
-import { MaterialDetailPage } from './pages/MaterialDetailPage'
+import { MaterialViewerRedirectPage } from './pages/MaterialViewerRedirectPage'
 import { MaterialsPage } from './pages/MaterialsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { QuizPage } from './pages/QuizPage'
@@ -42,44 +45,58 @@ export function AppRoutes() {
           element={<ForgotPasswordPage />}
         />
         <Route path={routes.signup} element={<SignupPage />} />
+        <Route path={routes.resetPassword} element={<ResetPasswordPage />} />
+        <Route path={routes.authCallback} element={<AuthCallbackPage />} />
       </Route>
 
       <Route element={<RequireAuth />}>
         <Route element={<AppLayout />}>
           <Route path={routes.classrooms} element={<ClassroomsPage />} />
           <Route path={routes.materials} element={<MaterialsPage />} />
-          <Route path={routes.materialDetail} element={<MaterialDetailPage />} />
+          <Route path={routes.materialViewer} element={<MaterialViewerRedirectPage />} />
           <Route path={routes.sessions} element={<SessionsPage />} />
           <Route path={routes.sessionDetail} element={<SessionDetailPage />} />
           <Route path={routes.quizDetail} element={<QuizPage />} />
           <Route path={routes.diagnosis} element={<DiagnosisPage />} />
           <Route path={routes.settings} element={<SettingsPage />} />
           <Route path={routes.calendar} element={<InstructorCalendarPage />} />
+          <Route path={routes.classroomCalendar} element={<InstructorCalendarPage />} />
           <Route path={routes.notes} element={<LearnerNotesPage />} />
           <Route path={routes.reviewQuizzes} element={<LearnerReviewQuizzesPage />} />
-          <Route path={routes.exams} element={<ExamsPage />} />
-          <Route path={routes.examDetail} element={<ExamDetailPage />} />
+          <Route path={routes.exams} element={<LegacyClassroomRouteRedirect destination="exams" />} />
+          <Route path={routes.examDetail} element={<LegacyExamDetailRedirect />} />
+          <Route path={routes.classroomExams} element={<ExamsPage />} />
+          <Route path={routes.classroomExamDetail} element={<ExamDetailPage />} />
           <Route
             path={routes.classroomDetail}
             element={<ClassroomDetailPage />}
           />
           <Route element={<RequireInstructor />}>
             <Route
-              path={routes.classroomEdit}
+              path={routes.classroomSettings}
               element={<InstructorClassroomEditPage />}
             />
+            <Route path={routes.legacyClassroomEdit} element={<LegacyClassroomSettingsRedirect />} />
             <Route
               path={routes.learningStatus}
-              element={<InstructorLearningStatusPage />}
+              element={<LegacyClassroomRouteRedirect destination="analytics" />}
             />
+            <Route path={routes.classroomAnalytics} element={<InstructorLearningStatusPage />} />
             <Route
               path={routes.announcements}
-              element={<InstructorNoticesPage />}
+              element={<LegacyClassroomRouteRedirect destination="announcements" />}
             />
+            <Route path={routes.classroomAnnouncements} element={<InstructorNoticesPage />} />
             <Route
               path={routes.entranceRequests}
-              element={<EntranceRequestsPage />}
+              element={<LegacyClassroomRouteRedirect destination="entrance-requests" />}
             />
+            <Route path={routes.classroomEntranceRequests} element={<EntranceRequestsPage />} />
+            <Route path={routes.classroomReports} element={<InstructorReportsPage />} />
+            <Route path={routes.classroomStudentReports} element={<InstructorStudentReportsPage />} />
+            <Route path={routes.classroomReportDetail} element={<InstructorReportDetailPage />} />
+            <Route path={routes.classroomReportCriteria} element={<InstructorReportCriteriaPage />} />
+            <Route path={routes.legacyReportDetail} element={<LegacyReportDetailRedirect />} />
           </Route>
           <Route path="*" element={<NotFoundPage />} />
         </Route>

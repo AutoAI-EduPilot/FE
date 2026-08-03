@@ -10,6 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { TestAuthProvider } from '../../test/TestAuthProvider'
 import { installApiFixtureServer } from '../../test/apiFixtureServer'
+import { rememberClassroomId } from '../../features/classrooms'
 import { SessionDetailPage } from './SessionDetailPage'
 
 beforeEach(() => {
@@ -18,6 +19,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup()
+  sessionStorage.clear()
   vi.restoreAllMocks()
   vi.unstubAllEnvs()
 })
@@ -40,6 +42,15 @@ function renderSessionDetail(path = '/sessions/100') {
 }
 
 describe('SessionDetailPage', () => {
+  it('returns to the remembered classroom week page', async () => {
+    rememberClassroomId('12')
+    renderSessionDetail()
+
+    expect(
+      await screen.findByRole('link', { name: '주차 페이지로' }),
+    ).toHaveAttribute('href', '/classrooms/12')
+  })
+
   it('updates pages only after the page API succeeds', async () => {
     renderSessionDetail()
 
@@ -50,18 +61,31 @@ describe('SessionDetailPage', () => {
         { timeout: 3_000 },
       ),
     ).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: '다음' }))
+    fireEvent.keyDown(window, { key: 'ArrowRight' })
     await waitFor(() =>
       expect(
         screen.getByRole('progressbar', { name: '학습 진행률 2 / 5쪽' }),
       ).toBeInTheDocument(),
     )
+    expect(screen.queryByText('현재 페이지를 설명할까요?')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '목차' }))
     fireEvent.click(screen.getByRole('button', { name: '4쪽으로 이동' }))
     await waitFor(() =>
       expect(
         screen.getByRole('progressbar', { name: '학습 진행률 4 / 5쪽' }),
       ).toBeInTheDocument(),
     )
+  })
+
+  it('exposes a keyboard-adjustable divider for the PDF and chat panels', async () => {
+    renderSessionDetail()
+
+    await screen.findByRole('progressbar', { name: '학습 진행률 1 / 5쪽' })
+    const separator = screen.getByRole('separator', { name: 'PDF와 AI 채팅 너비 조절' })
+    expect(separator).toHaveAttribute('aria-valuenow', '660')
+
+    fireEvent.keyDown(separator, { key: 'ArrowRight' })
+    expect(separator).toHaveAttribute('aria-valuenow', '636')
   })
 
   it('renders a session 404 state', async () => {
