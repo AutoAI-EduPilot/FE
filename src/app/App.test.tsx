@@ -91,12 +91,14 @@ describe('AppRoutes', () => {
     ).toBeInTheDocument()
   })
 
-  it('keeps instructor menus out of learner navigation', () => {
+  it('shows learner study menus and keeps instructor management menus out', () => {
     renderRoute('/')
 
-    expect(screen.queryByRole('link', { name: '캘린더' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: '내 노트' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '캘린더' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '내 노트' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '복습 퀴즈' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: '입장 요청' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: '학습 현황' })).not.toBeInTheDocument()
   })
 
   it('redirects learners away from instructor-only routes', () => {
@@ -105,6 +107,13 @@ describe('AppRoutes', () => {
     expect(
       screen.getByRole('heading', { name: '내 강의실' }),
     ).toBeInTheDocument()
+  })
+
+  it('opens the learner calendar without instructor schedule commands', () => {
+    renderRoute('/calendar')
+
+    expect(screen.getByRole('heading', { name: '캘린더' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '일정 추가' })).not.toBeInTheDocument()
   })
 
   it('renders instructor navigation and management routes', async () => {

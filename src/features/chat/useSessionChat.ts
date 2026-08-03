@@ -18,6 +18,7 @@ export interface SessionChat {
   isTurnPending: boolean
   messages: ChatMessage[]
   reloadHistory: () => void
+  startNewConversation: () => Promise<void>
   streamNotice: string | null
   streamUiActions: UiAction[]
   submitTurn: (turn: SessionTurnRequest) => Promise<SessionTurnResult>
@@ -162,6 +163,21 @@ export function useSessionChat(
     [appendMessages, reloadHistory, repository, sessionId],
   )
 
+  const startNewConversation = useCallback(async () => {
+    if (isTurnPending) return
+    setIsTurnPending(true)
+    try {
+      await repository.startNewConversation(sessionId)
+      setMessages([])
+      setHistoryError(null)
+      setStreamNotice(null)
+      setStreamUiActions([])
+      streamingMessageIdRef.current = null
+    } finally {
+      setIsTurnPending(false)
+    }
+  }, [isTurnPending, repository, sessionId])
+
   return {
     appendLocalMessage,
     appendMessages,
@@ -170,6 +186,7 @@ export function useSessionChat(
     isTurnPending,
     messages,
     reloadHistory,
+    startNewConversation,
     streamNotice,
     streamUiActions,
     submitTurn,

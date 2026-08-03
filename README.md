@@ -57,8 +57,11 @@ src/
 | `/login` | 로그인 및 저장 세션 복원 |
 | `/signup` | 회원가입 후 자동 로그인 |
 | `/classrooms` | 역할별 내 강의실 |
-| `/classrooms/:classroomId` | 강의자 강의실 자료 관리 |
-| `/calendar` | 강의자 강의 일정 |
+| `/classrooms/:classroomId` | 역할별 강의실 상세와 주차별 자료 |
+| `/classrooms/:classroomId/edit` | 강의자 강의실 정보·학습자 관리 |
+| `/calendar` | 역할별 강의 일정. 강의자는 일정 관리 가능 |
+| `/notes` | 학습자가 세션에서 저장한 노트 모음 |
+| `/review-quizzes` | 학습자가 세션에서 만든 복습 퀴즈 모음 |
 | `/learning-status` | 강의자 학습 현황 |
 | `/announcements` | 강의자 공지 관리 |
 | `/entrance-requests` | 강의자 입장 요청 관리 |
@@ -83,6 +86,10 @@ EduPilot FE는 운영형 SaaS 학습 도구 방향을 기본으로 합니다. �
 
 - 배포 Swagger와 FE 연결 상태는
   [Swagger API 연결 상태](docs/swagger-api-connection-status.md)에서 관리합니다.
+- 화면은 구현되어 있지만 BE 계약이 없는 기능은
+  [BE 필요 API 목록](docs/be-api-requests.md)에서 관리합니다.
+- 브랜치·PR·이슈 정리 점검 결과는
+  [FE GitHub 정리 점검](docs/github-repository-audit-2026-08-02.md)에서 관리합니다.
 - 모든 브라우저 요청은 `VITE_API_BASE_URL`에 설정한 Spring Main Service로 보냅니다.
 - `apiRequest`는 `/api/...` 형태의 상대 경로만 허용합니다. 절대 URL이나 FastAPI URL을 직접 전달할 수 없습니다.
 - 요청에는 기본적으로 `credentials: include`를 적용합니다.

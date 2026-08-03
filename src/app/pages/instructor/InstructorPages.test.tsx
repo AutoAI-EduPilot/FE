@@ -36,9 +36,9 @@ function renderCalendar() {
   )
 }
 
-function renderInstructorPage(page: ReactNode) {
+function renderInstructorPage(page: ReactNode, initialEntries = ['/']) {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={initialEntries}>
       <AuthProvider initialUser={{ email: 'instructor@example.com', id: 7, name: '강의자', role: 'INSTRUCTOR' }}>
         <ToastProvider>{page}</ToastProvider>
       </AuthProvider>
@@ -86,6 +86,44 @@ function stubNoticesApi() {
             name: '자료구조',
             startDate: '2026-08-03',
             status: 'ACTIVE',
+            weekCount: 15,
+          },
+        ],
+        page: 0,
+        size: 100,
+        totalElements: 1,
+        totalPages: 1,
+      })
+    }
+    return envelope(null)
+  })
+}
+
+function stubClassroomsApi(status: 'ACTIVE' | 'COMPLETED' = 'ACTIVE') {
+  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+    const url = String(input instanceof Request ? input.url : input)
+    const envelope = (data: unknown) =>
+      new Response(JSON.stringify({ data, message: 'ok', success: true }), {
+        headers: { 'Content-Type': 'application/json' },
+        status: 200,
+      })
+
+    if (url.includes('/invite-code')) return envelope({ inviteCode: '7QK4-MZ2A' })
+    if (url.includes('/weeks')) return envelope({ items: [] })
+    if (url.includes('/api/classrooms')) {
+      return envelope({
+        items: [
+          {
+            classroomId: 12,
+            color: 'BLUE',
+            endDate: '2026-11-15',
+            instructorName: '박교수',
+            learnerCount: 42,
+            name: '자료구조',
+            pendingRequestCount: 0,
+            progressRate: 38,
+            startDate: '2026-08-03',
+            status,
             weekCount: 15,
           },
         ],
@@ -158,6 +196,40 @@ describe('instructor pages', () => {
     expect(screen.queryByText('⌘K로 어디서든 열기')).not.toBeInTheDocument()
   })
 
+  it('uses the simplified classroom card actions', async () => {
+    const fetchMock = stubClassroomsApi()
+    renderInstructorPage(<InstructorClassroomsPage />)
+
+    const classroomLink = await screen.findByRole('link', { name: '자료구조' })
+    const copyButton = screen.getByRole('button', { name: '자료구조 초대 코드 복사' })
+    const regenerateButton = screen.getByRole('button', { name: '자료구조 초대 코드 재발급' })
+
+    expect(classroomLink).toHaveClass('type-card-title')
+    expect(screen.getByText('7QK4-MZ2A')).toHaveClass('type-section-title')
+    expect(copyButton).toHaveClass('type-compact-action')
+    expect(regenerateButton).toHaveClass('type-compact-action')
+    expect(copyButton.querySelector('svg')).not.toBeInTheDocument()
+    expect(regenerateButton.querySelector('svg')).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: '자료 관리' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '설정' })).toHaveAttribute('href', '/classrooms/12/edit')
+    expect(screen.getByRole('link', { name: '학습 현황' })).toHaveAttribute('href', '/learning-status?classroomId=12')
+
+    fetchMock.mockRestore()
+  })
+
+  it('keeps classroom settings available after the classroom is completed', async () => {
+    const fetchMock = stubClassroomsApi('COMPLETED')
+    renderInstructorPage(<InstructorClassroomsPage />)
+
+    await screen.findByRole('link', { name: '자료구조' })
+
+    expect(screen.getByRole('link', { name: '보관된 자료 보기' })).toHaveAttribute('href', '/classrooms/12')
+    expect(screen.getByRole('link', { name: '설정' })).toHaveAttribute('href', '/classrooms/12/edit')
+    expect(screen.queryByRole('link', { name: '학습 현황' })).not.toBeInTheDocument()
+
+    fetchMock.mockRestore()
+  })
+
   it('offers edit and takedown controls for each notice', async () => {
     const fetchMock = stubNoticesApi()
     renderInstructorPage(<InstructorNoticesPage />)
@@ -224,6 +296,38 @@ describe('instructor pages', () => {
     ).not.toBeInTheDocument()
   })
 
+  it('moves between months with the calendar wheel and returns to this month', () => {
+    renderCalendar()
+    const now = new Date()
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
+    const monthCalendar = screen.getByRole('region', { name: '월간 캘린더' })
+
+    fireEvent.wheel(monthCalendar, { deltaX: 0, deltaY: 100 })
+
+    expect(screen.getByRole('button', { name: '연도와 월 선택' })).toHaveTextContent(
+      `${nextMonth.getFullYear()}년 ${nextMonth.getMonth() + 1}월`,
+    )
+    expect(screen.getByRole('button', { name: '이번 달' })).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '이번 달' }))
+
+    expect(screen.getByRole('button', { name: '연도와 월 선택' })).toHaveTextContent(
+      `${now.getFullYear()}년 ${now.getMonth() + 1}월`,
+    )
+    expect(screen.queryByRole('button', { name: '이번 달' })).not.toBeInTheDocument()
+  })
+
+  it('places the schedule action after the view controls in a fixed-height layout', () => {
+    renderCalendar()
+    const viewControls = screen.getByRole('group', { name: '캘린더 보기' })
+    const addButton = screen.getByRole('button', { name: '일정 추가' })
+    const page = screen.getByRole('heading', { name: '캘린더' }).closest('.w-full')
+
+    expect(viewControls.nextElementSibling).toBe(addButton)
+    expect(page).toHaveClass('lg:h-[calc(100dvh-4.5rem)]', 'lg:overflow-hidden')
+    expect(screen.getByRole('region', { name: '월간 캘린더' })).toHaveClass('lg:min-h-0')
+  })
+
   it('uses distinct colors for Saturday and Sunday dates', () => {
     renderCalendar()
 
@@ -284,14 +388,20 @@ describe('instructor pages', () => {
     expect(screen.getByRole('switch', { name: '시간' })).toHaveAttribute('aria-checked', 'false')
   })
 
-  it('shows the instructor learning status header actions', () => {
-    render(<InstructorLearningStatusPage />)
+  it('opens the learning status for the classroom selected in the URL', async () => {
+    const fetchMock = stubClassroomsApi()
+    renderInstructorPage(
+      <InstructorLearningStatusPage />,
+      ['/learning-status?classroomId=12'],
+    )
 
-    expect(screen.getByLabelText('강의실 선택')).toBeDisabled()
+    expect(await screen.findByLabelText('강의실 선택')).toHaveValue('12')
+    expect(screen.getByText('자료구조의 자료별 열람 인원이 표시됩니다.')).toBeInTheDocument()
     expect(screen.getByText('마지막 갱신 정보 없음')).toBeInTheDocument()
     expect(
       screen.getByRole('button', { name: '리마인더 보내기' }),
     ).toBeDisabled()
+    fetchMock.mockRestore()
   })
 
   it('opens the notice composer from the design action', () => {

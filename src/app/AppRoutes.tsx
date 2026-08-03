@@ -8,11 +8,15 @@ import { ClassroomDetailPage } from './pages/ClassroomDetailPage'
 import { DiagnosisPage } from './pages/DiagnosisPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { EntranceRequestsPage } from './pages/EntranceRequestsPage'
+import { ExamDetailPage } from './pages/ExamDetailPage'
+import { ExamsPage } from './pages/ExamsPage'
 import { InstructorCalendarPage } from './pages/instructor/InstructorCalendarPage'
 import { InstructorClassroomEditPage } from './pages/instructor/InstructorClassroomEditPage'
 import { InstructorLearningStatusPage } from './pages/instructor/InstructorLearningStatusPage'
 import { InstructorNoticesPage } from './pages/instructor/InstructorNoticesPage'
 import { LoginPage } from './pages/LoginPage'
+import { LearnerNotesPage } from './pages/learner/LearnerNotesPage'
+import { LearnerReviewQuizzesPage } from './pages/learner/LearnerReviewQuizzesPage'
 import { MaterialDetailPage } from './pages/MaterialDetailPage'
 import { MaterialsPage } from './pages/MaterialsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
@@ -50,6 +54,11 @@ export function AppRoutes() {
           <Route path={routes.quizDetail} element={<QuizPage />} />
           <Route path={routes.diagnosis} element={<DiagnosisPage />} />
           <Route path={routes.settings} element={<SettingsPage />} />
+          <Route path={routes.calendar} element={<InstructorCalendarPage />} />
+          <Route path={routes.notes} element={<LearnerNotesPage />} />
+          <Route path={routes.reviewQuizzes} element={<LearnerReviewQuizzesPage />} />
+          <Route path={routes.exams} element={<ExamsPage />} />
+          <Route path={routes.examDetail} element={<ExamDetailPage />} />
           <Route
             path={routes.classroomDetail}
             element={<ClassroomDetailPage />}
@@ -58,10 +67,6 @@ export function AppRoutes() {
             <Route
               path={routes.classroomEdit}
               element={<InstructorClassroomEditPage />}
-            />
-            <Route
-              path={routes.calendar}
-              element={<InstructorCalendarPage />}
             />
             <Route
               path={routes.learningStatus}

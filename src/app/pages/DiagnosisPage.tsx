@@ -139,11 +139,11 @@ export function DiagnosisPage() {
         <div className="flex min-w-0 items-start gap-3">
           <RotateCcw aria-hidden="true" className="mt-0.5 shrink-0 text-amber-700" size={18} />
           <div>
-            <h2 className="text-sm font-bold text-amber-950">진단 복원</h2>
-            <p className="mt-1 text-sm leading-6 text-amber-900">
+            <h2 className="type-body font-bold text-amber-950">진단 복원</h2>
+            <p className="mt-1 type-body leading-6 text-amber-900">
               저득점 결과 {pendingDiagnosis.quizScore}점에서 이어진 진단입니다.
             </p>
-            <p className="mt-2 text-sm font-semibold text-amber-950">
+            <p className="mt-2 type-body font-semibold text-amber-950">
               {pendingDiagnosis.sourceQuestion}
             </p>
           </div>
@@ -154,11 +154,11 @@ export function DiagnosisPage() {
       <section className="overflow-hidden rounded-xl border border-stone-200 bg-white">
         <form className="p-4 sm:p-6" onSubmit={handleSubmit}>
           <label className="block">
-            <span className="text-lg font-bold text-stone-950">
+            <span className="type-dialog-title font-bold text-stone-950">
               {pendingDiagnosis.prompt}
             </span>
             <textarea
-              className="mt-4 min-h-40 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
+              className="mt-4 min-h-40 w-full rounded-lg border border-stone-300 px-3 py-2 type-body focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
               disabled={isSubmitted}
               onChange={(event) => {
                 setAnswer(event.target.value)
@@ -169,7 +169,7 @@ export function DiagnosisPage() {
           </label>
 
           {error ? (
-            <p className="mt-3 text-sm font-medium text-rose-700" role="alert">
+            <p className="mt-3 type-body font-medium text-rose-700" role="alert">
               {error}
             </p>
           ) : null}
@@ -187,8 +187,8 @@ export function DiagnosisPage() {
           <div className="flex items-start gap-3 border-b border-emerald-200 bg-emerald-50 px-4 py-4 sm:px-5">
             <CheckCircle2 aria-hidden="true" className="mt-0.5 text-emerald-700" size={19} />
             <div>
-              <h2 className="text-base font-bold text-emerald-950">{correction.title}</h2>
-              <p className="mt-1 text-sm leading-6 text-emerald-900">
+              <h2 className="type-section-title font-bold text-emerald-950">{correction.title}</h2>
+              <p className="mt-1 type-body leading-6 text-emerald-900">
                 {correction.summary}
               </p>
             </div>
@@ -196,14 +196,14 @@ export function DiagnosisPage() {
           {correction.focusAreas.length > 0 ? (
             <ul className="grid divide-y divide-stone-200 sm:grid-cols-3 sm:divide-x sm:divide-y-0">
               {correction.focusAreas.map((focusArea) => (
-                <li className="px-4 py-3 text-sm font-semibold text-stone-700" key={focusArea}>
+                <li className="px-4 py-3 type-body font-semibold text-stone-700" key={focusArea}>
                   {focusArea}
                 </li>
               ))}
             </ul>
           ) : null}
           <div className="border-t border-stone-200 px-4 py-4 sm:px-5">
-            <p className="text-sm text-stone-700">{correction.nextQuestionPrompt}</p>
+            <p className="type-body text-stone-700">{correction.nextQuestionPrompt}</p>
             <ButtonLink
               className="mt-4"
               to={sessionDetailPath(pendingDiagnosis.sessionId)}

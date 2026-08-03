@@ -131,7 +131,7 @@ export function SettingsPage() {
             <button
               aria-current={section === item.id ? 'page' : undefined}
               className={cx(
-                'flex h-9 shrink-0 items-center rounded-lg px-3 text-[13.5px]',
+                'flex h-9 shrink-0 items-center rounded-lg px-3 type-control',
                 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
                 item.id === 'account' && 'text-rose-700 lg:mt-4 lg:border-t lg:border-stone-200 lg:pt-px',
                 section === item.id
@@ -168,8 +168,8 @@ export function SettingsPage() {
 
           {section === 'account' ? (
             <section className="rounded-xl border border-rose-200 bg-white p-5 sm:p-6">
-              <h2 className="text-base font-bold text-rose-900">회원 탈퇴</h2>
-              <p className="mt-1 text-sm text-stone-500">
+              <h2 className="type-section-title font-bold text-rose-900">회원 탈퇴</h2>
+              <p className="mt-1 type-body text-stone-500">
                 탈퇴하면 자료와 학습 세션이 삭제되고 복구할 수 없습니다. 계속하려면
                 비밀번호를 입력하세요.
               </p>
@@ -227,17 +227,17 @@ export function SettingsPage() {
               {section !== 'notification' ? (
                 <div className="flex items-center gap-4 py-4">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-stone-900">
+                    <p className="type-body font-semibold text-stone-900">
                       AI 답변 스타일
                     </p>
-                    <p className="mt-0.5 text-[12.5px] text-stone-400">
+                    <p className="mt-0.5 type-caption text-stone-400">
                       채팅 답변의 길이와 난이도를 조절해요
                     </p>
                   </div>
                   <label className="ml-auto shrink-0">
                     <span className="sr-only">AI 답변 스타일</span>
                     <select
-                      className="h-9 rounded-lg border border-stone-200 bg-white px-3 text-[12.5px] font-medium text-stone-700 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                      className="h-9 rounded-lg border border-stone-200 bg-white px-3 type-caption font-medium text-stone-700 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
                       onChange={(event) => setAnswerStyle(event.target.value as AiAnswerStyle)}
                       value={answerStyle}
                     >
@@ -255,7 +255,7 @@ export function SettingsPage() {
 
           {section === 'account' ? null : (
             <div className="flex items-center justify-end gap-3">
-              <p className="mr-auto text-xs text-stone-400">
+              <p className="mr-auto type-caption text-stone-400">
                 변경사항은 계정에 저장됩니다.
               </p>
               <Button
@@ -307,10 +307,10 @@ function ProfileSection({
 }) {
   return (
     <Card as="section" className="p-5 sm:p-6">
-      <h2 className="text-base font-bold text-stone-950">프로필</h2>
+      <h2 className="type-section-title font-bold text-stone-950">프로필</h2>
 
       <div className="mt-5 flex items-center gap-4.5">
-        <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-stone-200 text-[22px] font-bold text-stone-500">{avatarUrl ? <img alt="프로필" className="h-full w-full object-cover" src={avatarUrl} /> : name.slice(0, 1) || '?'}</span>
+        <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-stone-200 type-page-title font-bold text-stone-500">{avatarUrl ? <img alt="프로필" className="h-full w-full object-cover" src={avatarUrl} /> : name.slice(0, 1) || '?'}</span>
         <div className="flex gap-2">
           <Button onClick={onSelectAvatar} size="sm" type="button" variant="secondary">
             사진 변경
@@ -370,8 +370,8 @@ function ToggleRow({
       )}
     >
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-stone-900">{label}</p>
-        <p className="mt-0.5 text-[12.5px] text-stone-400">{description}</p>
+        <p className="type-body font-semibold text-stone-900">{label}</p>
+        <p className="mt-0.5 type-caption text-stone-400">{description}</p>
       </div>
       <button
         aria-checked={checked}

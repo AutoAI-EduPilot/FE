@@ -8,6 +8,7 @@ import {
   EmptyState,
   ErrorState,
   PageContainer,
+  PageHeader,
   TextInput,
 } from './index'
 
@@ -20,6 +21,7 @@ describe('shared ui', () => {
     )
 
     expect(screen.getByRole('button', { name: '저장 준비 중' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '저장 준비 중' })).toHaveClass('type-body')
   })
 
   it('renders button links with router navigation', () => {
@@ -83,5 +85,13 @@ describe('shared ui', () => {
     )
 
     expect(screen.getByLabelText('이메일')).toHaveAttribute('aria-describedby', 'email-description')
+    expect(screen.getByLabelText('이메일')).toHaveClass('type-body')
+    expect(screen.getByText('로그인에 사용할 이메일입니다.')).toHaveClass('type-caption')
+  })
+
+  it('uses the page title typography for shared page headers', () => {
+    render(<PageHeader title="내 강의실" />)
+
+    expect(screen.getByRole('heading', { name: '내 강의실' })).toHaveClass('type-page-title')
   })
 })

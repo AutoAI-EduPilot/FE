@@ -6,13 +6,14 @@ import {
   ChevronsLeft,
   ChevronsRight,
   CircleHelp,
-  FileText,
-  GraduationCap,
+  ClipboardCheck,
+  FileCheck2,
   LayoutGrid,
   LogOut,
   Monitor,
   Megaphone,
   Moon,
+  NotebookPen,
   Settings,
   Sun,
   UserPlus,
@@ -52,8 +53,10 @@ const learnerNavigation: Array<{
   to: string
 }> = [
   { icon: LayoutGrid, label: '내 강의실', to: routes.classrooms },
-  { icon: FileText, label: '자료', to: routes.materials },
-  { icon: GraduationCap, label: '세션', to: routes.sessions },
+  { icon: CalendarDays, label: '캘린더', to: routes.calendar },
+  { icon: NotebookPen, label: '내 노트', to: routes.notes },
+  { icon: ClipboardCheck, label: '복습 퀴즈', to: routes.reviewQuizzes },
+  { icon: FileCheck2, label: '시험', to: routes.exams },
 ]
 
 const instructorNavigation: Array<{
@@ -65,6 +68,7 @@ const instructorNavigation: Array<{
   { icon: CalendarDays, label: '캘린더', to: routes.calendar },
   { icon: BarChart3, label: '학습 현황', to: routes.learningStatus },
   { icon: Megaphone, label: '공지 관리', to: routes.announcements },
+  { icon: FileCheck2, label: '시험 관리', to: routes.exams },
   { icon: UserPlus, label: '입장 요청', to: routes.entranceRequests },
 ]
 
@@ -211,20 +215,20 @@ export function AppLayout() {
       role="menu"
     >
       <div className="flex items-center gap-2.5 border-b border-stone-100 px-2.5 py-2.5">
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-stone-200 text-xs font-semibold text-stone-600">
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-stone-200 type-caption font-semibold text-stone-600">
           {user?.name?.slice(0, 1) ?? '?'}
         </span>
         <div className="min-w-0">
-          <p className="truncate text-[13px] font-semibold text-stone-800">
+          <p className="truncate type-control font-semibold text-stone-800">
             {user?.name}
           </p>
-          <p className="truncate text-[11px] text-stone-400">
+          <p className="truncate type-micro text-stone-400">
             {user?.email} · {roleLabel}
           </p>
         </div>
       </div>
       <button
-        className="mt-1 flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-[13.5px] font-medium text-stone-700 hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+        className="mt-1 flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 type-control font-medium text-stone-700 hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
         onClick={openSettings}
         role="menuitem"
         type="button"
@@ -233,7 +237,7 @@ export function AppLayout() {
         설정
       </button>
       <button
-        className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-[13.5px] font-medium text-stone-700 hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+        className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 type-control font-medium text-stone-700 hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
         onClick={() => { setIsMenuOpen(false); setIsFeedbackOpen(true) }}
         role="menuitem"
         type="button"
@@ -241,7 +245,7 @@ export function AppLayout() {
         <CircleHelp aria-hidden="true" size={15} />
         도움말 · 피드백
       </button>
-      <div className="flex h-10 items-center gap-2.5 px-2.5 text-[13.5px] font-medium text-stone-700">
+      <div className="flex h-10 items-center gap-2.5 px-2.5 type-control font-medium text-stone-700">
         <Monitor aria-hidden="true" size={15} />
         <span>화면 모드</span>
         <div
@@ -272,7 +276,7 @@ export function AppLayout() {
       </div>
       <div className="mx-2 my-1 h-px bg-stone-100" />
       <button
-        className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 text-[13.5px] font-medium text-rose-700 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+        className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 type-control font-medium text-rose-700 hover:bg-rose-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
         onClick={() => void handleLogout()}
         role="menuitem"
         type="button"
@@ -314,7 +318,7 @@ export function AppLayout() {
                 <BookOpenCheck aria-hidden="true" size={16} />
               </span>
               <span
-                className={cx('text-[15px] font-bold', isCollapsed && 'lg:hidden')}
+                className={cx('type-section-title font-bold', isCollapsed && 'lg:hidden')}
               >
                 EduPilot
               </span>
@@ -341,7 +345,7 @@ export function AppLayout() {
                 >
                   <Bell aria-hidden="true" size={15} />
                   {upcomingEvents.length > 0 ? (
-                    <span className="absolute -top-1 -right-1 flex min-w-4 items-center justify-center rounded-full bg-brand-600 px-1 text-[9px] font-bold leading-4 text-white">
+                    <span className="absolute -top-1 -right-1 flex min-w-4 items-center justify-center rounded-full bg-brand-600 px-1 type-micro font-bold leading-4 text-white">
                       {upcomingEvents.length > 9 ? '9+' : upcomingEvents.length}
                     </span>
                   ) : null}
@@ -396,7 +400,7 @@ export function AppLayout() {
                   <span
                     aria-label={`${pendingJoinRequestCount}개의 대기 요청`}
                     className={cx(
-                      'ml-auto min-w-5 rounded-full bg-brand-600 px-1.5 text-center text-[10px] font-bold leading-5 text-white',
+                      'ml-auto min-w-5 rounded-full bg-brand-600 px-1.5 text-center type-micro font-bold leading-5 text-white',
                       isCollapsed && 'lg:absolute lg:top-0 lg:right-0 lg:min-w-4 lg:px-1 lg:leading-4',
                     )}
                   >
@@ -413,7 +417,7 @@ export function AppLayout() {
             aria-expanded={isMenuOpen}
             aria-haspopup="menu"
             aria-label="프로필 메뉴"
-            className="flex size-9 items-center justify-center rounded-full bg-stone-200 text-[12px] font-semibold text-stone-600 hover:bg-stone-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+            className="flex size-9 items-center justify-center rounded-full bg-stone-200 type-caption font-semibold text-stone-600 hover:bg-stone-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
             onClick={() => setIsMenuOpen((open) => !open)}
             type="button"
           >
@@ -427,7 +431,7 @@ export function AppLayout() {
         </div>
 
         <div
-          className="relative hidden lg:mt-auto lg:block"
+          className="relative hidden lg:mt-auto lg:flex lg:items-center lg:gap-1"
           ref={menuContainerRef}
         >
           <button
@@ -435,24 +439,58 @@ export function AppLayout() {
             aria-haspopup="menu"
             aria-label="프로필 메뉴"
             className={cx(
-              'flex w-full items-center gap-2.5 rounded-lg border-t border-transparent p-1.5 text-left hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
+              'flex min-w-0 flex-1 items-center gap-2.5 rounded-lg border-t border-transparent p-1.5 text-left hover:bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
               isCollapsed && 'justify-center p-1',
             )}
             onClick={() => setIsMenuOpen((open) => !open)}
             type="button"
           >
-            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-stone-200 text-[11px] font-semibold text-stone-600">
+            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-stone-200 type-micro font-semibold text-stone-600">
               {user?.name?.slice(0, 1) ?? '?'}
             </span>
             <span className={cx('min-w-0 flex-1', isCollapsed && 'lg:hidden')}>
-              <span className="block truncate text-[13px] font-semibold text-stone-800">
+              <span className="block truncate type-control font-semibold text-stone-800">
                 {user?.name}
               </span>
-              <span className="block truncate text-[11px] text-stone-400">
+              <span className="block truncate type-micro text-stone-400">
                 {roleLabel}
               </span>
             </span>
           </button>
+          {!isInstructor && !isCollapsed ? (
+            <div className="relative" ref={notificationsRef}>
+              <button
+                aria-expanded={isNotificationsOpen}
+                aria-haspopup="dialog"
+                aria-label={`알림 ${upcomingEvents.length}개`}
+                className="relative flex size-8 items-center justify-center rounded-lg text-stone-400 hover:bg-white hover:text-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+                onClick={() => {
+                  setIsNotificationsOpen((open) => !open)
+                  setIsMenuOpen(false)
+                }}
+                title="예정 알림"
+                type="button"
+              >
+                <Bell aria-hidden="true" size={15} />
+                {upcomingEvents.length > 0 ? (
+                  <span className="absolute -top-1 -right-1 flex min-w-4 items-center justify-center rounded-full bg-brand-600 px-1 type-micro font-bold leading-4 text-white">
+                    {upcomingEvents.length > 9 ? '9+' : upcomingEvents.length}
+                  </span>
+                ) : null}
+              </button>
+              {isNotificationsOpen ? (
+                <NotificationPanel
+                  events={upcomingEvents}
+                  isCollapsed={false}
+                  onOpenCalendar={() => {
+                    setIsNotificationsOpen(false)
+                    navigate(routes.calendar)
+                  }}
+                  placement="footer"
+                />
+              ) : null}
+            </div>
+          ) : null}
           {isMenuOpen ? (
             <div
               className={cx(
@@ -495,26 +533,31 @@ function NotificationPanel({
   events,
   isCollapsed,
   onOpenCalendar,
+  placement = 'header',
 }: {
   events: CalendarEvent[]
   isCollapsed: boolean
   onOpenCalendar: () => void
+  placement?: 'footer' | 'header'
 }) {
   return (
     <div
       aria-label="예정 알림"
       className={cx(
-        'absolute top-[calc(100%+8px)] right-0 z-40 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-stone-200 bg-white shadow-xl',
-        isCollapsed
+        'absolute z-40 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-stone-200 bg-white shadow-xl',
+        placement === 'footer'
+          ? 'right-0 bottom-[calc(100%+8px)]'
+          : 'top-[calc(100%+8px)] right-0',
+        placement === 'header' && (isCollapsed
           ? 'lg:top-0 lg:right-auto lg:left-[calc(100%+8px)]'
-          : 'lg:right-auto lg:left-0',
+          : 'lg:right-auto lg:left-0'),
       )}
       role="dialog"
     >
       <div className="flex h-12 items-center justify-between border-b border-stone-100 px-4">
-        <h2 className="text-sm font-bold text-stone-900">예정 알림</h2>
+        <h2 className="type-body font-bold text-stone-900">예정 알림</h2>
         <button
-          className="text-xs font-semibold text-brand-700 hover:text-brand-900"
+          className="type-caption font-semibold text-brand-700 hover:text-brand-900"
           onClick={onOpenCalendar}
           type="button"
         >
@@ -534,10 +577,10 @@ function NotificationPanel({
                 <CalendarDays aria-hidden="true" size={14} />
               </span>
               <span className="min-w-0 flex-1">
-                <strong className="block truncate text-[13px] font-semibold text-stone-900">
+                <strong className="block truncate type-control font-semibold text-stone-900">
                   {event.title}
                 </strong>
-                <span className="mt-0.5 block text-[11px] text-stone-400">
+                <span className="mt-0.5 block type-micro text-stone-400">
                   {event.hasTime === false ? new Date(event.startsAt).toLocaleDateString('ko-KR') : formatDateTime(event.startsAt)} ·{' '}
                   {getCalendarEventKindLabel(event.kind)}
                 </span>
@@ -548,7 +591,7 @@ function NotificationPanel({
       ) : (
         <div className="flex min-h-32 flex-col items-center justify-center px-5 text-center">
           <Bell aria-hidden="true" className="text-stone-300" size={20} />
-          <p className="mt-2 text-sm font-semibold text-stone-700">
+          <p className="mt-2 type-body font-semibold text-stone-700">
             예정된 알림이 없습니다
           </p>
         </div>
@@ -559,7 +602,7 @@ function NotificationPanel({
 
 function navLinkClassName(isActive: boolean, isCollapsed: boolean): string {
   return cx(
-    'relative inline-flex h-9 shrink-0 items-center gap-2.5 rounded-lg px-3 text-[13.5px]',
+    'relative inline-flex h-9 shrink-0 items-center gap-2.5 rounded-lg px-3 type-control',
     isCollapsed && 'lg:w-9 lg:justify-center lg:px-0',
     'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
     isActive
@@ -583,5 +626,5 @@ function FeedbackDialog({ onClose, onSubmit }: { onClose: () => void; onSubmit: 
   const [message, setMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   async function submit(event: FormEvent<HTMLFormElement>) { event.preventDefault(); if (!message.trim() || isSubmitting) return; setIsSubmitting(true); await onSubmit({ category, message: message.trim() }).finally(() => setIsSubmitting(false)) }
-  return <div aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/35 px-4" role="dialog"><form className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl" onSubmit={submit}><div className="flex items-center justify-between"><h2 className="text-lg font-bold text-stone-950">도움말 · 피드백</h2><button aria-label="닫기" className="p-2 text-stone-400" onClick={onClose} type="button"><X size={16} /></button></div><label className="mt-5 block text-sm font-semibold text-stone-800">분류<select className="mt-1 h-11 w-full rounded-lg border border-stone-300 bg-white px-3" onChange={(event) => setCategory(event.target.value as FeedbackCategory)} value={category}><option value="GENERAL">일반 문의</option><option value="BUG">오류 신고</option><option value="FEATURE_REQUEST">기능 제안</option></select></label><label className="mt-4 block text-sm font-semibold text-stone-800">내용<textarea autoFocus className="mt-1 min-h-36 w-full resize-none rounded-lg border border-stone-300 px-3 py-3" maxLength={2000} onChange={(event) => setMessage(event.target.value)} value={message} /></label><div className="mt-5 flex justify-end gap-2"><button className="h-10 rounded-lg px-4 text-sm font-semibold text-stone-600 hover:bg-stone-100" onClick={onClose} type="button">취소</button><button className="h-10 rounded-lg bg-brand-600 px-4 text-sm font-semibold text-white disabled:bg-stone-300" disabled={!message.trim() || isSubmitting} type="submit">{isSubmitting ? '전송 중' : '보내기'}</button></div></form></div>
+  return <div aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/35 px-4" role="dialog"><form className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl" onSubmit={submit}><div className="flex items-center justify-between"><h2 className="type-dialog-title font-bold text-stone-950">도움말 · 피드백</h2><button aria-label="닫기" className="p-2 text-stone-400" onClick={onClose} type="button"><X size={16} /></button></div><label className="mt-5 block type-body font-semibold text-stone-800">분류<select className="mt-1 h-11 w-full rounded-lg border border-stone-300 bg-white px-3" onChange={(event) => setCategory(event.target.value as FeedbackCategory)} value={category}><option value="GENERAL">일반 문의</option><option value="BUG">오류 신고</option><option value="FEATURE_REQUEST">기능 제안</option></select></label><label className="mt-4 block type-body font-semibold text-stone-800">내용<textarea autoFocus className="mt-1 min-h-36 w-full resize-none rounded-lg border border-stone-300 px-3 py-3" maxLength={2000} onChange={(event) => setMessage(event.target.value)} value={message} /></label><div className="mt-5 flex justify-end gap-2"><button className="h-10 rounded-lg px-4 type-body font-semibold text-stone-600 hover:bg-stone-100" onClick={onClose} type="button">취소</button><button className="h-10 rounded-lg bg-brand-600 px-4 type-body font-semibold text-white disabled:bg-stone-300" disabled={!message.trim() || isSubmitting} type="submit">{isSubmitting ? '전송 중' : '보내기'}</button></div></form></div>
 }

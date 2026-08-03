@@ -86,14 +86,27 @@ DELETE /api/classrooms/{classroomId}/permanent
 시작일 변경 시 기존 주차 공개일을 함께 이동할지 여부를 요청 필드로 명시해야 하며,
 영구 삭제는 확인용 강의실명과 재인증 또는 별도 확인 토큰을 요구해야 한다.
 
-## P1. 학습 대화 제어
+## P1. 주차 순서와 운영 상태
 
-- `대화 새로 시작`: 현재 화면 메시지만 숨기므로 서버 대화 컨텍스트 초기화 API 필요
-- `현재 페이지 첨부 해제`: `USER_QUESTION.payload.includeCurrentPage` 계약 필요
+현재 `PATCH /api/classrooms/{classroomId}/weeks/{weekNumber}`는 제목과
+`releaseAt`만 변경할 수 있어 자료가 포함된 주차의 순서 이동, 공개 취소, 휴강 상태를
+서버에 저장할 수 없다.
 
 ```http
-POST /api/sessions/{sessionId}/conversations
+PATCH /api/classrooms/{classroomId}/weeks/reorder
+PATCH /api/classrooms/{classroomId}/weeks/{weekNumber}/status
 ```
+
+순서 변경 요청은 전체 `weekNumber` 배열을 받아 자료 연결을 포함한 주차 단위를
+원자적으로 재정렬해야 한다. 상태 변경은 `PRIVATE`, `SCHEDULED`, `PUBLISHED`,
+`BREAK`를 구분하고, `SCHEDULED`일 때만 `releaseAt`을 필수로 받는 계약이 필요하다.
+
+## P1. 학습 대화 제어
+
+- `현재 페이지 첨부 해제`: `USER_QUESTION.payload.includeCurrentPage` 계약 필요
+
+`대화 새로 시작`은 `POST /api/sessions/{sessionId}/conversations` 계약이 추가되어
+FE 연결을 완료했다.
 
 ## P2. 운영 편의
 

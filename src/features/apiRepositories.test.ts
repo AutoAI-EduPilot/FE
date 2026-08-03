@@ -141,6 +141,9 @@ describe('remote feature repositories', () => {
           uiActions: [],
         }),
       )
+      .mockResolvedValueOnce(
+        success({ conversationId: 9, startedAt: '2026-08-03T00:00:00Z' }),
+      )
     const repository = createSessionsRepository(request as AuthenticatedRequest)
 
     await expect(repository.movePage('100', 4)).resolves.toMatchObject({
@@ -175,6 +178,16 @@ describe('remote feature repositories', () => {
         },
         method: 'POST',
       }),
+    )
+
+    await expect(repository.startNewConversation('100')).resolves.toEqual({
+      conversationId: '9',
+      startedAt: '2026-08-03T00:00:00Z',
+    })
+    expect(request).toHaveBeenNthCalledWith(
+      3,
+      '/api/sessions/100/conversations',
+      { method: 'POST', signal: undefined },
     )
   })
 

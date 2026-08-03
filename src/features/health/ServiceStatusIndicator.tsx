@@ -55,7 +55,7 @@ export function ServiceStatusIndicator() {
     <button
       aria-label={`서비스 상태: ${label}`}
       className={cx(
-        'flex h-8 items-center justify-center gap-2 rounded-lg px-2 text-[11.5px] text-stone-500 hover:bg-stone-50',
+        'flex h-8 items-center justify-center gap-2 rounded-lg px-2 type-caption text-stone-500 hover:bg-stone-50',
         'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
       )}
       onClick={() => void refresh()}

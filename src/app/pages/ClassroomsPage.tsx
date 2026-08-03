@@ -1,4 +1,5 @@
 import {
+  ArrowRight,
   ArrowDownUp,
   Check,
   DoorOpen,
@@ -17,10 +18,11 @@ import { Link } from 'react-router-dom'
 
 import { isInstructorRole, useAuth } from '../../features/auth'
 import { createClassroomsRepository, type Classroom } from '../../features/classrooms'
+import { createSessionsRepository, type LearningSession } from '../../features/sessions'
 import { getRequestErrorMessage } from '../../shared/api'
 import { usePageTitle } from '../../shared/lib/usePageTitle'
-import { Button, EmptyState, PageContainer, PageHeader, useToast } from '../../shared/ui'
-import { classroomDetailPath } from '../routes'
+import { Button, ButtonLink, EmptyState, PageContainer, PageHeader, useToast } from '../../shared/ui'
+import { classroomDetailPath, sessionDetailPath } from '../routes'
 import { InstructorClassroomsPage } from './instructor/InstructorClassroomsPage'
 
 type ClassroomSort = 'name' | 'progress' | 'recent' | 'unread'
@@ -47,6 +49,7 @@ function LearnerClassroomsPage() {
   const { apiRequest } = useAuth()
   const { show: showToast } = useToast()
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
+  const [latestSession, setLatestSession] = useState<LearningSession | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isJoining, setIsJoining] = useState(false)
@@ -59,6 +62,7 @@ function LearnerClassroomsPage() {
   const searchInputRef = useRef<HTMLInputElement | null>(null)
   const joinInputRef = useRef<HTMLInputElement | null>(null)
   const repository = useMemo(() => createClassroomsRepository(apiRequest), [apiRequest])
+  const sessionsRepository = useMemo(() => createSessionsRepository(apiRequest), [apiRequest])
 
   async function loadClassrooms(search = '') {
     setIsLoading(true)
@@ -77,6 +81,20 @@ function LearnerClassroomsPage() {
     repository.list().then((items) => { if (!cancelled) setClassrooms(items) }).catch((requestError) => { if (!cancelled) setError(getRequestErrorMessage(requestError)) }).finally(() => { if (!cancelled) setIsLoading(false) })
     return () => { cancelled = true }
   }, [repository])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    sessionsRepository
+      .list(controller.signal)
+      .then((sessions) => {
+        const latest = sessions
+          .filter((session) => session.status === 'ACTIVE')
+          .sort((left, right) => right.lastActivityAt.localeCompare(left.lastActivityAt))[0]
+        setLatestSession(latest ?? null)
+      })
+      .catch(() => undefined)
+    return () => controller.abort()
+  }, [sessionsRepository])
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
@@ -122,22 +140,30 @@ function LearnerClassroomsPage() {
   const selectedSortLabel =
     sortOptions.find((option) => option.value === sort)?.label ??
     '최근 학습순'
+  const sortedClassrooms = useMemo(() => {
+    return [...classrooms].sort((left, right) => {
+      if (sort === 'name') return left.name.localeCompare(right.name, 'ko-KR')
+      if (sort === 'progress') return left.progressRate - right.progressRate
+      if (sort === 'unread') return (right.currentWeek ?? 0) - (left.currentWeek ?? 0)
+      return right.id.localeCompare(left.id, undefined, { numeric: true })
+    })
+  }, [classrooms, sort])
 
   return (
     <PageContainer>
       <PageHeader
         title="내 강의실"
-        titleAccessory={<p className="text-xs text-stone-400">참여 중 {classrooms.length}개</p>}
+        titleAccessory={<p className="type-caption text-stone-400">참여 중 {classrooms.length}개</p>}
         actions={<>
           <button
             aria-label="강의실 검색"
-            className="flex h-10 min-w-56 flex-1 items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 text-left text-sm text-stone-400 transition-colors hover:border-stone-300 hover:text-stone-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:min-w-72 xl:flex-none"
+            className="flex h-10 min-w-56 flex-1 items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 text-left type-body text-stone-400 transition-colors hover:border-stone-300 hover:text-stone-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:min-w-72 xl:flex-none"
             onClick={() => setIsSearchOpen(true)}
             type="button"
           >
             <Search aria-hidden="true" size={15} />
             <span className="flex-1">강의실 검색</span>
-            <kbd className="rounded border border-stone-200 bg-stone-50 px-1.5 py-0.5 text-[10px] text-stone-400">
+            <kbd className="rounded border border-stone-200 bg-stone-50 px-1.5 py-0.5 type-micro text-stone-400">
               Ctrl K
             </kbd>
           </button>
@@ -146,7 +172,7 @@ function LearnerClassroomsPage() {
             <button
               aria-expanded={isSortOpen}
               aria-haspopup="menu"
-              className="flex h-10 items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 text-sm font-medium text-stone-700 hover:border-stone-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+              className="flex h-10 items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 type-body font-medium text-stone-700 hover:border-stone-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
               onClick={() => setIsSortOpen((open) => !open)}
               type="button"
             >
@@ -160,7 +186,7 @@ function LearnerClassroomsPage() {
               >
                 {sortOptions.map((option) => (
                   <button
-                    className="flex h-9 w-full items-center rounded-md px-2.5 text-left text-[13px] text-stone-700 hover:bg-stone-100"
+                    className="flex h-9 w-full items-center rounded-md px-2.5 text-left type-control text-stone-700 hover:bg-stone-100"
                     key={option.value}
                     onClick={() => {
                       setSort(option.value)
@@ -190,8 +216,28 @@ function LearnerClassroomsPage() {
         </>}
       />
 
+      {latestSession ? (
+        <section className="flex flex-col gap-4 rounded-lg bg-stone-100 px-5 py-4 sm:flex-row sm:items-center">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-rose-50 type-micro font-bold text-rose-600">
+            PDF
+          </span>
+          <div className="min-w-0 flex-1">
+            <h2 className="truncate type-body font-bold text-stone-950">
+              이어서 학습하기 — {latestSession.materialTitle}
+            </h2>
+            <p className="mt-1 type-caption text-stone-400">
+              {latestSession.currentPage}쪽까지 학습했습니다.
+            </p>
+          </div>
+          <ButtonLink to={sessionDetailPath(latestSession.id)}>
+            {latestSession.currentPage}쪽부터 계속
+            <ArrowRight aria-hidden="true" size={14} />
+          </ButtonLink>
+        </section>
+      ) : null}
+
       {error ? <EmptyState action={<Button onClick={() => void loadClassrooms()} variant="secondary">다시 시도</Button>} description={error} title="강의실을 불러오지 못했습니다" /> : null}
-      {!error && isLoading ? <p className="py-16 text-center text-sm text-stone-500" role="status">강의실을 불러오는 중입니다.</p> : null}
+      {!error && isLoading ? <p className="py-16 text-center type-body text-stone-500" role="status">강의실을 불러오는 중입니다.</p> : null}
       {!error && !isLoading ? <section
         aria-labelledby="classroom-list-heading"
         className="border-t border-stone-100 pt-5"
@@ -200,20 +246,42 @@ function LearnerClassroomsPage() {
           참여 중인 강의실
         </h2>
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {classrooms.map((classroom) => (
-            <Link className="rounded-lg border border-stone-200 bg-white p-5 hover:border-brand-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600" key={classroom.id} to={classroomDetailPath(classroom.id)}>
-              <div className="flex items-start justify-between gap-3"><h2 className="font-bold text-stone-950">{classroom.name}</h2><span className="text-xs font-semibold text-brand-700">{classroom.progressRate}%</span></div>
-              <p className="mt-1 text-xs text-stone-400">{classroom.instructorName} · 총 {classroom.weekCount}주</p>
-              <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-stone-100"><span className="block h-full bg-brand-600" style={{ width: `${Math.min(100, classroom.progressRate)}%` }} /></div>
+          {sortedClassrooms.map((classroom) => (
+            <Link className="flex min-h-44 flex-col rounded-lg border border-stone-200 bg-white p-4 hover:border-brand-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600" key={classroom.id} to={classroomDetailPath(classroom.id)}>
+              <div className="flex items-center gap-3">
+                <span className={`flex size-9 shrink-0 items-center justify-center rounded-lg type-body font-bold ${getClassroomTone(classroom)}`}>
+                  {classroom.name.slice(0, 1)}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <h2 className="truncate type-body font-bold text-stone-950">{classroom.name}</h2>
+                  <p className="mt-0.5 truncate type-micro text-stone-400">
+                    {classroom.instructorName} · {classroom.currentWeek ?? 1}주차
+                  </p>
+                </div>
+              </div>
+              <div className="mt-auto pt-5">
+                <div className="flex items-center justify-between type-micro">
+                  <span className="text-stone-400">진도</span>
+                  <strong className="text-brand-700">{classroom.progressRate}%</strong>
+                </div>
+                <div className="mt-1.5 h-1 rounded-full bg-stone-200">
+                  <span className="block h-full rounded-full bg-brand-600" style={{ width: `${Math.min(100, Math.max(0, classroom.progressRate))}%` }} />
+                </div>
+                <p className="mt-3 truncate type-caption text-stone-500">
+                  {classroom.progressRate >= 100
+                    ? '모든 자료를 학습했어요'
+                    : `${classroom.currentWeek ?? 1}주차 학습 이어가기`}
+                </p>
+              </div>
             </Link>
           ))}
         </div>
 
         {classrooms.length === 0 ? <div className="pt-7 text-center">
-          <h2 className="text-base font-bold text-stone-900">
+          <h2 className="type-section-title font-bold text-stone-900">
             아직 참여 중인 강의실이 없습니다
           </h2>
-          <p className="mt-1.5 text-sm text-stone-500">
+          <p className="mt-1.5 type-body text-stone-500">
             강의자가 전달한 초대 코드를 입력해 첫 강의실에 참여하세요.
           </p>
         </div> : null}
@@ -231,7 +299,7 @@ function LearnerClassroomsPage() {
               <Search aria-hidden="true" className="text-stone-400" size={16} />
               <input
                 aria-label="검색어"
-                className="h-full min-w-0 flex-1 border-0 bg-transparent text-sm text-stone-900 outline-none placeholder:text-stone-400"
+                className="h-full min-w-0 flex-1 border-0 bg-transparent type-body text-stone-900 outline-none placeholder:text-stone-400"
                 onChange={(event) => setSearchQuery(event.target.value)}
                 placeholder="강의실 이름을 검색하세요"
                 ref={searchInputRef}
@@ -247,8 +315,8 @@ function LearnerClassroomsPage() {
               </button>
             </div>
             <div className="min-h-44 px-4 py-4">
-              {classrooms.filter((item) => item.name.toLowerCase().includes(searchQuery.trim().toLowerCase())).map((item) => <Link className="block rounded-lg px-3 py-3 text-sm font-semibold text-stone-800 hover:bg-stone-50" key={item.id} onClick={() => setIsSearchOpen(false)} to={classroomDetailPath(item.id)}>{item.name}<span className="ml-2 text-xs font-normal text-stone-400">{item.instructorName}</span></Link>)}
-              {!searchQuery.trim() ? <p className="py-12 text-center text-sm text-stone-500">검색할 강의실 이름을 입력하세요</p> : null}
+              {classrooms.filter((item) => item.name.toLowerCase().includes(searchQuery.trim().toLowerCase())).map((item) => <Link className="block rounded-lg px-3 py-3 type-body font-semibold text-stone-800 hover:bg-stone-50" key={item.id} onClick={() => setIsSearchOpen(false)} to={classroomDetailPath(item.id)}>{item.name}<span className="ml-2 type-caption font-normal text-stone-400">{item.instructorName}</span></Link>)}
+              {!searchQuery.trim() ? <p className="py-12 text-center type-body text-stone-500">검색할 강의실 이름을 입력하세요</p> : null}
             </div>
           </div>
         </div>
@@ -268,12 +336,12 @@ function LearnerClassroomsPage() {
               </span>
               <div className="min-w-0 flex-1">
                 <h2
-                  className="text-base font-bold text-stone-950"
+                  className="type-section-title font-bold text-stone-950"
                   id="join-classroom-title"
                 >
                   강의실 참여
                 </h2>
-                <p className="mt-1 text-sm text-stone-500">
+                <p className="mt-1 type-body text-stone-500">
                   강의자가 공유한 초대 코드를 입력하세요.
                 </p>
               </div>
@@ -289,14 +357,14 @@ function LearnerClassroomsPage() {
 
             <form className="mt-5" onSubmit={submitInviteCode}>
               <label
-                className="text-[13px] font-semibold text-stone-800"
+                className="type-control font-semibold text-stone-800"
                 htmlFor="classroom-invite-code"
               >
                 초대 코드
               </label>
               <input
                 autoComplete="off"
-                className="mt-1 h-11 w-full rounded-lg border border-stone-300 bg-white px-3.5 text-sm font-medium tracking-wider text-stone-900 outline-none placeholder:font-normal placeholder:tracking-normal placeholder:text-stone-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
+                className="mt-1 h-11 w-full rounded-lg border border-stone-300 bg-white px-3.5 type-body font-medium tracking-wider text-stone-900 outline-none placeholder:font-normal placeholder:tracking-normal placeholder:text-stone-400 focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
                 id="classroom-invite-code"
                 onChange={(event) => setInviteCode(event.target.value)}
                 placeholder="예: EDU-2026"
@@ -320,4 +388,21 @@ function LearnerClassroomsPage() {
       ) : null}
     </PageContainer>
   )
+}
+
+function getClassroomTone(classroom: Classroom): string {
+  switch (classroom.color) {
+    case 'ORANGE':
+      return 'bg-orange-100 text-orange-700'
+    case 'GREEN':
+      return 'bg-emerald-100 text-emerald-700'
+    case 'PURPLE':
+      return 'bg-violet-100 text-violet-700'
+    case 'RED':
+      return 'bg-rose-100 text-rose-700'
+    case 'GRAY':
+      return 'bg-stone-100 text-stone-500'
+    case 'BLUE':
+      return 'bg-brand-100 text-brand-700'
+  }
 }

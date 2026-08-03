@@ -1,11 +1,8 @@
 import {
   BookOpen,
-  ClipboardCopy,
   FileText,
   Minus,
-  Pencil,
   Plus,
-  RefreshCw,
   Search,
   X,
 } from 'lucide-react'
@@ -39,8 +36,8 @@ import {
 import {
   classroomDetailPath,
   classroomEditPath,
+  learningStatusPath,
   materialDetailPath,
-  routes,
 } from '../../routes'
 
 type CreateClassroomDraft = CreateClassroomInput & { weekCount: number }
@@ -229,7 +226,7 @@ export function InstructorClassroomsPage() {
       <PageHeader
         title="내 강의실"
         titleAccessory={
-          <p className="text-xs text-stone-400">
+          <p className="type-caption text-stone-400">
             운영 중{' '}
             {classrooms.filter((item) => item.status === 'ACTIVE').length}개
           </p>
@@ -238,13 +235,13 @@ export function InstructorClassroomsPage() {
           <>
             <button
               aria-label="강의실 검색"
-              className="flex h-10 min-w-56 flex-1 items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 text-left text-sm text-stone-400 hover:border-stone-300 hover:text-stone-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:min-w-72 xl:flex-none"
+              className="flex h-10 min-w-56 flex-1 items-center gap-2 rounded-lg border border-stone-200 bg-white px-3 text-left type-body text-stone-400 hover:border-stone-300 hover:text-stone-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600 sm:min-w-72 xl:flex-none"
               onClick={() => setIsSearchOpen(true)}
               type="button"
             >
               <Search aria-hidden="true" size={15} />
               <span className="flex-1">강의실 검색</span>
-              <kbd className="rounded border border-stone-200 bg-stone-50 px-1.5 py-0.5 text-[10px]">
+              <kbd className="rounded border border-stone-200 bg-stone-50 px-1.5 py-0.5 type-micro">
                 ⌘K
               </kbd>
             </button>
@@ -268,7 +265,7 @@ export function InstructorClassroomsPage() {
         />
       ) : null}
       {!error && isLoading ? (
-        <p className="py-16 text-center text-sm text-stone-500" role="status">
+        <p className="py-16 text-center type-body text-stone-500" role="status">
           강의실을 불러오는 중입니다.
         </p>
       ) : null}
@@ -370,18 +367,18 @@ function ClassroomCard({
     >
       <div className="flex items-start gap-3">
         <span
-          className={`flex size-9 shrink-0 items-center justify-center rounded-lg text-sm font-bold ${tone}`}
+          className={`flex size-9 shrink-0 items-center justify-center rounded-lg type-body font-bold ${tone}`}
         >
           {classroom.name.slice(0, 1)}
         </span>
         <div className="min-w-0 flex-1">
           <Link
-            className="block truncate text-sm font-bold text-stone-950 hover:text-brand-700"
+            className="block truncate type-card-title font-bold text-stone-950 hover:text-brand-700"
             to={classroomDetailPath(classroom.id)}
           >
             {classroom.name}
           </Link>
-          <p className="mt-0.5 truncate text-[11px] text-stone-400">
+          <p className="mt-0.5 truncate type-micro text-stone-400">
             학습자 {classroom.learnerCount}명 · 자료{' '}
             {classroom.materialCount ?? 0}개
           </p>
@@ -389,8 +386,8 @@ function ClassroomCard({
         <span
           className={
             isActive
-              ? 'rounded-full bg-emerald-50 px-2 py-1 text-[10px] font-semibold text-emerald-700'
-              : 'rounded-full bg-stone-100 px-2 py-1 text-[10px] font-semibold text-stone-500'
+              ? 'rounded-full bg-emerald-50 px-2 py-1 type-micro font-semibold text-emerald-700'
+              : 'rounded-full bg-stone-100 px-2 py-1 type-micro font-semibold text-stone-500'
           }
         >
           {isActive ? '운영 중' : '종료'}
@@ -398,8 +395,8 @@ function ClassroomCard({
       </div>
       <div className="mt-3 flex min-h-12 items-center gap-3 rounded-lg bg-stone-50 px-3">
         <div className="min-w-0 flex-1">
-          <p className="text-[10px] text-stone-400">초대코드</p>
-          <strong className="block truncate font-mono text-sm tracking-wide text-stone-900">
+          <p className="type-micro text-stone-400">초대코드</p>
+          <strong className="block truncate font-mono type-section-title tracking-wide text-stone-900">
             {isActive
               ? (classroom.inviteCode ?? '코드 확인')
               : '비활성화됨'}
@@ -409,27 +406,27 @@ function ClassroomCard({
           <>
             <button
               aria-label={`${classroom.name} 초대 코드 복사`}
-              className="inline-flex h-7 items-center gap-1 rounded-md border border-stone-200 bg-white px-2 text-[10px] font-semibold text-brand-700 hover:bg-brand-50"
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-stone-200 bg-white px-2 type-compact-action font-semibold text-brand-700 hover:bg-brand-50"
               onClick={onCopy}
               title="초대 코드 복사"
               type="button"
             >
-              <ClipboardCopy size={11} />복사
+              복사
             </button>
             <button
               aria-label={`${classroom.name} 초대 코드 재발급`}
-              className="inline-flex h-7 items-center gap-1 rounded-md border border-stone-200 bg-white px-2 text-[10px] font-semibold text-stone-600 hover:bg-stone-100"
+              className="inline-flex h-7 items-center gap-1 rounded-md border border-stone-200 bg-white px-2 type-compact-action font-semibold text-stone-600 hover:bg-stone-100"
               onClick={onRegenerate}
               title="초대 코드 재발급"
               type="button"
             >
-              <RefreshCw size={11} />재발급
+              재발급
             </button>
           </>
         ) : null}
       </div>
       <div className="mt-3">
-        <div className="flex items-center justify-between text-[11px]">
+        <div className="flex items-center justify-between type-micro">
           <span className="text-stone-400">평균 진도</span>
           <strong className={isActive ? 'text-brand-700' : 'text-stone-400'}>
             {progress}%
@@ -442,38 +439,19 @@ function ClassroomCard({
           />
         </div>
       </div>
-      <div className="mt-auto grid grid-cols-[1fr_1fr_auto] gap-2 pt-3">
-        {isActive ? (
-          <>
-            <Link
-              className="inline-flex h-8 items-center justify-center rounded-md border border-stone-200 text-[11px] font-semibold text-stone-700 hover:bg-stone-50"
-              to={classroomDetailPath(classroom.id)}
-            >
-              자료 관리
-            </Link>
-            <Link
-              className="inline-flex h-8 items-center justify-center rounded-md border border-stone-200 text-[11px] font-semibold text-stone-700 hover:bg-stone-50"
-              to={`${routes.learningStatus}?classroomId=${classroom.id}`}
-            >
-              학습 현황
-            </Link>
-            <Link
-              aria-label={`${classroom.name} 수정`}
-              className="inline-flex size-8 items-center justify-center rounded-md border border-stone-200 text-stone-500 hover:bg-stone-50"
-              title="강의실 수정"
-              to={classroomEditPath(classroom.id)}
-            >
-              <Pencil size={13} />
-            </Link>
-          </>
-        ) : (
-          <Link
-            className="col-span-3 inline-flex h-8 items-center justify-center rounded-md border border-stone-200 text-[11px] font-semibold text-stone-500"
-            to={classroomDetailPath(classroom.id)}
-          >
-            보관된 자료 보기
-          </Link>
-        )}
+      <div className="mt-auto grid grid-cols-[1fr_auto] gap-2 pt-3">
+        <Link
+          className="inline-flex h-8 items-center justify-center rounded-md border border-stone-200 type-micro font-semibold text-stone-700 hover:bg-stone-50"
+          to={isActive ? learningStatusPath(classroom.id) : classroomDetailPath(classroom.id)}
+        >
+          {isActive ? '학습 현황' : '보관된 자료 보기'}
+        </Link>
+        <Link
+          className="inline-flex h-8 items-center justify-center rounded-md border border-stone-200 px-3 type-micro font-semibold text-stone-700 hover:bg-stone-50"
+          to={classroomEditPath(classroom.id)}
+        >
+          설정
+        </Link>
       </div>
     </article>
   )
@@ -521,7 +499,7 @@ function SearchDialog({
             }
             aria-controls="classroom-search-results"
             aria-label="검색어"
-            className="h-full min-w-0 flex-1 border-0 bg-transparent text-sm text-stone-900 outline-none placeholder:text-stone-400"
+            className="h-full min-w-0 flex-1 border-0 bg-transparent type-body text-stone-900 outline-none placeholder:text-stone-400"
             onChange={(event) => onQueryChange(event.target.value)}
             onKeyDown={onKeyDown}
             placeholder="강의실 또는 자료 검색"
@@ -531,7 +509,7 @@ function SearchDialog({
           />
           <button
             aria-label="검색 닫기"
-            className="flex h-7 items-center justify-center rounded-md border border-stone-200 px-2 text-[10px] font-semibold text-stone-400"
+            className="flex h-7 items-center justify-center rounded-md border border-stone-200 px-2 type-micro font-semibold text-stone-400"
             onClick={onClose}
             type="button"
           >
@@ -569,7 +547,7 @@ function SearchDialog({
           />
         </div>
         {results.length > 0 ? (
-          <div className="flex gap-4 border-t border-stone-100 px-4 py-2.5 text-[10px] font-medium text-stone-400">
+          <div className="flex gap-4 border-t border-stone-100 px-4 py-2.5 type-micro font-medium text-stone-400">
             <span>↑↓ 이동</span>
             <span>↵ 열기</span>
           </div>
@@ -597,7 +575,7 @@ function SearchResultGroup({
   if (results.length === 0) return null
   return (
     <section aria-label={label} className="mb-2 last:mb-0">
-      <p className="px-2 pb-1.5 text-[11px] font-semibold text-stone-400">
+      <p className="px-2 pb-1.5 type-micro font-semibold text-stone-400">
         {label}
       </p>
       {results.map((result, index) => {
@@ -622,10 +600,10 @@ function SearchResultGroup({
               )}
             </span>
             <span className="min-w-0 flex-1">
-              <strong className="block truncate text-sm text-stone-900">
+              <strong className="block truncate type-body text-stone-900">
                 {result.title}
               </strong>
-              <span className="block truncate text-[11px] text-stone-400">
+              <span className="block truncate type-micro text-stone-400">
                 {result.subtitle}
               </span>
             </span>
@@ -646,8 +624,8 @@ function SearchEmpty({
   return (
     <div className="flex min-h-44 flex-col items-center justify-center text-center">
       <Search aria-hidden="true" className="text-stone-300" size={22} />
-      <p className="mt-3 text-sm font-semibold text-stone-800">{title}</p>
-      <p className="mt-1 text-xs text-stone-400">{description}</p>
+      <p className="mt-3 type-body font-semibold text-stone-800">{title}</p>
+      <p className="mt-1 type-caption text-stone-400">{description}</p>
     </div>
   )
 }
@@ -744,7 +722,7 @@ function CreateClassroomDialog({
         onSubmit={submit}
       >
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-bold" id="create-classroom-title">
+          <h2 className="type-dialog-title font-bold" id="create-classroom-title">
             강의실 만들기
           </h2>
           <button
@@ -756,7 +734,7 @@ function CreateClassroomDialog({
             <X size={16} />
           </button>
         </div>
-        <label className="mt-5 block text-sm font-semibold">
+        <label className="mt-5 block type-body font-semibold">
           강의실 이름
           <input
             autoFocus
@@ -767,9 +745,9 @@ function CreateClassroomDialog({
           />
         </label>
         <div className="mt-4 rounded-lg border border-stone-200 bg-stone-50 p-4">
-          <p className="text-sm font-semibold">수업 기간</p>
+          <p className="type-body font-semibold">수업 기간</p>
           <div className="mt-2 grid gap-4 sm:grid-cols-[1fr_auto]">
-            <label className="text-sm font-semibold">
+            <label className="type-body font-semibold">
               수업 시작일
               <input
                 className="mt-1 h-11 w-full rounded-lg border border-stone-300 bg-white px-3"
@@ -779,7 +757,7 @@ function CreateClassroomDialog({
               />
             </label>
             <div>
-              <span className="text-sm font-semibold">주차 수</span>
+              <span className="type-body font-semibold">주차 수</span>
               <div className="mt-1 flex h-11 items-center rounded-lg border border-stone-300 bg-white p-1">
                 <button
                   aria-label="주차 수 줄이기"
@@ -792,7 +770,7 @@ function CreateClassroomDialog({
                 >
                   <Minus size={14} />
                 </button>
-                <output className="min-w-12 text-center text-sm font-bold">
+                <output className="min-w-12 text-center type-body font-bold">
                   {weekCount}주
                 </output>
                 <button
@@ -810,12 +788,12 @@ function CreateClassroomDialog({
             </div>
           </div>
         </div>
-        <p className="mt-2 min-h-5 text-xs text-stone-500">
+        <p className="mt-2 min-h-5 type-caption text-stone-500">
           {endDate
             ? `${endDate}까지 · ${weekCount}개 주차가 자동 생성됩니다.`
             : '시작일을 선택하면 종료일과 주차 공개일을 계산합니다.'}
         </p>
-        <label className="mt-4 block text-sm font-semibold">
+        <label className="mt-4 block type-body font-semibold">
           설명 <span className="font-normal text-stone-400">(선택)</span>
           <textarea
             className="mt-1 min-h-24 w-full resize-none rounded-lg border border-stone-300 p-3"

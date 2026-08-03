@@ -50,6 +50,22 @@ describe('apiRequest', () => {
     expect(init?.body).toBe('{"value":1}')
   })
 
+  it('lets the browser add the multipart boundary for FormData requests', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      jsonResponse({ success: true, data: {}, message: '정상' }),
+    )
+    const body = new FormData()
+    body.append('file', new File(['%PDF-test'], 'material.pdf', { type: 'application/pdf' }))
+    body.append('title', 'material.pdf')
+
+    await apiRequest('/api/materials', { body, method: 'POST' })
+
+    const init = fetchMock.mock.calls[0]?.[1]
+    const headers = new Headers(init?.headers)
+    expect(headers.has('Content-Type')).toBe(false)
+    expect(init?.body).toBe(body)
+  })
+
   it('preserves backend error details and traceId', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(
       jsonResponse(

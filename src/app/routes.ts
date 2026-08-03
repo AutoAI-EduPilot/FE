@@ -7,6 +7,10 @@ export const routes = {
   classroomDetail: '/classrooms/:classroomId',
   classroomEdit: '/classrooms/:classroomId/edit',
   calendar: '/calendar',
+  notes: '/notes',
+  reviewQuizzes: '/review-quizzes',
+  exams: '/exams',
+  examDetail: '/exams/:examId',
   learningStatus: '/learning-status',
   announcements: '/announcements',
   entranceRequests: '/entrance-requests',
@@ -27,6 +31,10 @@ export function classroomEditPath(classroomId: string | number): string {
   return `/classrooms/${classroomId}/edit`
 }
 
+export function learningStatusPath(classroomId: string | number): string {
+  return `${routes.learningStatus}?classroomId=${encodeURIComponent(String(classroomId))}`
+}
+
 export function materialDetailPath(materialId: string | number): string {
   return `/materials/${materialId}`
 }
@@ -37,6 +45,10 @@ export function sessionDetailPath(sessionId: string | number): string {
 
 export function quizDetailPath(quizId: string | number): string {
   return `/quizzes/${quizId}`
+}
+
+export function examDetailPath(examId: string | number): string {
+  return `/exams/${examId}`
 }
 
 export function diagnosisPath(

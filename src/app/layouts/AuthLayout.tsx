@@ -14,23 +14,23 @@ export function AuthLayout() {
           <span className="flex size-6 items-center justify-center rounded-[7px] bg-brand-600 text-white">
             <BookOpenCheck aria-hidden="true" size={13} />
           </span>
-          <span className="text-sm font-bold">EduPilot</span>
+          <span className="type-body font-bold">EduPilot</span>
         </Link>
 
         <div className="flex flex-col gap-4">
-          <p className="max-w-sm text-[28px] font-bold leading-[1.35]">
+          <p className="max-w-sm type-display font-bold leading-[1.35]">
             강의 자료를 읽고,
             <br />
             바로 물어보세요.
           </p>
-          <p className="max-w-sm text-[12.5px] leading-relaxed text-stone-500">
+          <p className="max-w-sm type-body leading-relaxed text-stone-500">
             PDF·PPT를 보면서 AI 학습 도우미와
             <br />
             대화하는 학습 플랫폼
           </p>
         </div>
 
-        <p className="text-[10px] text-stone-400">© 2026 EduPilot</p>
+        <p className="type-micro text-stone-400">© 2026 EduPilot</p>
       </aside>
 
       <section className="flex min-h-screen items-center justify-center px-4 py-8 sm:px-8">
@@ -42,7 +42,7 @@ export function AuthLayout() {
             <span className="flex size-8 items-center justify-center rounded-[9px] bg-brand-600 text-white">
               <BookOpenCheck aria-hidden="true" size={17} />
             </span>
-            <span className="text-lg font-bold">EduPilot</span>
+            <span className="type-dialog-title font-bold">EduPilot</span>
           </Link>
 
           <Outlet />

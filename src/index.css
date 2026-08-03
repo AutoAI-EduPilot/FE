@@ -8,6 +8,57 @@
     "Segoe UI", sans-serif;
 }
 
+/* 역할 기반 타이포그래피. 화면별 임의 px 값 대신 의미에 따라 사용한다. */
+@utility type-display {
+  font-size: 1.75rem;
+  line-height: 2.375rem;
+}
+
+@utility type-page-title {
+  font-size: 1.375rem;
+  line-height: 1.875rem;
+}
+
+@utility type-card-title {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+
+@utility type-dialog-title {
+  font-size: 1.125rem;
+  line-height: 1.625rem;
+}
+
+@utility type-section-title {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+@utility type-body {
+  font-size: 0.875rem;
+  line-height: 1.375rem;
+}
+
+@utility type-control {
+  font-size: 0.8125rem;
+  line-height: 1.25rem;
+}
+
+@utility type-caption {
+  font-size: 0.75rem;
+  line-height: 1.125rem;
+}
+
+@utility type-micro {
+  font-size: 0.6875rem;
+  line-height: 1rem;
+}
+
+@utility type-compact-action {
+  font-size: 0.625rem;
+  line-height: 0.875rem;
+}
+
 /* 브랜드 컬러 — 디자인 시안(강의실 레이아웃 시안.dc.html)의 #4059d6 인디고 스케일.
    팔레트 교체 시 이 블록만 수정한다. */
 @theme {
@@ -75,6 +126,8 @@ body {
   min-height: 100vh;
   margin: 0;
   background: #fff;
+  font-size: 0.875rem;
+  line-height: 1.375rem;
 }
 
 html.dark body {

@@ -39,6 +39,8 @@ export interface ClassroomMaterial {
   status: 'PROCESSING' | 'READY' | 'FAILED'
   title: string
   uploadedAt: string
+  viewerCount?: number
+  viewRate?: number
 }
 
 export interface ClassroomWeek {
@@ -87,7 +89,7 @@ interface ClassroomDto {
 }
 
 interface WeekDto {
-  materials: Array<{ materialId: number; pageCount?: number; processingStatus: ClassroomMaterial['status']; title: string; uploadedAt: string }>
+  materials: Array<{ materialId: number; pageCount?: number; processingStatus: ClassroomMaterial['status']; title: string; uploadedAt: string; viewerCount?: number; viewRate?: number }>
   releaseAt?: string
   status: ClassroomWeek['status']
   title: string
@@ -216,7 +218,7 @@ function mapClassroom(value: ClassroomDto): Classroom {
 }
 
 function mapWeek(value: WeekDto): ClassroomWeek {
-  return { ...value, materials: value.materials.map((item) => ({ id: String(item.materialId), pageCount: item.pageCount, status: item.processingStatus, title: item.title, uploadedAt: item.uploadedAt })) }
+  return { ...value, materials: value.materials.map((item) => ({ id: String(item.materialId), pageCount: item.pageCount, status: item.processingStatus, title: item.title, uploadedAt: item.uploadedAt, viewerCount: item.viewerCount, viewRate: item.viewRate })) }
 }
 
 function mapNotice(value: NoticeDto): ClassroomNotice {

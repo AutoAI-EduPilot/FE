@@ -88,8 +88,8 @@ export function SessionsPage() {
 
       <section className="overflow-hidden rounded-xl border border-stone-200 bg-white">
         <div className="flex items-center justify-between border-b border-stone-200 px-4 py-4 sm:px-5">
-          <h2 className="text-base font-bold text-stone-950">최근 세션</h2>
-          <span className="text-xs font-medium text-stone-500">
+          <h2 className="type-section-title font-bold text-stone-950">최근 세션</h2>
+          <span className="type-caption font-medium text-stone-500">
             {sessions.length}개 세션
           </span>
         </div>
@@ -123,7 +123,7 @@ export function SessionsPage() {
         </div>
         )}
         {error && sessions.length > 0 ? (
-          <p className="border-t border-stone-200 px-4 py-3 text-xs font-medium text-rose-700 sm:px-5" role="alert">
+          <p className="border-t border-stone-200 px-4 py-3 type-caption font-medium text-rose-700 sm:px-5" role="alert">
             {error}
           </p>
         ) : null}
@@ -135,8 +135,8 @@ export function SessionsPage() {
             <Plus aria-hidden="true" size={17} />
           </span>
           <div>
-            <h2 className="text-sm font-bold text-stone-950">새 학습 시작</h2>
-            <p className="mt-1 text-sm text-stone-500">
+            <h2 className="type-body font-bold text-stone-950">새 학습 시작</h2>
+            <p className="mt-1 type-body text-stone-500">
               자료 처리가 끝나면 자료 상세에서 새 세션을 시작합니다.
             </p>
           </div>
@@ -168,10 +168,10 @@ function SessionRow({
           <FileText aria-hidden="true" size={17} />
         </span>
         <div className="min-w-0">
-          <h3 className="break-words text-sm font-bold text-stone-950">
+          <h3 className="break-words type-body font-bold text-stone-950">
             {session.materialTitle}
           </h3>
-          <p className="mt-1 text-xs text-stone-500">
+          <p className="mt-1 type-caption text-stone-500">
             {session.currentPage}
             {session.totalPages ? `/${session.totalPages}` : ''}쪽 · 최근 학습{' '}
             {formatDateTime(session.lastActivityAt)}
