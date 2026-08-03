@@ -5,7 +5,10 @@ import { formatDate, formatDateTime, formatFileSize } from './format'
 describe('format helpers', () => {
   it('formats ISO strings as Korean dates', () => {
     expect(formatDate('2026-07-22T00:00:00Z')).toMatch(/2026/)
-    expect(formatDateTime('2026-07-22T09:30:00Z')).toMatch(/2026/)
+    const dateTime = formatDateTime('2026-07-22T09:30:00Z')
+    expect(dateTime).toMatch(/2026/)
+    expect(dateTime).toMatch(/오전|오후/)
+    expect(dateTime).not.toMatch(/\b(?:AM|PM)\b/)
   })
 
   it('returns the raw string for invalid dates', () => {
