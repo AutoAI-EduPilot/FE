@@ -227,6 +227,42 @@ describe('remote feature repositories', () => {
     })
   })
 
+  it('maps the non-paged session quiz history response', async () => {
+    const request = vi.fn().mockResolvedValue(
+      success({
+        quizzes: [
+          {
+            createdAt: '2026-07-27T00:00:00Z',
+            maxScore: 100,
+            passed: false,
+            quizId: 50,
+            quizType: 'MCQ',
+            score: 48,
+            submitted: true,
+            title: '학습 확인 퀴즈',
+          },
+        ],
+      }),
+    )
+    const repository = createSessionsRepository(request as AuthenticatedRequest)
+
+    await expect(repository.listQuizzes('100')).resolves.toEqual([
+      {
+        createdAt: '2026-07-27T00:00:00Z',
+        maxScore: 100,
+        passed: false,
+        quizId: '50',
+        quizType: 'MCQ',
+        score: 48,
+        submitted: true,
+        title: '학습 확인 퀴즈',
+      },
+    ])
+    expect(request).toHaveBeenCalledWith('/api/sessions/100/quizzes', {
+      signal: undefined,
+    })
+  })
+
   it('maps every server widget kind and drops malformed ones', async () => {
     const request = vi.fn().mockResolvedValue(
       success({
