@@ -682,6 +682,7 @@ function formatEntryTime(value: string): string {
     hour: '2-digit',
     minute: '2-digit',
     month: 'numeric',
+    timeZone: 'Asia/Seoul',
     year: 'numeric',
   }).format(new Date(value))
 }
