@@ -151,7 +151,7 @@ describe('instructor pages', () => {
     expect(dialog).toBeInTheDocument()
     expect(within(dialog).queryByText('학기')).not.toBeInTheDocument()
     expect(within(dialog).getByText('15주')).toBeInTheDocument()
-    expect(screen.getByText('운영 중 0개')).toBeInTheDocument()
+    expect(screen.queryByText('운영 중 0개')).not.toBeInTheDocument()
     expect(screen.queryByText(/\d{4}년 \d학기/)).not.toBeInTheDocument()
     expect(submitButton).toBeDisabled()
 
@@ -210,9 +210,9 @@ describe('instructor pages', () => {
     expect(regenerateButton).toHaveClass('type-compact-action')
     expect(copyButton.querySelector('svg')).not.toBeInTheDocument()
     expect(regenerateButton.querySelector('svg')).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: '자료 관리' })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '설정' })).toHaveAttribute('href', '/classrooms/12/edit')
-    expect(screen.getByRole('link', { name: '학습 현황' })).toHaveAttribute('href', '/learning-status?classroomId=12')
+    expect(screen.getByRole('link', { name: '자료 관리' })).toHaveAttribute('href', '/classrooms/12')
+    expect(screen.getByRole('link', { name: '설정' })).toHaveAttribute('href', '/classrooms/12/settings')
+    expect(screen.getByRole('link', { name: '학습 현황' })).toHaveAttribute('href', '/classrooms/12/analytics')
 
     fetchMock.mockRestore()
   })
@@ -224,7 +224,7 @@ describe('instructor pages', () => {
     await screen.findByRole('link', { name: '자료구조' })
 
     expect(screen.getByRole('link', { name: '보관된 자료 보기' })).toHaveAttribute('href', '/classrooms/12')
-    expect(screen.getByRole('link', { name: '설정' })).toHaveAttribute('href', '/classrooms/12/edit')
+    expect(screen.getByRole('link', { name: '설정' })).toHaveAttribute('href', '/classrooms/12/settings')
     expect(screen.queryByRole('link', { name: '학습 현황' })).not.toBeInTheDocument()
 
     fetchMock.mockRestore()
@@ -392,15 +392,16 @@ describe('instructor pages', () => {
     const fetchMock = stubClassroomsApi()
     renderInstructorPage(
       <InstructorLearningStatusPage />,
-      ['/learning-status?classroomId=12'],
+      ['/classrooms/12/analytics'],
     )
 
     expect(await screen.findByLabelText('강의실 선택')).toHaveValue('12')
     expect(screen.getByText('자료구조의 자료별 열람 인원이 표시됩니다.')).toBeInTheDocument()
     expect(screen.getByText('마지막 갱신 정보 없음')).toBeInTheDocument()
+    expect(screen.getByText('페이지별 AI 질문 수')).toBeInTheDocument()
     expect(
-      screen.getByRole('button', { name: '리마인더 보내기' }),
-    ).toBeDisabled()
+      screen.queryByRole('button', { name: '리마인더 보내기' }),
+    ).not.toBeInTheDocument()
     fetchMock.mockRestore()
   })
 

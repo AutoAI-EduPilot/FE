@@ -4,8 +4,8 @@
 
 | 항목 | 내용 |
 | --- | --- |
-| 확인일 | 2026-08-02 |
-| FE 기준 | `main` `955a3af` + 현재 로컬 변경사항 |
+| 확인일 | 2026-08-03 |
+| FE 기준 | `fix/deploy-api-base-env` 현재 로컬 변경사항 |
 | BE 기준 | `develop` `docs/api-spec.md` 2026-08-02 |
 | 실행 계약 | 배포 Swagger `/v3/api-docs` 62개 operation |
 
@@ -16,20 +16,37 @@ FE repository에 반영했다. 아래에는 **화면은 존재하지만 여전�
 ## P0. 강의자 학습 현황·리포트
 
 현재 학습 현황 화면은 지표와 표 레이아웃만 있고 실제 데이터를 조회할 수 없다.
-GitHub 이슈 #34~#37의 리포트 기능도 공개 Swagger에 계약이 없다.
+BE #117에서 리포트 정책은 확정됐지만 외부 API 구현 이슈 BE #118은 진행 중이며,
+2026-08-03 배포 Swagger에는 아직 아래 endpoint가 없다.
 
 ```http
 GET  /api/classrooms/{classroomId}/analytics
-GET  /api/classrooms/{classroomId}/learners
-GET  /api/classrooms/{classroomId}/learners/{learnerId}/report
-POST /api/classrooms/{classroomId}/reports
-GET  /api/classrooms/{classroomId}/reports/{reportId}
-POST /api/classrooms/{classroomId}/reminders
+GET  /api/classrooms/{classroomId}/students
+GET  /api/classrooms/{classroomId}/report-criteria
+POST /api/classrooms/{classroomId}/report-criteria
+PATCH /api/classrooms/{classroomId}/report-criteria/{criterionId}
+POST /api/classrooms/{classroomId}/students/{studentId}/reports
+GET  /api/classrooms/{classroomId}/students/{studentId}/reports
+GET  /api/reports/{reportId}
 ```
 
 최소 응답에는 학습자 수, 평균 진도, 최근 7일 AI 질문 수, 7일 이상 미접속자,
-자료별 열람 인원·진도, 질문 주제 집계가 필요하다. 리포트는 생성 상태와 버전,
-평가 기준, 근거 메시지·페이지를 포함해야 한다.
+자료별 열람 인원·진도, 페이지별 질문 수 집계가 필요하다. 리포트 생성은 `202` 응답의
+`status=PENDING|PROCESSING|COMPLETED|FAILED`와 `pollAfterSeconds`를 사용한다.
+분석 범위는 `FULL` 또는 단일 `WEEK`만 허용하고, `WEEK`에는 `weekNumber` 하나만
+전달한다. 기본 9개 평가 기준 중 근거가 부족한
+항목은 `score=null`, `status=INSUFFICIENT_DATA`로 반환해야 한다. 종합 4단계와
+`trend`는 서버 계산값을 그대로 제공하고, 버전·평가 기준·근거 메시지·페이지를
+포함해야 한다. FE는 API 배포 전까지 `VITE_API_CAPABILITIES=reports`를 켜지 않는다.
+
+다음 기능은 현재 P0 범위에서 제외한다.
+
+- `POST /api/reports/{reportId}/questions`: DEC-033과 BE #119·#120에 따라 Phase 3.
+  FE 리포트 상세 화면에서도 질문 UI와 repository 메서드를 노출하지 않는다.
+- AI 질문의 주제별 분류: 조회 시 LLM을 호출하지 않고 페이지별 질문 수로 대체한다.
+  주제 클러스터링은 배치 인프라가 마련된 뒤 P2 backlog에서 검토한다.
+- `POST /api/classrooms/{classroomId}/reminders`: 전달 수단과 알림 인프라가 정해질
+  때까지 보류한다. 이메일을 채택하면 비밀번호 재설정 이메일과 함께 구축한다.
 
 ## P1. 인증 보조 기능
 
@@ -67,8 +84,8 @@ DELETE /api/users/me/schedule/{scheduleId}
 필요하다.
 
 ```http
-GET    /api/classrooms/{classroomId}/learners
-DELETE /api/classrooms/{classroomId}/learners/{learnerId}
+GET    /api/classrooms/{classroomId}/students
+DELETE /api/classrooms/{classroomId}/students/{studentId}
 ```
 
 목록 응답에는 `learnerId`, 이름, 이메일, 소속, 입장일, 상태가 필요하다. 삭제는
@@ -101,12 +118,11 @@ PATCH /api/classrooms/{classroomId}/weeks/{weekNumber}/status
 원자적으로 재정렬해야 한다. 상태 변경은 `PRIVATE`, `SCHEDULED`, `PUBLISHED`,
 `BREAK`를 구분하고, `SCHEDULED`일 때만 `releaseAt`을 필수로 받는 계약이 필요하다.
 
-## P1. 학습 대화 제어
+## 연결 완료: 학습 대화 제어
 
-- `현재 페이지 첨부 해제`: `USER_QUESTION.payload.includeCurrentPage` 계약 필요
-
-`대화 새로 시작`은 `POST /api/sessions/{sessionId}/conversations` 계약이 추가되어
-FE 연결을 완료했다.
+- `USER_QUESTION.payload.includeCurrentPage`: BE PR #152가 `develop`에 병합되어
+  현재 페이지 첨부·해제 상태를 FE 요청 payload에 연결했다.
+- `대화 새로 시작`: `POST /api/sessions/{sessionId}/conversations`에 연결했다.
 
 ## P2. 운영 편의
 
@@ -120,6 +136,10 @@ POST /api/classrooms/{classroomId}/join-requests/approve-batch
 
 ## 계약 확인 필요
 
+- 주차별 공지를 주차 카드 상단에 안정적으로 표시하려면 공지 생성·수정·목록 계약에
+  선택 `weekNumber`가 필요하다. `weekNumber=null`은 전체 공지, 값이 있으면 해당
+  주차 공지로 정의하고, 목록 응답에도 같은 값을 반환해야 한다. 현재 FE는 데이터
+  손실을 피하기 위해 기존 계약으로 생성 가능한 전체 공지만 제공한다.
 - 공지 API는 현재 즉시 게시만 가능하다. 예약 게시가 범위라면 `publishAt` 필드 또는
   별도 예약 endpoint가 필요하다.
 - 자료 업로드는 Swagger상 PDF 전용이다. PPT/PPTX 지원 계획이 있다면 허용 MIME,

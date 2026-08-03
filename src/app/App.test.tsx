@@ -18,6 +18,7 @@ const authenticatedUser: AuthUser = {
 
 beforeEach(() => {
   window.localStorage.clear()
+  window.sessionStorage.clear()
   installApiFixtureServer()
 })
 
@@ -26,6 +27,7 @@ afterEach(() => {
   vi.restoreAllMocks()
   vi.unstubAllEnvs()
   window.localStorage.clear()
+  window.sessionStorage.clear()
 })
 
 function renderRoute(path: string, initialUser: AuthUser | null = authenticatedUser) {
@@ -101,11 +103,11 @@ describe('AppRoutes', () => {
     expect(screen.queryByRole('link', { name: '학습 현황' })).not.toBeInTheDocument()
   })
 
-  it('redirects learners away from instructor-only routes', () => {
-    renderRoute('/entrance-requests')
+  it('shows an access error for learners on instructor-only routes', () => {
+    renderRoute('/classrooms/12/entrance-requests')
 
     expect(
-      screen.getByRole('heading', { name: '내 강의실' }),
+      screen.getByRole('heading', { name: '접근 권한이 없습니다' }),
     ).toBeInTheDocument()
   })
 
@@ -117,7 +119,7 @@ describe('AppRoutes', () => {
   })
 
   it('renders instructor navigation and management routes', async () => {
-    renderRoute('/entrance-requests', {
+    renderRoute('/classrooms/12/entrance-requests', {
       email: 'instructor@example.com',
       name: '강의자',
       role: 'INSTRUCTOR',
@@ -133,6 +135,18 @@ describe('AppRoutes', () => {
     expect(screen.queryByRole('link', { name: '자료' })).not.toBeInTheDocument()
     expect(await screen.findByRole('button', { name: '초대 코드' })).toBeDisabled()
     expect(screen.getByRole('option', { name: '강의실 없음' })).toBeInTheDocument()
+  })
+
+  it('keeps instructor reports unavailable until the backend capability is deployed', () => {
+    renderRoute('/classrooms/12/reports', {
+      email: 'instructor@example.com',
+      name: '강의자',
+      role: 'INSTRUCTOR',
+    })
+
+    expect(screen.getByRole('heading', { name: '학습 리포트' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: '리포트 API 준비 중' })).toBeInTheDocument()
+    expect(screen.queryByText('0점')).not.toBeInTheDocument()
   })
 
   it('shows upcoming calendar schedules in the notification panel', () => {

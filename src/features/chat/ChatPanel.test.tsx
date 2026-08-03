@@ -11,14 +11,16 @@ afterEach(() => {
 })
 
 function ChatHarness({
+  currentPage,
   repository,
   sessionId = '100',
 }: {
+  currentPage?: number
   repository: SessionsRepository
   sessionId?: string
 }) {
   const chat = useSessionChat(repository, sessionId)
-  return <ChatPanel chat={chat} sessionId={sessionId} />
+  return <ChatPanel chat={chat} currentPage={currentPage} sessionId={sessionId} />
 }
 
 describe('ChatPanel', () => {
@@ -57,9 +59,35 @@ describe('ChatPanel', () => {
       '100',
       expect.objectContaining({
         eventType: 'USER_QUESTION',
-        payload: { message: '이 페이지의 핵심은 무엇인가요?' },
+        payload: {
+          includeCurrentPage: true,
+          message: '이 페이지의 핵심은 무엇인가요?',
+        },
       }),
     )
+  })
+
+  it('attaches page context without rendering an attachment status chip', async () => {
+    const repository = createRepository()
+    render(<ChatHarness currentPage={3} repository={repository} />)
+    await screen.findByText('보고 있는 페이지를 함께 읽고 답변해요')
+
+    expect(screen.queryByText('현재 페이지 첨부됨 · 3쪽')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('질문'), {
+      target: { value: '일반적인 개념만 설명해 주세요.' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '질문 보내기' }))
+
+    await waitFor(() => expect(repository.submitTurn).toHaveBeenCalledWith(
+      '100',
+      expect.objectContaining({
+        eventType: 'USER_QUESTION',
+        payload: {
+          includeCurrentPage: true,
+          message: '일반적인 개념만 설명해 주세요.',
+        },
+      }),
+    ))
   })
 
   it('locks input while the learning turn request is pending', async () => {
@@ -124,6 +152,46 @@ describe('ChatPanel', () => {
     expect(strong.tagName).toBe('STRONG')
     expect(screen.getByRole('list')).toBeInTheDocument()
     expect(screen.getByText('*별표*는 그대로 보여야 합니다.')).toBeInTheDocument()
+  })
+
+  it('renders GFM tables and preserves markdown when an answer is saved as a note', async () => {
+    const repository = createRepository({
+      listMessages: vi.fn().mockResolvedValue([
+        {
+          content: '# 워터마킹\n\n| 유형 | 목적 |\n| --- | --- |\n| zero-bit | 존재 여부 확인 |',
+          createdAt: '2026-07-27T00:00:00Z',
+          id: '500',
+          senderType: 'AI',
+        },
+      ]),
+    })
+    render(<ChatHarness repository={repository} />)
+
+    expect(await screen.findByRole('table')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'AI 답변 복사' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'AI 답변 공유' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'AI 답변 노트에 저장' }))
+
+    expect(await screen.findByRole('heading', { name: '워터마킹' })).toBeInTheDocument()
+    expect(screen.getByRole('table')).toBeInTheDocument()
+  })
+
+  it('shows message actions on user chat bubbles', async () => {
+    const repository = createRepository({
+      listMessages: vi.fn().mockResolvedValue([
+        {
+          content: '이 질문을 정리해 주세요.',
+          createdAt: '2026-07-27T00:00:00Z',
+          id: '501',
+          senderType: 'USER',
+        },
+      ]),
+    })
+    render(<ChatHarness repository={repository} />)
+
+    expect(await screen.findByRole('button', { name: '내 질문 복사' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '내 질문 공유' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '내 질문 노트에 저장' })).toBeInTheDocument()
   })
 })
 

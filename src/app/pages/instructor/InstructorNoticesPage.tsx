@@ -1,19 +1,23 @@
 import { BellRing, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
 
 import { useAuth } from '../../../features/auth'
-import { createClassroomsRepository, type Classroom, type ClassroomNotice } from '../../../features/classrooms'
+import { createClassroomsRepository, rememberClassroomId, type Classroom, type ClassroomNotice } from '../../../features/classrooms'
 import { getRequestErrorMessage } from '../../../shared/api'
 import { usePageTitle } from '../../../shared/lib/usePageTitle'
 import { Button, EmptyState, PageContainer, PageHeader, useToast } from '../../../shared/ui'
+import { classroomAnnouncementsPath } from '../../routes'
 
 export function InstructorNoticesPage() {
   usePageTitle('공지 관리')
   const { apiRequest } = useAuth()
+  const { classroomId: routeClassroomId = '' } = useParams()
+  const navigate = useNavigate()
   const { show: showToast } = useToast()
   const repository = useMemo(() => createClassroomsRepository(apiRequest), [apiRequest])
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
-  const [classroomId, setClassroomId] = useState('')
+  const [classroomId, setClassroomId] = useState(routeClassroomId)
   const [notices, setNotices] = useState<ClassroomNotice[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -36,11 +40,12 @@ export function InstructorNoticesPage() {
     }
   }
 
-  useEffect(() => { repository.list().then((items) => { setClassrooms(items); setClassroomId(items[0]?.id ?? ''); if (items.length === 0) setIsLoading(false) }).catch((requestError) => { setError(getRequestErrorMessage(requestError)); setIsLoading(false) }) }, [repository])
+  useEffect(() => { repository.list().then((items) => { setClassrooms(items); setClassroomId(items.some((item) => item.id === routeClassroomId) ? routeClassroomId : items[0]?.id ?? ''); if (items.length === 0) setIsLoading(false) }).catch((requestError) => { setError(getRequestErrorMessage(requestError)); setIsLoading(false) }) }, [repository, routeClassroomId])
   useEffect(() => { if (!classroomId) return; repository.listNotices(classroomId).then(setNotices).catch((requestError) => setError(getRequestErrorMessage(requestError))).finally(() => setIsLoading(false)) }, [classroomId, repository])
+  useEffect(() => { if (classroomId) rememberClassroomId(classroomId) }, [classroomId])
 
   return <PageContainer>
-    <PageHeader title="공지 관리" titleAccessory={<label><span className="sr-only">강의실 선택</span><select className="h-9 min-w-40 rounded-lg border border-stone-200 bg-white px-3 type-caption font-semibold text-stone-600" onChange={(event) => setClassroomId(event.target.value)} value={classroomId}>{classrooms.length === 0 ? <option value="">강의실 없음</option> : classrooms.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>} actions={<Button disabled={!classroomId} onClick={() => setIsComposerOpen(true)}><Plus aria-hidden="true" size={15} />새 공지</Button>} />
+    <PageHeader title="공지 관리" titleAccessory={<label><span className="sr-only">강의실 선택</span><select className="h-9 min-w-40 rounded-lg border border-stone-200 bg-white px-3 type-caption font-semibold text-stone-600" onChange={(event) => navigate(classroomAnnouncementsPath(event.target.value), { replace: true })} value={classroomId}>{classrooms.length === 0 ? <option value="">강의실 없음</option> : classrooms.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></label>} actions={<Button disabled={!classroomId} onClick={() => setIsComposerOpen(true)}><Plus aria-hidden="true" size={15} />새 공지</Button>} />
     {isLoading ? <p className="py-16 text-center type-body text-stone-500" role="status">공지를 불러오는 중입니다.</p> : null}
     {error ? <EmptyState description={error} title="공지를 불러오지 못했습니다" /> : null}
     {!isLoading && !error && notices.length === 0 ? <EmptyState description="새 공지를 등록하면 학습자에게 바로 전달됩니다." title="등록된 공지가 없습니다" /> : null}

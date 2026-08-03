@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+.study-session-content {
+  display: grid;
+  grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
+}
+
+@media (min-width: 1024px) {
+  .study-session-content {
+    grid-template-columns: minmax(0, 1fr) 6px var(--chat-panel-width, 660px);
+    grid-template-rows: minmax(0, 1fr);
+  }
+}
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
@@ -188,6 +200,19 @@ select {
 button,
 a {
   -webkit-tap-highlight-color: transparent;
+}
+
+button:not(:disabled),
+input:is([type="button"], [type="reset"], [type="submit"]):not(:disabled),
+[role="button"]:not([aria-disabled="true"]),
+a[href] {
+  cursor: pointer;
+}
+
+button:disabled,
+input:is([type="button"], [type="reset"], [type="submit"]):disabled,
+[role="button"][aria-disabled="true"] {
+  cursor: not-allowed;
 }
 
 ::selection {

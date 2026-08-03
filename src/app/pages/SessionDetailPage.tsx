@@ -1,7 +1,9 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { CheckCircle2 } from 'lucide-react'
 
 import { useAuth } from '../../features/auth'
+import { getRememberedClassroomId } from '../../features/classrooms'
 import { ApiClientError, getRequestErrorMessage } from '../../shared/api'
 import { ChatPanel, useSessionChat } from '../../features/chat'
 import {
@@ -25,8 +27,9 @@ import {
   LoadingState,
 } from '../../shared/ui'
 import {
+  classroomDetailPath,
   diagnosisPath,
-  materialDetailPath,
+  materialViewerPath,
   quizDetailPath,
   routes,
   sessionDetailPath,
@@ -44,6 +47,11 @@ const QUIZ_TYPE_OPTIONS: Array<{ kind: QuizKind; label: string }> = [
   { kind: 'SHORT', label: '단답형' },
   { kind: 'ESSAY', label: '서술형' },
 ]
+
+const DEFAULT_CHAT_PANEL_WIDTH = 660
+const MIN_CHAT_PANEL_WIDTH = 360
+const MIN_PDF_PANEL_WIDTH = 360
+const PANEL_RESIZER_WIDTH = 6
 
 export function SessionDetailPage() {
   usePageTitle('학습 공간')
@@ -71,7 +79,17 @@ export function SessionDetailPage() {
   const [materials, setMaterials] = useState<StudyMaterial[]>([])
   const [materialFile, setMaterialFile] = useState<Blob | null | undefined>()
   const [materialFileError, setMaterialFileError] = useState<string | null>(null)
+  const [chatPanelWidth, setChatPanelWidth] = useState(DEFAULT_CHAT_PANEL_WIDTH)
+  const [chatPanelMaxWidth, setChatPanelMaxWidth] = useState(DEFAULT_CHAT_PANEL_WIDTH)
+  const [sessionsPastInitialChat, setSessionsPastInitialChat] = useState<ReadonlySet<string>>(
+    () => new Set(),
+  )
+  const workspaceRef = useRef<HTMLDivElement | null>(null)
   const chat = useSessionChat(sessionsRepository, sessionId ?? '')
+  const classroomId = getRememberedClassroomId()
+  const weekPagePath = classroomId
+    ? classroomDetailPath(classroomId)
+    : routes.classrooms
 
   useEffect(() => {
     const controller = new AbortController()
@@ -174,6 +192,25 @@ export function SessionDetailPage() {
     return () => controller.abort()
   }, [materialsRepository, session?.materialId])
 
+  useEffect(() => {
+    const workspace = workspaceRef.current
+    if (!workspace || typeof ResizeObserver === 'undefined') return
+
+    const updatePanelBounds = () => {
+      const nextMaximum = Math.max(
+        MIN_CHAT_PANEL_WIDTH,
+        workspace.clientWidth - MIN_PDF_PANEL_WIDTH - PANEL_RESIZER_WIDTH,
+      )
+      setChatPanelMaxWidth(nextMaximum)
+      setChatPanelWidth((width) => Math.min(nextMaximum, Math.max(MIN_CHAT_PANEL_WIDTH, width)))
+    }
+
+    updatePanelBounds()
+    const observer = new ResizeObserver(updatePanelBounds)
+    observer.observe(workspace)
+    return () => observer.disconnect()
+  }, [])
+
   if (!sessionId) {
     return (
       <ErrorState
@@ -216,8 +253,18 @@ export function SessionDetailPage() {
   const activeSession = session
   const totalPages = activeSession.totalPages ?? Math.max(activeSession.currentPage, 1)
 
+  function leaveInitialChatState() {
+    setSessionsPastInitialChat((current) => {
+      if (current.has(activeSession.id)) return current
+      const next = new Set(current)
+      next.add(activeSession.id)
+      return next
+    })
+  }
+
   async function handlePageMove(nextPage: number) {
     if (isActionPending) return
+    leaveInitialChatState()
     const nextSafePage = movePage(nextPage, totalPages)
     setIsActionPending(true)
     setError(null)
@@ -281,6 +328,7 @@ export function SessionDetailPage() {
   }
 
   async function handleEvent(event: UiActionEvent) {
+    leaveInitialChatState()
     switch (event) {
       case 'MOVE_NEXT_PAGE':
         await handlePageMove(currentPage + 1)
@@ -322,6 +370,47 @@ export function SessionDetailPage() {
     }
   }
 
+  const availableUiActions = chat.streamUiActions.length > 0
+    ? chat.streamUiActions
+    : (activeSession.uiActions ?? [])
+  const isInitialChatState = !chat.isLoadingHistory
+    && !sessionsPastInitialChat.has(activeSession.id)
+    && chat.messages.length === 0
+  const visibleUiActions = availableUiActions.filter((action) => (
+    isInitialChatState || !isInitialPageExplanationAction(action)
+  ))
+
+  function resizeChatPanel(clientX: number) {
+    const workspace = workspaceRef.current
+    if (!workspace) return
+    const bounds = workspace.getBoundingClientRect()
+    const nextMaximum = Math.max(
+      MIN_CHAT_PANEL_WIDTH,
+      bounds.width - MIN_PDF_PANEL_WIDTH - PANEL_RESIZER_WIDTH,
+    )
+    const nextWidth = bounds.right - clientX - PANEL_RESIZER_WIDTH / 2
+    setChatPanelMaxWidth(nextMaximum)
+    setChatPanelWidth(Math.min(nextMaximum, Math.max(MIN_CHAT_PANEL_WIDTH, nextWidth)))
+  }
+
+  function handleResizerPointerDown(event: PointerEvent<HTMLDivElement>) {
+    event.preventDefault()
+    event.currentTarget.setPointerCapture(event.pointerId)
+    resizeChatPanel(event.clientX)
+  }
+
+  function handleResizerPointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
+    resizeChatPanel(event.clientX)
+  }
+
+  function handleResizerKeyDown(event: KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
+    event.preventDefault()
+    const delta = event.key === 'ArrowLeft' ? 24 : -24
+    setChatPanelWidth((width) => Math.min(chatPanelMaxWidth, Math.max(MIN_CHAT_PANEL_WIDTH, width + delta)))
+  }
+
   return (
     <div className="h-full min-h-0">
       <h1 className="sr-only">학습 공간</h1>
@@ -332,12 +421,8 @@ export function SessionDetailPage() {
       <section className="flex h-full min-h-0">
         <SessionResourcePanel
           activeMaterialId={activeSession.materialId}
-          backLabel="내 자료로"
-          backTo={
-            activeSession.materialId
-              ? materialDetailPath(activeSession.materialId)
-              : routes.materials
-          }
+          backLabel="주차 페이지로"
+          backTo={weekPagePath}
           materials={materials}
           progressLabel={`${currentPage}/${totalPages}`}
           quizDetailPath={quizDetailPath}
@@ -345,11 +430,15 @@ export function SessionDetailPage() {
           resourcePath={(material) =>
             material.activeSessionId
               ? sessionDetailPath(material.activeSessionId)
-              : materialDetailPath(material.id)
+              : materialViewerPath(material.id)
           }
         />
 
-        <div className="grid h-full min-h-0 min-w-0 flex-1 grid-rows-[minmax(0,3fr)_minmax(0,2fr)] lg:grid-cols-[minmax(0,1fr)_minmax(340px,400px)] lg:grid-rows-1">
+        <div
+          className="study-session-content h-full min-h-0 min-w-0 flex-1"
+          ref={workspaceRef}
+          style={{ '--chat-panel-width': `${chatPanelWidth}px` } as CSSProperties}
+        >
           <Suspense
             fallback={
               <div
@@ -371,10 +460,29 @@ export function SessionDetailPage() {
             />
           </Suspense>
 
+          <div
+            aria-label="PDF와 AI 채팅 너비 조절"
+            aria-orientation="vertical"
+            aria-valuemax={Math.round(chatPanelMaxWidth)}
+            aria-valuemin={MIN_CHAT_PANEL_WIDTH}
+            aria-valuenow={Math.round(chatPanelWidth)}
+            className="group hidden h-full cursor-col-resize touch-none items-center justify-center bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-brand-600 lg:flex"
+            onDoubleClick={() => setChatPanelWidth(Math.min(DEFAULT_CHAT_PANEL_WIDTH, chatPanelMaxWidth))}
+            onKeyDown={handleResizerKeyDown}
+            onPointerDown={handleResizerPointerDown}
+            onPointerMove={handleResizerPointerMove}
+            onPointerUp={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}
+            role="separator"
+            tabIndex={0}
+            title="드래그하여 PDF와 채팅 너비 조절"
+          >
+            <span className="h-full w-px bg-stone-200 transition-colors group-hover:bg-brand-400" />
+          </div>
+
           <ChatPanel
             request={apiRequest}
             chat={chat}
-            className="rounded-none border-y-0 border-r-0"
+            className="!rounded-none !border-0"
             currentPage={currentPage}
             footer={
               <div className="grid gap-2">
@@ -400,11 +508,7 @@ export function SessionDetailPage() {
                   </div>
                 ) : (
                   <UiActionsRenderer
-                    actions={
-                      chat.streamUiActions.length > 0
-                        ? chat.streamUiActions
-                        : (activeSession.uiActions ?? [])
-                    }
+                    actions={visibleUiActions}
                     disabled={isActionPending}
                     onEvent={(event) => void handleEvent(event)}
                     onOpenDiagnosis={(diagnosisId) =>
@@ -423,22 +527,6 @@ export function SessionDetailPage() {
                   </ButtonLink>
                 ) : null}
 
-                {activeSession.status === 'ACTIVE' ? (
-                  <Button
-                    disabled={isActionPending}
-                    onClick={() => {
-                      if (window.confirm('학습을 완료 처리할까요?')) {
-                        void handleEvent('COMPLETE_SESSION')
-                      }
-                    }}
-                    size="sm"
-                    type="button"
-                    variant="secondary"
-                  >
-                    학습 완료
-                  </Button>
-                ) : null}
-
                 {error ? (
                   <p className="type-caption font-medium text-rose-700" role="alert">
                     {error}
@@ -446,6 +534,23 @@ export function SessionDetailPage() {
                 ) : null}
               </div>
             }
+            headerAction={activeSession.status === 'ACTIVE' ? (
+              <Button
+                disabled={isActionPending}
+                onClick={() => {
+                  if (window.confirm('학습을 완료 처리할까요?')) {
+                    void handleEvent('COMPLETE_SESSION')
+                  }
+                }}
+                size="sm"
+                type="button"
+                variant="secondary"
+              >
+                <CheckCircle2 aria-hidden="true" size={13} />
+                학습 완료
+              </Button>
+            ) : undefined}
+            onConversationStarted={leaveInitialChatState}
             onRequestQuiz={() => setIsSelectingQuizType(true)}
             sessionId={activeSession.id}
           />
@@ -459,4 +564,8 @@ function createTurnRequestId(): string {
   return typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
     : `turn-${Date.now()}`
+}
+
+function isInitialPageExplanationAction(action: { kind: string; yesEvent?: string }): boolean {
+  return action.kind === 'BINARY_DECISION' && action.yesEvent === 'EXPLAIN_CURRENT_PAGE'
 }

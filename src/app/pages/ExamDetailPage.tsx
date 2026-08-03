@@ -1,46 +1,48 @@
 import { CheckCircle2, ChevronLeft, ChevronRight, Send, Trash2 } from 'lucide-react'
-import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { isInstructorRole, useAuth } from '../../features/auth'
+import { rememberClassroomId } from '../../features/classrooms'
 import { createExamsRepository, type CreateExamInput, type Exam, type ExamQuestion, type ExamSubmission, type InstructorSubmissionSummary } from '../../features/exams'
 import { ExamEditor } from '../../features/exams/ExamEditor'
 import { isExamDraftValid } from '../../features/exams/examEditorModel'
 import { getRequestErrorMessage } from '../../shared/api'
 import { formatDateTime } from '../../shared/lib/format'
 import { usePageTitle } from '../../shared/lib/usePageTitle'
+import { useAsyncJobPolling } from '../../shared/state'
 import { Badge, Button, ButtonLink, EmptyState, ErrorState, LoadingState, PageContainer, PageHeader, useToast } from '../../shared/ui'
 import { ExamStatusBadge } from './ExamsPage'
-import { routes } from '../routes'
+import { classroomExamsPath } from '../routes'
 
 export function ExamDetailPage() {
   usePageTitle('시험')
-  const { examId } = useParams(); const { apiRequest, user } = useAuth(); const navigate = useNavigate(); const { show } = useToast()
+  const { classroomId = '', examId } = useParams(); const { apiRequest, user } = useAuth(); const navigate = useNavigate(); const { show } = useToast()
   const isInstructor = isInstructorRole(user?.role)
   const repository = useMemo(() => createExamsRepository(apiRequest), [apiRequest])
   const [exam, setExam] = useState<Exam | null>()
   const [error, setError] = useState<string | null>(null)
   const [isWorking, setIsWorking] = useState(false)
 
-  useEffect(() => { if (!examId) return; const controller = new AbortController(); repository.get(examId, controller.signal).then((value) => { setExam(value); setError(null) }).catch((requestError) => { if (!controller.signal.aborted) { setExam(null); setError(getRequestErrorMessage(requestError)) } }); return () => controller.abort() }, [examId, repository])
+  useEffect(() => { if (!examId) return; const controller = new AbortController(); repository.get(examId, controller.signal).then((value) => { setExam(value); setError(null); rememberClassroomId(value.classroomId) }).catch((requestError) => { if (!controller.signal.aborted) { setExam(null); setError(getRequestErrorMessage(requestError)) } }); return () => controller.abort() }, [examId, repository])
   if (!examId) return <ErrorState title="시험을 찾을 수 없습니다" description="시험 식별자가 없습니다." />
   if (exam === undefined) return <LoadingState message="시험을 불러오는 중입니다." />
-  if (!exam) return <ErrorState title="시험을 불러오지 못했습니다" description={error ?? '접근 권한이나 시험 상태를 확인하세요.'} action={<ButtonLink to={routes.exams}>시험 목록으로</ButtonLink>} />
+  if (!exam) return <ErrorState title="시험을 불러오지 못했습니다" description={error ?? '접근 권한이나 시험 상태를 확인하세요.'} action={<ButtonLink to={classroomId ? classroomExamsPath(classroomId) : '/classrooms'}>시험 목록으로</ButtonLink>} />
 
   async function runAction(action: 'publish' | 'close' | 'delete') {
-    if (!examId || isWorking) return
+    if (!examId || !exam || isWorking) return
     const messages = { publish: '시험을 공개할까요?', close: '시험을 종료할까요?', delete: '시험 초안을 삭제할까요?' }
     if (!window.confirm(messages[action])) return
     setIsWorking(true)
     try {
-      if (action === 'delete') { await repository.delete(examId); show('시험을 삭제했습니다.', 'success'); navigate(routes.exams); return }
+      if (action === 'delete') { await repository.delete(examId); show('시험을 삭제했습니다.', 'success'); navigate(classroomExamsPath(exam.classroomId)); return }
       const updated = action === 'publish' ? await repository.publish(examId) : await repository.close(examId)
       setExam(updated); show(action === 'publish' ? '시험을 공개했습니다.' : '시험을 종료했습니다.', 'success')
     } catch (requestError) { show(getRequestErrorMessage(requestError), 'danger') } finally { setIsWorking(false) }
   }
 
   return <PageContainer>
-    <PageHeader title={exam.title} titleAccessory={<ExamStatusBadge status={exam.status} />} actions={<ButtonLink to={routes.exams} variant="secondary">목록</ButtonLink>} />
+    <PageHeader title={exam.title} titleAccessory={<ExamStatusBadge status={exam.status} />} actions={<ButtonLink to={classroomExamsPath(exam.classroomId)} variant="secondary">목록</ButtonLink>} />
     {isInstructor ? <InstructorExamView exam={exam} isWorking={isWorking} onAction={(action) => void runAction(action)} onUpdated={setExam} repository={repository} /> : <LearnerExamView exam={exam} repository={repository} />}
   </PageContainer>
 }
@@ -60,7 +62,10 @@ function InstructorExamView({ exam, isWorking, onAction, onUpdated, repository }
 function LearnerExamView({ exam, repository }: { exam: Exam; repository: ReturnType<typeof createExamsRepository> }) {
   const [answers, setAnswers] = useState<Record<string, string>>({}); const [index, setIndex] = useState(0); const [submission, setSubmission] = useState<ExamSubmission | null>(exam.mySubmission ? { ...exam.mySubmission, id: '', items: [], maxScore: exam.totalScore } as ExamSubmission : null); const [isSubmitting, setIsSubmitting] = useState(false); const [error, setError] = useState<string | null>(null)
   const question = exam.questions[index]
-  useEffect(() => { if (submission?.status !== 'SUBMITTED') return; let cancelled = false; const startedAt = Date.now(); const poll = async () => { try { const next = await repository.getMySubmission(exam.id); if (cancelled) return; setSubmission(next); if (next.status === 'SUBMITTED' && Date.now() - startedAt < 31 * 60_000) window.setTimeout(poll, Date.now() - startedAt < 30_000 ? 2_000 : 5_000) } catch (requestError) { if (!cancelled) setError(getRequestErrorMessage(requestError)) } }; const timer = window.setTimeout(poll, 2_000); return () => { cancelled = true; window.clearTimeout(timer) } }, [exam.id, repository, submission?.status])
+  const fetchSubmission = useCallback((signal: AbortSignal) => repository.getMySubmission(exam.id, undefined, signal), [exam.id, repository])
+  const handlePollingError = useCallback((requestError: unknown) => setError(getRequestErrorMessage(requestError)), [])
+  const handlePollingDelay = useCallback(() => setError('채점이 지연되고 있습니다. 잠시 후 다시 확인하세요.'), [])
+  useAsyncJobPolling({ enabled: submission?.status === 'SUBMITTED', fetchNext: fetchSubmission, getDelayMs: getExamPollingDelay, isPending: isExamSubmissionPending, maxDurationMs: 31 * 60_000, onDelayed: handlePollingDelay, onError: handlePollingError, onResult: setSubmission })
   async function submit(event: FormEvent) { event.preventDefault(); if (isSubmitting || !exam.submittable) return; setIsSubmitting(true); try { setSubmission(await repository.submit(exam.id, answers, createRequestId())); setError(null) } catch (requestError) { setError(getRequestErrorMessage(requestError)) } finally { setIsSubmitting(false) } }
   if (submission && submission.status !== 'SUBMITTED') return <SubmissionResult exam={exam} submission={submission} />
   if (!question) return <EmptyState title="공개된 문항이 없습니다" description="강의자에게 시험 상태를 문의하세요." />
@@ -76,4 +81,6 @@ function SubmissionResult({ exam, submission }: { exam: Exam; submission: ExamSu
 function PrivateAnswer({ question }: { question: ExamQuestion }) { const answer = question.questionType === 'MCQ' ? question.answerChoiceId?.toUpperCase() : question.questionType === 'OX' ? (question.answerValue ? 'O' : 'X') : question.questionType === 'SHORT' ? question.referenceAnswer : question.modelAnswer; return answer ? <p className="mt-2 type-caption text-stone-600"><strong>정답:</strong> {answer}</p> : null }
 function toExamInput(exam: Exam): CreateExamInput { return { allowRetake: exam.allowRetake, description: exam.description, questions: exam.questions.map((question) => ({ answerChoiceId: question.answerChoiceId, answerValue: question.answerValue, explanation: question.explanation, modelAnswer: question.modelAnswer, options: question.options, points: question.maxScore, questionText: question.questionText, questionType: question.questionType, referenceAnswer: question.referenceAnswer, rubric: question.rubric })), title: exam.title, weekNumber: exam.weekNumber } }
 function getSubmissionLabel(status: ExamSubmission['status']) { return status === 'GRADED' ? '채점 완료' : status === 'SUBMITTED' ? '채점 중' : '채점 실패' }
+function isExamSubmissionPending(submission: ExamSubmission) { return submission.status === 'SUBMITTED' }
+function getExamPollingDelay(elapsedMs: number) { return elapsedMs < 30_000 ? 2000 : 5000 }
 function createRequestId() { return typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `exam-${Date.now()}` }

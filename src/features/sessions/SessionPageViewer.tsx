@@ -1,6 +1,4 @@
 import {
-  ChevronLeft,
-  ChevronRight,
   Download,
   List,
   Minus,
@@ -41,17 +39,25 @@ export function SessionPageViewer({
   const [zoom, setZoom] = useState(100)
   const [pageWidth, setPageWidth] = useState(560)
   const [pageAspectRatio, setPageAspectRatio] = useState(1 / Math.sqrt(2))
-  const [isOutlineVisible, setIsOutlineVisible] = useState(true)
+  const [isOutlineVisible, setIsOutlineVisible] = useState(false)
+  const viewerRef = useRef<HTMLElement | null>(null)
   const pageContainerRef = useRef<HTMLDivElement | null>(null)
   const progress = totalPages > 0 ? (currentPage / totalPages) * 100 : 0
+  const viewerGridClassName = cx(
+    'grid min-h-0 flex-1',
+    isOutlineVisible
+      ? 'grid-cols-[108px_minmax(0,1fr)] sm:grid-cols-[120px_minmax(0,1fr)]'
+      : 'grid-cols-[minmax(0,1fr)]',
+  )
 
   useEffect(() => {
     const container = pageContainerRef.current
     if (!container || typeof ResizeObserver === 'undefined') return
 
     const updatePageWidth = () => {
-      const availableWidth = Math.max(container.clientWidth - 48, 220)
-      const availableHeight = Math.max(container.clientHeight - 80, 280)
+      if (container.clientWidth < 220 || container.clientHeight < 280) return
+      const availableWidth = container.clientWidth - 48
+      const availableHeight = container.clientHeight - 80
       const fittedWidth = Math.min(
         availableWidth,
         availableHeight * pageAspectRatio,
@@ -61,8 +67,45 @@ export function SessionPageViewer({
     updatePageWidth()
     const observer = new ResizeObserver(updatePageWidth)
     observer.observe(container)
-    return () => observer.disconnect()
+    window.addEventListener('resize', updatePageWidth)
+    return () => {
+      observer.disconnect()
+      window.removeEventListener('resize', updatePageWidth)
+    }
   }, [pageAspectRatio])
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) return
+      if (isEditableTarget(event.target) || isResizeHandle(event.target)) return
+
+      const isPrevious = event.key === 'ArrowLeft' || event.key === 'ArrowUp'
+      const isNext = event.key === 'ArrowRight' || event.key === 'ArrowDown'
+      if ((!isPrevious && !isNext) || isPending) return
+
+      const nextPage = isPrevious ? currentPage - 1 : currentPage + 1
+      if (nextPage < 1 || nextPage > totalPages) return
+      event.preventDefault()
+      onMovePage(nextPage)
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [currentPage, isPending, onMovePage, totalPages])
+
+  useEffect(() => {
+    const viewer = viewerRef.current
+    if (!viewer) return
+
+    function handleWheel(event: WheelEvent) {
+      if ((!event.ctrlKey && !event.metaKey) || event.deltaY === 0) return
+      event.preventDefault()
+      setZoom((value) => clampZoom(value + (event.deltaY < 0 ? 10 : -10)))
+    }
+
+    viewer.addEventListener('wheel', handleWheel, { passive: false })
+    return () => viewer.removeEventListener('wheel', handleWheel)
+  }, [])
 
   function downloadOriginal() {
     if (!file) return
@@ -75,7 +118,7 @@ export function SessionPageViewer({
   }
 
   return (
-    <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-y-0 border-stone-200 bg-white xl:border-r">
+    <section aria-label="PDF 뷰어" className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-y-0 border-stone-200 bg-white" ref={viewerRef}>
       <div className="flex h-13 shrink-0 items-center gap-3 border-b border-stone-200 px-4">
         <h2 className="hidden min-w-0 truncate type-body font-semibold text-stone-950 sm:block">
           {materialTitle ?? '학습 자료'}
@@ -99,7 +142,7 @@ export function SessionPageViewer({
             <ToolbarIconButton
               icon={Minus}
               label="축소"
-              onClick={() => setZoom((value) => Math.max(50, value - 10))}
+              onClick={() => setZoom((value) => clampZoom(value - 10))}
             />
             <span className="min-w-10 text-center type-caption font-medium text-stone-600">
               {zoom}%
@@ -107,7 +150,7 @@ export function SessionPageViewer({
             <ToolbarIconButton
               icon={Plus}
               label="확대"
-              onClick={() => setZoom((value) => Math.min(200, value + 10))}
+              onClick={() => setZoom((value) => clampZoom(value + 10))}
             />
           </div>
           <ToolbarButton
@@ -125,61 +168,26 @@ export function SessionPageViewer({
         </div>
       </div>
 
-      <div
-        className={cx(
-          'grid min-h-0 flex-1',
-          isOutlineVisible
-            ? 'grid-cols-[56px_minmax(0,1fr)] sm:grid-cols-[68px_minmax(0,1fr)]'
-            : 'grid-cols-[minmax(0,1fr)]',
-        )}
-      >
-        {isOutlineVisible ? (
-          <nav
-            aria-label="자료 페이지"
-            className="grid content-start gap-1.5 overflow-y-auto border-r border-stone-200 bg-stone-50 p-2"
-          >
-            {Array.from({ length: totalPages }, (_, index) => index + 1).map(
-              (pageNumber) => (
-                <button
-                  aria-label={`${pageNumber}쪽으로 이동`}
-                  className={cx(
-                    'aspect-[3/4] w-full rounded-md border type-micro font-semibold transition-colors',
-                    'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600',
-                    'disabled:cursor-not-allowed disabled:opacity-60',
-                    pageNumber === currentPage
-                      ? 'border-brand-600 bg-brand-50 text-brand-800'
-                      : 'border-stone-200 bg-white text-stone-400 hover:border-stone-300 hover:text-stone-600',
-                  )}
-                  disabled={isPending}
-                  key={pageNumber}
-                  onClick={() => onMovePage(pageNumber)}
-                  type="button"
-                >
-                  {pageNumber}
-                </button>
-              ),
-            )}
-          </nav>
-        ) : null}
-
-        <div
-          className="relative flex min-h-0 items-center justify-center overflow-hidden bg-stone-100 p-6 pb-16"
-          ref={pageContainerRef}
+      {file ? (
+        <Document
+          className={viewerGridClassName}
+          error={<DocumentState isError message="PDF 문서를 열지 못했습니다." />}
+          file={file}
+          loading={<DocumentState message="PDF 문서를 준비하는 중입니다." />}
         >
-          {file === undefined ? (
-            <ViewerState message="PDF 원본을 불러오는 중입니다." />
-          ) : file === null ? (
-            <ViewerState
-              isError
-              message={fileError ?? 'PDF 원본을 표시할 수 없습니다.'}
+          {isOutlineVisible ? (
+            <PageOutline
+              currentPage={currentPage}
+              isPending={isPending}
+              onMovePage={onMovePage}
+              renderThumbnails
+              totalPages={totalPages}
             />
-          ) : (
-            <Document
-              className="flex max-h-full max-w-full items-center justify-center"
-              error={<ViewerState isError message="PDF 문서를 열지 못했습니다." />}
-              file={file}
-              loading={<ViewerState message="PDF 문서를 준비하는 중입니다." />}
-            >
+          ) : null}
+          <div
+            className="relative flex min-h-0 items-center justify-center overflow-hidden bg-white p-6"
+            ref={pageContainerRef}
+          >
               <Page
                 className="overflow-hidden rounded-sm bg-white shadow-[0_2px_14px_rgba(0,0,0,0.08)]"
                 pageNumber={currentPage}
@@ -191,27 +199,104 @@ export function SessionPageViewer({
                 renderTextLayer
                 width={pageWidth * (zoom / 100)}
               />
-            </Document>
-          )}
-
-          <div className="absolute bottom-4 left-1/2 flex h-9 -translate-x-1/2 items-center gap-2.5 rounded-[10px] border border-stone-200 bg-white px-2.5 shadow-[0_4px_14px_rgba(0,0,0,0.08)]">
-            <PageStepButton
-              disabled={isPending || currentPage <= 1}
-              label="이전"
-              onClick={() => onMovePage(currentPage - 1)}
+          </div>
+        </Document>
+      ) : (
+        <div className={viewerGridClassName}>
+          {isOutlineVisible ? (
+            <PageOutline
+              currentPage={currentPage}
+              isPending={isPending}
+              onMovePage={onMovePage}
+              totalPages={totalPages}
             />
-            <span className="min-w-14 text-center type-caption font-semibold text-stone-900">
-              {currentPage} / {totalPages}
-            </span>
-            <PageStepButton
-              disabled={isPending || currentPage >= totalPages}
-              label="다음"
-              onClick={() => onMovePage(currentPage + 1)}
+          ) : null}
+          <div
+            className="relative flex min-h-0 items-center justify-center overflow-hidden bg-white p-6"
+            ref={pageContainerRef}
+          >
+            <ViewerState
+              isError={file === null}
+              message={
+                file === undefined
+                  ? 'PDF 원본을 불러오는 중입니다.'
+                  : (fileError ?? 'PDF 원본을 표시할 수 없습니다.')
+              }
             />
           </div>
         </div>
-      </div>
+      )}
     </section>
+  )
+}
+
+function PageOutline({
+  currentPage,
+  isPending,
+  onMovePage,
+  renderThumbnails = false,
+  totalPages,
+}: {
+  currentPage: number
+  isPending: boolean
+  onMovePage: (page: number) => void
+  renderThumbnails?: boolean
+  totalPages: number
+}) {
+  return (
+    <nav
+      aria-label="자료 페이지"
+      className="grid content-start gap-2 overflow-y-auto border-r border-stone-200 bg-stone-50 p-2"
+    >
+      {Array.from({ length: totalPages }, (_, index) => index + 1).map(
+        (pageNumber) => (
+          <button
+            aria-label={`${pageNumber}쪽으로 이동`}
+            className={cx(
+              'flex w-full flex-col items-center rounded-md border p-1.5 transition-colors',
+              'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600',
+              'disabled:cursor-not-allowed disabled:opacity-60',
+              pageNumber === currentPage
+                ? 'border-brand-600 bg-brand-50 text-brand-800'
+                : 'border-stone-200 bg-white text-stone-400 hover:border-stone-300 hover:text-stone-600',
+            )}
+            disabled={isPending}
+            key={pageNumber}
+            onClick={() => onMovePage(pageNumber)}
+            type="button"
+          >
+            <span className="flex aspect-[3/4] w-full items-center justify-center overflow-hidden rounded-sm bg-white shadow-sm">
+              {renderThumbnails ? (
+                <Page
+                  devicePixelRatio={1}
+                  pageNumber={pageNumber}
+                  renderAnnotationLayer={false}
+                  renderTextLayer={false}
+                  width={88}
+                />
+              ) : (
+                <span className="h-full w-full animate-pulse bg-stone-100" />
+              )}
+            </span>
+            <span className="mt-1 type-micro font-semibold">{pageNumber}</span>
+          </button>
+        ),
+      )}
+    </nav>
+  )
+}
+
+function DocumentState({
+  isError = false,
+  message,
+}: {
+  isError?: boolean
+  message: string
+}) {
+  return (
+    <div className="col-span-full flex min-h-0 items-center justify-center bg-white p-6">
+      <ViewerState isError={isError} message={message} />
+    </div>
   )
 }
 
@@ -296,26 +381,15 @@ function getDownloadFileName(materialTitle: string | undefined): string {
   return /\.(pdf|pptx?)$/i.test(title) ? title : `${title}.pdf`
 }
 
-function PageStepButton({
-  disabled,
-  label,
-  onClick,
-}: {
-  disabled: boolean
-  label: '다음' | '이전'
-  onClick: () => void
-}) {
-  const Icon = label === '이전' ? ChevronLeft : ChevronRight
+function clampZoom(value: number): number {
+  return Math.min(200, Math.max(50, value))
+}
 
-  return (
-    <button
-      aria-label={label}
-      className="flex size-6 items-center justify-center rounded-md text-stone-500 hover:bg-stone-100 hover:text-stone-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600 disabled:cursor-not-allowed disabled:text-stone-300 disabled:hover:bg-transparent"
-      disabled={disabled}
-      onClick={onClick}
-      type="button"
-    >
-      <Icon aria-hidden="true" size={15} />
-    </button>
-  )
+function isEditableTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false
+  return target.isContentEditable || Boolean(target.closest('input, textarea, select'))
+}
+
+function isResizeHandle(target: EventTarget | null): boolean {
+  return target instanceof HTMLElement && Boolean(target.closest('[role="separator"]'))
 }

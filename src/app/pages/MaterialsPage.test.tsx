@@ -11,7 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MAX_MATERIAL_UPLOAD_BYTES } from '../../features/materials'
 import { TestAuthProvider } from '../../test/TestAuthProvider'
 import { apiSuccess, installApiFixtureServer } from '../../test/apiFixtureServer'
-import { MaterialDetailPage } from './MaterialDetailPage'
+import { MaterialViewerRedirectPage } from './MaterialViewerRedirectPage'
 import { MaterialsPage } from './MaterialsPage'
 
 beforeEach(() => {
@@ -35,12 +35,13 @@ function renderMaterialsPage() {
   )
 }
 
-function renderMaterialDetail(path: string) {
+function renderMaterialViewer(path: string) {
   return render(
     <TestAuthProvider>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
-          <Route path="/materials/:materialId" element={<MaterialDetailPage />} />
+          <Route path="/materials/:materialId" element={<MaterialViewerRedirectPage />} />
+          <Route path="/sessions/:sessionId" element={<p>PDF 뷰어</p>} />
         </Routes>
       </MemoryRouter>
     </TestAuthProvider>,
@@ -187,54 +188,10 @@ describe('MaterialsPage', () => {
   )
 })
 
-describe('MaterialDetailPage', () => {
-  it('renders API material details and active session guidance', async () => {
-    renderMaterialDetail('/materials/10')
+describe('MaterialViewerRedirectPage', () => {
+  it('creates or restores a session and opens the PDF viewer immediately', async () => {
+    renderMaterialViewer('/materials/14')
 
-    expect(
-      await screen.findByRole('heading', { name: '시험 대비 요약.pdf' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('heading', { name: '활성 세션 충돌 안내' }),
-    ).toBeInTheDocument()
-    expect(
-      screen.getByRole('link', { name: '진행 중인 세션으로' }),
-    ).toHaveAttribute('href', '/sessions/100')
-  })
-
-  it('renders the API 404 material state', async () => {
-    renderMaterialDetail('/materials/999')
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      '자료를 찾을 수 없습니다.',
-    )
-  })
-
-  it('renders the learner memory card when analysis exists', async () => {
-    renderMaterialDetail('/materials/10')
-
-    expect(await screen.findByText('학습 분석')).toBeInTheDocument()
-    expect(
-      screen.getByText('수식 전개를 어려워하고 쉬운 예시를 선호함'),
-    ).toBeInTheDocument()
-    expect(screen.getByText('평균 개념을 정확히 사용함')).toBeInTheDocument()
-    expect(screen.getByText('수식 전개 과정 설명')).toBeInTheDocument()
-  })
-
-  it('starts a session from a ready material and navigates to it', async () => {
-    render(
-      <TestAuthProvider>
-        <MemoryRouter initialEntries={['/materials/14']}>
-          <Routes>
-            <Route path="/materials/:materialId" element={<MaterialDetailPage />} />
-            <Route path="/sessions/:sessionId" element={<p>세션 화면</p>} />
-          </Routes>
-        </MemoryRouter>
-      </TestAuthProvider>,
-    )
-
-    fireEvent.click(await screen.findByRole('button', { name: /학습 시작/ }))
-
-    expect(await screen.findByText('세션 화면')).toBeInTheDocument()
+    expect(await screen.findByText('PDF 뷰어')).toBeInTheDocument()
   })
 })

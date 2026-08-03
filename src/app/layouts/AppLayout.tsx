@@ -8,6 +8,7 @@ import {
   CircleHelp,
   ClipboardCheck,
   FileCheck2,
+  FileSearch,
   LayoutGrid,
   LogOut,
   Monitor,
@@ -33,6 +34,7 @@ import { getRoleLabel, isInstructorRole, useAuth } from '../../features/auth'
 import { createFeedbackRepository, type FeedbackCategory } from '../../features/feedback'
 import {
   createClassroomsRepository,
+  getRememberedClassroomId,
   JOIN_REQUESTS_CHANGED_EVENT,
 } from '../../features/classrooms'
 import {
@@ -45,7 +47,14 @@ import { getRequestErrorMessage } from '../../shared/api'
 import { formatDateTime } from '../../shared/lib/format'
 import { useTheme, type ThemeMode } from '../../shared/theme'
 import { useToast } from '../../shared/ui'
-import { routes } from '../routes'
+import {
+  classroomAnalyticsPath,
+  classroomAnnouncementsPath,
+  classroomEntranceRequestsPath,
+  classroomExamsPath,
+  classroomReportsPath,
+  routes,
+} from '../routes'
 
 const learnerNavigation: Array<{
   icon: LucideIcon
@@ -57,19 +66,6 @@ const learnerNavigation: Array<{
   { icon: NotebookPen, label: '내 노트', to: routes.notes },
   { icon: ClipboardCheck, label: '복습 퀴즈', to: routes.reviewQuizzes },
   { icon: FileCheck2, label: '시험', to: routes.exams },
-]
-
-const instructorNavigation: Array<{
-  icon: LucideIcon
-  label: string
-  to: string
-}> = [
-  { icon: LayoutGrid, label: '내 강의실', to: routes.classrooms },
-  { icon: CalendarDays, label: '캘린더', to: routes.calendar },
-  { icon: BarChart3, label: '학습 현황', to: routes.learningStatus },
-  { icon: Megaphone, label: '공지 관리', to: routes.announcements },
-  { icon: FileCheck2, label: '시험 관리', to: routes.exams },
-  { icon: UserPlus, label: '입장 요청', to: routes.entranceRequests },
 ]
 
 export function AppLayout() {
@@ -115,9 +111,10 @@ export function AppLayout() {
       )
       .slice(0, 5)
   }, [calendarEvents, notificationReferenceTime])
-  const primaryNavigation = isInstructor
-    ? instructorNavigation
-    : learnerNavigation
+  const classroomContextId = getClassroomIdFromPath(location.pathname) ?? getRememberedClassroomId()
+  const primaryNavigation = useMemo(() => isInstructor
+    ? getInstructorNavigation(classroomContextId)
+    : learnerNavigation, [classroomContextId, isInstructor])
 
   useEffect(() => {
     if (!isInstructor) {
@@ -296,7 +293,7 @@ export function AppLayout() {
     >
       <aside
         className={cx(
-          'flex border-b border-stone-200 bg-stone-100 px-4 py-3 dark:bg-[#222327] lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:flex-col lg:border-r lg:border-b-0 lg:py-4',
+          'relative z-40 flex border-b border-stone-200 bg-stone-100 px-4 py-3 dark:bg-[#222327] lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:flex-col lg:border-r lg:border-b-0 lg:py-4',
           isCollapsed ? 'lg:w-14 lg:px-2' : 'lg:w-50 lg:px-3',
         )}
       >
@@ -389,14 +386,14 @@ export function AppLayout() {
           >
             {primaryNavigation.map((item) => (
               <NavLink
-                key={item.to}
+                key={item.label}
                 to={item.to}
                 className={({ isActive }) => navLinkClassName(isActive, isCollapsed)}
                 title={item.label}
               >
                 <item.icon aria-hidden="true" className="shrink-0" size={16} />
                 <span className={cx(isCollapsed && 'lg:sr-only')}>{item.label}</span>
-                {item.to === routes.entranceRequests && pendingJoinRequestCount > 0 ? (
+                {item.label === '입장 요청' && pendingJoinRequestCount > 0 ? (
                   <span
                     aria-label={`${pendingJoinRequestCount}개의 대기 요청`}
                     className={cx(
@@ -544,7 +541,7 @@ function NotificationPanel({
     <div
       aria-label="예정 알림"
       className={cx(
-        'absolute z-40 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-stone-200 bg-white shadow-xl',
+        'isolate absolute z-[60] w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-stone-200 bg-white shadow-xl ring-1 ring-stone-950/5 dark:bg-[#26272c]',
         placement === 'footer'
           ? 'right-0 bottom-[calc(100%+8px)]'
           : 'top-[calc(100%+8px)] right-0',
@@ -609,6 +606,28 @@ function navLinkClassName(isActive: boolean, isCollapsed: boolean): string {
       ? 'bg-white font-semibold text-stone-900 shadow-sm dark:bg-stone-200'
       : 'font-medium text-stone-500 hover:bg-white/60 hover:text-stone-800',
   )
+}
+
+function getInstructorNavigation(classroomId: string | null): Array<{ icon: LucideIcon; label: string; to: string }> {
+  return [
+    { icon: LayoutGrid, label: '내 강의실', to: routes.classrooms },
+    { icon: CalendarDays, label: '캘린더', to: routes.calendar },
+    { icon: BarChart3, label: '학습 현황', to: classroomId ? classroomAnalyticsPath(classroomId) : routes.learningStatus },
+    { icon: FileSearch, label: '리포트', to: classroomId ? classroomReportsPath(classroomId) : routes.classrooms },
+    { icon: Megaphone, label: '공지 관리', to: classroomId ? classroomAnnouncementsPath(classroomId) : routes.announcements },
+    { icon: FileCheck2, label: '시험 관리', to: classroomId ? classroomExamsPath(classroomId) : routes.exams },
+    { icon: UserPlus, label: '입장 요청', to: classroomId ? classroomEntranceRequestsPath(classroomId) : routes.entranceRequests },
+  ]
+}
+
+function getClassroomIdFromPath(pathname: string): string | null {
+  const match = pathname.match(/^\/classrooms\/([^/]+)/)
+  if (!match?.[1]) return null
+  try {
+    return decodeURIComponent(match[1])
+  } catch {
+    return match[1]
+  }
 }
 
 const themeOptions: Array<{

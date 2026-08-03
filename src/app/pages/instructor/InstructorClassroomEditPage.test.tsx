@@ -92,6 +92,11 @@ describe('InstructorClassroomEditPage', () => {
     expect(
       screen.getByRole('heading', { name: '주차 구성' }),
     ).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '주차 추가' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '주차 수 줄이기' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '주차 수 늘리기' })).not.toBeInTheDocument()
+    expect(screen.queryByText(/6점 핸들을 끌어/)).not.toBeInTheDocument()
+    expect(screen.queryByText('전체 15주')).not.toBeInTheDocument()
     expect(screen.getByDisplayValue('자료구조')).toBeInTheDocument()
     expect(screen.getByLabelText('1주차 이름')).toHaveValue('1주차')
     expect(screen.getByLabelText('15주차 이름')).toBeInTheDocument()
@@ -107,7 +112,7 @@ describe('InstructorClassroomEditPage', () => {
     ).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: '위험 구역' }).closest('section')).toHaveClass('mt-auto')
     expect(document.getElementById('classroom-edit-form')).toHaveClass('xl:flex-1', 'flex-col', 'xl:overflow-hidden')
-    expect(screen.getByRole('heading', { name: '강의실 수정' }).closest('.w-full')).toHaveClass(
+    expect(screen.getByRole('heading', { name: '강의실 삭제' }).closest('.w-full')).toHaveClass(
       'xl:h-[calc(100dvh-4.5rem)]',
       'xl:overflow-hidden',
     )

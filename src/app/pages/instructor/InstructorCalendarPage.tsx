@@ -15,8 +15,10 @@ import {
   type FormEvent,
   type WheelEvent as ReactWheelEvent,
 } from 'react'
+import { useParams } from 'react-router-dom'
 
 import { isInstructorRole, useAuth } from '../../../features/auth'
+import { rememberClassroomId } from '../../../features/classrooms'
 import {
   getCalendarEventKindLabel,
   useCalendarEvents,
@@ -35,6 +37,7 @@ const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일']
 export function InstructorCalendarPage() {
   usePageTitle('캘린더')
   const { apiRequest, user } = useAuth()
+  const { classroomId = '' } = useParams()
   const isInstructor = isInstructorRole(user?.role)
   const { addEvent, events, removeEvent } = useCalendarEvents(
     user?.id ?? user?.email,
@@ -49,6 +52,10 @@ export function InstructorCalendarPage() {
   const [pickerYear, setPickerYear] = useState(cursor.getFullYear())
   const pickerRef = useRef<HTMLDivElement | null>(null)
   const lastWheelNavigationAt = useRef(0)
+
+  useEffect(() => {
+    if (classroomId) rememberClassroomId(classroomId)
+  }, [classroomId])
 
   const label = `${cursor.getFullYear()}년 ${cursor.getMonth() + 1}월`
   const isViewingCurrentMonth = isSameMonth(cursor, today)

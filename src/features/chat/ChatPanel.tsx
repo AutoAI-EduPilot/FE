@@ -1,10 +1,11 @@
 import {
   ArrowUp,
+  Copy,
   FileText,
   NotebookPen,
   RotateCcw,
+  Share2,
   Trash2,
-  X,
 } from 'lucide-react'
 import {
   useEffect,
@@ -15,6 +16,7 @@ import {
   type ReactNode,
 } from 'react'
 import Markdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 import { cx } from '../../shared/lib/cx'
 import { getRequestErrorMessage } from '../../shared/api'
@@ -31,6 +33,10 @@ interface ChatPanelProps {
   currentPage?: number
   /** 서버 위젯·퀴즈 유형 선택 등 대화 흐름에 붙는 액션 (입력창 바로 위) */
   footer?: ReactNode
+  /** 세션 완료처럼 대화 전체에 적용되는 명령 (채팅 헤더 우측) */
+  headerAction?: ReactNode
+  /** 최초 안내 상태를 벗어나는 질문·새 대화 시작을 부모에 알린다. */
+  onConversationStarted?: () => void
   /** 시안 빠른 칩의 "퀴즈 내줘" — 세션 화면의 유형 선택(W4)을 연다. */
   onRequestQuiz?: () => void
   request?: AuthenticatedRequest
@@ -53,8 +59,9 @@ function createRequestId(): string {
 export function ChatPanel({
   chat,
   className,
-  currentPage,
   footer,
+  headerAction,
+  onConversationStarted,
   onRequestQuiz,
   request,
   sessionId,
@@ -66,7 +73,7 @@ export function ChatPanel({
   const [notesError, setNotesError] = useState<string | null>(null)
   const [hiddenMessageCount, setHiddenMessageCount] = useState(0)
   const [isStartingConversation, setIsStartingConversation] = useState(false)
-  const [isPageAttached, setIsPageAttached] = useState(true)
+  const [messageActionStatus, setMessageActionStatus] = useState('')
   const logEndRef = useRef<HTMLDivElement | null>(null)
   const notesRepository = useMemo(
     () => request ? createNotesRepository(request) : null,
@@ -97,6 +104,7 @@ export function ChatPanel({
 
     const requestId = createRequestId()
 
+    onConversationStarted?.()
     chat.appendLocalMessage({
       content: trimmedQuestion,
       id: `user-${requestId}`,
@@ -105,12 +113,14 @@ export function ChatPanel({
     })
     setQuestion('')
     setError(null)
-    setIsPageAttached(true)
 
     try {
       await chat.submitTurn({
         eventType: 'USER_QUESTION',
-        payload: { message: trimmedQuestion },
+        payload: {
+          includeCurrentPage: true,
+          message: trimmedQuestion,
+        },
         requestId,
       })
     } catch (requestError) {
@@ -137,17 +147,22 @@ export function ChatPanel({
       .reverse()
       .find((message) => message.role === 'assistant')
     if (!lastAnswer) return
-    void saveNote(lastAnswer.content, lastAnswer.pageNumber)
+    void saveNote(lastAnswer.content, lastAnswer.pageNumber, lastAnswer.id)
   }
 
-  async function saveNote(content: string, pageNumber?: number) {
+  async function saveNote(content: string, pageNumber?: number, sourceMessageId?: string) {
     if (!notesRepository) {
-      setNotes((current) => [...current, { content, id: `local-${Date.now()}`, pageNumber }])
+      setNotes((current) => [...current, { content, id: `local-${Date.now()}`, pageNumber, sourceMessageId }])
       setTab('notes')
       return
     }
     try {
-      const note = await notesRepository.createForSession(sessionId, { content, pageNumber })
+      const numericMessageId = Number(sourceMessageId)
+      const note = await notesRepository.createForSession(sessionId, {
+        content,
+        pageNumber,
+        sourceMessageId: Number.isSafeInteger(numericMessageId) && numericMessageId > 0 ? numericMessageId : undefined,
+      })
       setNotes((current) => [...current, note])
       setNotesError(null)
       setTab('notes')
@@ -159,6 +174,7 @@ export function ChatPanel({
     setIsStartingConversation(true)
     try {
       await chat.startNewConversation()
+      onConversationStarted?.()
       setHiddenMessageCount(0)
       setError(null)
     } catch (requestError) {
@@ -172,6 +188,30 @@ export function ChatPanel({
     if (!notesRepository) { setNotes((current) => current.filter((note) => note.id !== id)); return }
     try { await notesRepository.delete(id); setNotes((current) => current.filter((note) => note.id !== id)); setNotesError(null) }
     catch (requestError) { setNotesError(getRequestErrorMessage(requestError)) }
+  }
+
+  async function copyMessage(content: string) {
+    try {
+      await navigator.clipboard.writeText(content)
+      setMessageActionStatus('메시지를 복사했습니다.')
+    } catch {
+      setMessageActionStatus('메시지를 복사하지 못했습니다.')
+    }
+  }
+
+  async function shareMessage(content: string) {
+    try {
+      if (navigator.share) {
+        await navigator.share({ text: content, title: 'EduPilot 학습 대화' })
+        setMessageActionStatus('메시지를 공유했습니다.')
+        return
+      }
+      await navigator.clipboard.writeText(content)
+      setMessageActionStatus('공유 기능을 지원하지 않아 메시지를 복사했습니다.')
+    } catch (shareError) {
+      if (shareError instanceof DOMException && shareError.name === 'AbortError') return
+      setMessageActionStatus('메시지를 공유하지 못했습니다.')
+    }
   }
 
   const visibleMessages = chat.messages.slice(hiddenMessageCount)
@@ -199,16 +239,19 @@ export function ChatPanel({
           onSelect={() => setTab('notes')}
         />
         <span className="sr-only">세션 {sessionId}</span>
-        <button
-          className="ml-auto flex items-center gap-1.5 rounded-lg px-2 py-1 type-caption text-stone-400 hover:bg-stone-50 hover:text-stone-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
-          disabled={isStartingConversation || chat.isTurnPending}
-          onClick={() => void startNewConversation()}
-          title="새 대화를 시작합니다. 이전 대화는 서버에 보관됩니다."
-          type="button"
-        >
-          <RotateCcw aria-hidden="true" size={13} />
-          {isStartingConversation ? '시작 중' : '대화 새로 시작'}
-        </button>
+        <div className="ml-auto flex items-center gap-1.5">
+          {headerAction}
+          <button
+            className="flex items-center gap-1.5 px-2 py-1 type-caption text-stone-400 hover:text-stone-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+            disabled={isStartingConversation || chat.isTurnPending}
+            onClick={() => void startNewConversation()}
+            title="새 대화를 시작합니다. 이전 대화는 서버에 보관됩니다."
+            type="button"
+          >
+            <RotateCcw aria-hidden="true" size={13} />
+            {isStartingConversation ? '시작 중' : '대화 새로 시작'}
+          </button>
+        </div>
       </div>
 
       {tab === 'notes' ? (
@@ -257,14 +300,13 @@ export function ChatPanel({
           <MessageBubble
             key={message.id}
             message={message}
-            onSaveNote={
-              message.role === 'assistant'
-                ? () =>
-                    void saveNote(message.content, message.pageNumber)
-                : undefined
-            }
+            onCopy={() => void copyMessage(message.content)}
+            onSaveNote={() => void saveNote(message.content, message.pageNumber, message.id)}
+            onShare={() => void shareMessage(message.content)}
           />
         ))}
+
+        <p aria-live="polite" className="sr-only">{messageActionStatus}</p>
 
         {chat.isTurnPending ? (
           <div
@@ -298,21 +340,6 @@ export function ChatPanel({
       {footer ? <div className="shrink-0 px-4 pb-1">{footer}</div> : null}
 
       <form className="shrink-0 p-3" onSubmit={handleSubmit}>
-        {currentPage && isPageAttached ? (
-          <p className="mb-2 inline-flex items-center gap-1.5 rounded-lg bg-stone-100 px-2.5 py-1 type-caption text-stone-500">
-            <FileText aria-hidden="true" size={12} />
-            현재 페이지 첨부됨 · {currentPage}쪽
-            <button
-              aria-label="현재 페이지 첨부 해제"
-              className="rounded text-stone-400 hover:text-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
-              onClick={() => setIsPageAttached(false)}
-              type="button"
-            >
-              <X aria-hidden="true" size={11} />
-            </button>
-          </p>
-        ) : null}
-
         <div
           className={cx(
             'flex items-end gap-2 rounded-xl border bg-stone-50 p-2',
@@ -373,11 +400,11 @@ function PanelTab({
     <button
       aria-selected={isActive}
       className={cx(
-        'flex h-8 items-center gap-1.5 rounded-lg px-2.5 type-control',
+        'flex h-full items-center gap-1.5 border-b-2 px-2.5 type-control',
         'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
         isActive
-          ? 'bg-brand-50 font-semibold text-brand-700'
-          : 'font-medium text-stone-400 hover:text-stone-600',
+          ? 'border-brand-600 font-semibold text-brand-700'
+          : 'border-transparent font-medium text-stone-400 hover:text-stone-600',
       )}
       onClick={onSelect}
       role="tab"
@@ -426,9 +453,7 @@ function NotesPanel({
           key={note.id}
         >
           <div className="flex items-start gap-2">
-            <p className="min-w-0 flex-1 whitespace-pre-wrap break-words type-body leading-6 text-stone-800">
-              {note.content}
-            </p>
+            <div className="min-w-0 flex-1"><MarkdownContent content={note.content} /></div>
             <button
               aria-label="노트 삭제"
               className="shrink-0 rounded-md p-1 text-stone-400 hover:bg-stone-100 hover:text-stone-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
@@ -451,10 +476,14 @@ function NotesPanel({
 
 function MessageBubble({
   message,
+  onCopy,
   onSaveNote,
+  onShare,
 }: {
   message: ChatMessage
-  onSaveNote?: () => void
+  onCopy: () => void
+  onSaveNote: () => void
+  onShare: () => void
 }) {
   const time = message.createdAt ? formatTime(message.createdAt) : ''
 
@@ -464,6 +493,7 @@ function MessageBubble({
         <article className="max-w-[85%] rounded-xl rounded-br-[4px] bg-brand-600 px-3.5 py-2.5 text-white">
           <span className="sr-only">내 질문</span>
           <p className="break-words type-body leading-6">{message.content}</p>
+          <MessageActions messageLabel="내 질문" onCopy={onCopy} onSaveNote={onSaveNote} onShare={onShare} tone="brand" />
         </article>
         {time ? <span className="type-micro text-stone-400">{time}</span> : null}
       </div>
@@ -474,9 +504,7 @@ function MessageBubble({
     <div className="flex flex-col items-start gap-1">
       <article className="max-w-[90%] rounded-xl rounded-bl-[4px] bg-stone-100 px-3.5 py-2.5 text-stone-900">
         <span className="sr-only">AI 답변</span>
-        <div className="break-words type-body leading-6 [&_a]:text-brand-600 [&_a]:underline [&_code]:rounded [&_code]:bg-white [&_code]:px-1 [&_code]:py-0.5 [&_code]:type-control [&_h1]:mt-2 [&_h1]:type-section-title [&_h1]:font-bold [&_h2]:mt-2 [&_h2]:type-body [&_h2]:font-bold [&_h3]:mt-2 [&_h3]:font-bold [&_li]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p+p]:mt-2 [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-white [&_pre]:p-2 [&_strong]:font-bold [&_ul]:list-disc [&_ul]:pl-5">
-          <Markdown>{message.content}</Markdown>
-        </div>
+        <MarkdownContent content={message.content} />
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {message.pageNumber ? (
             <p className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2 py-1 type-caption font-semibold text-brand-700">
@@ -484,19 +512,47 @@ function MessageBubble({
               {message.pageNumber}쪽 참조
             </p>
           ) : null}
-          {onSaveNote ? (
-            <button
-              className="inline-flex items-center gap-1.5 rounded-md border border-stone-200 bg-white px-2 py-1 type-caption font-semibold text-stone-500 hover:text-brand-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
-              onClick={onSaveNote}
-              type="button"
-            >
-              <NotebookPen aria-hidden="true" size={12} />
-              노트에 저장
-            </button>
-          ) : null}
+          <MessageActions messageLabel="AI 답변" onCopy={onCopy} onSaveNote={onSaveNote} onShare={onShare} />
         </div>
       </article>
       {time ? <span className="type-micro text-stone-400">{time}</span> : null}
+    </div>
+  )
+}
+
+function MarkdownContent({ content }: { content: string }) {
+  return (
+    <div className="min-w-0 overflow-x-auto break-words type-body leading-6 text-inherit [&_a]:text-brand-600 [&_a]:underline [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-stone-300 [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-white [&_code]:px-1 [&_code]:py-0.5 [&_code]:type-control [&_h1]:mt-2 [&_h1]:type-section-title [&_h1]:font-bold [&_h2]:mt-2 [&_h2]:type-body [&_h2]:font-bold [&_h3]:mt-2 [&_h3]:font-bold [&_hr]:my-3 [&_hr]:border-stone-200 [&_li]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p+p]:mt-2 [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-white [&_pre]:p-2 [&_strong]:font-bold [&_table]:my-3 [&_table]:min-w-full [&_table]:border-collapse [&_table]:bg-white [&_table]:type-caption [&_td]:border [&_td]:border-stone-200 [&_td]:px-2.5 [&_td]:py-2 [&_th]:whitespace-nowrap [&_th]:border [&_th]:border-stone-200 [&_th]:bg-stone-50 [&_th]:px-2.5 [&_th]:py-2 [&_th]:text-left [&_th]:font-bold [&_ul]:list-disc [&_ul]:pl-5">
+      <Markdown remarkPlugins={[remarkGfm]}>{content}</Markdown>
+    </div>
+  )
+}
+
+function MessageActions({
+  messageLabel,
+  onCopy,
+  onSaveNote,
+  onShare,
+  tone = 'neutral',
+}: {
+  messageLabel: string
+  onCopy: () => void
+  onSaveNote: () => void
+  onShare: () => void
+  tone?: 'brand' | 'neutral'
+}) {
+  const className = cx(
+    'flex size-7 items-center justify-center rounded-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1',
+    tone === 'brand'
+      ? 'text-white/75 hover:bg-white/15 hover:text-white focus-visible:outline-white'
+      : 'text-stone-400 hover:bg-white hover:text-brand-700 focus-visible:outline-brand-600',
+  )
+
+  return (
+    <div className={cx('flex items-center gap-0.5', tone === 'brand' ? 'mt-2 justify-end border-t border-white/15 pt-1.5' : 'ml-auto')}>
+      <button aria-label={`${messageLabel} 복사`} className={className} onClick={onCopy} title="복사" type="button"><Copy aria-hidden="true" size={13} /></button>
+      <button aria-label={`${messageLabel} 공유`} className={className} onClick={onShare} title="공유" type="button"><Share2 aria-hidden="true" size={13} /></button>
+      <button aria-label={`${messageLabel} 노트에 저장`} className={className} onClick={onSaveNote} title="노트에 저장" type="button"><NotebookPen aria-hidden="true" size={13} /></button>
     </div>
   )
 }

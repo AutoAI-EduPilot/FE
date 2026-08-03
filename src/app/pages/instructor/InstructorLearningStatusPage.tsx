@@ -1,23 +1,24 @@
-import { ArrowRight, BarChart3, HelpCircle, Users } from 'lucide-react'
+import { BarChart3, FileQuestion, FileSearch, Users } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 
 import { useAuth } from '../../../features/auth'
-import { createClassroomsRepository, type Classroom } from '../../../features/classrooms'
+import { createClassroomsRepository, rememberClassroomId, type Classroom } from '../../../features/classrooms'
 import { getRequestErrorMessage } from '../../../shared/api'
 import { usePageTitle } from '../../../shared/lib/usePageTitle'
-import { PageContainer, PageHeader } from '../../../shared/ui'
+import { ButtonLink, PageContainer, PageHeader } from '../../../shared/ui'
+import { classroomAnalyticsPath, classroomReportsPath } from '../../routes'
 
 export function InstructorLearningStatusPage() {
   usePageTitle('학습 현황')
   const { apiRequest } = useAuth()
+  const { classroomId = '' } = useParams()
+  const navigate = useNavigate()
   const repository = useMemo(() => createClassroomsRepository(apiRequest), [apiRequest])
-  const [searchParams, setSearchParams] = useSearchParams()
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const requestedClassroomId = searchParams.get('classroomId')
-  const selectedClassroom = classrooms.find((item) => item.id === requestedClassroomId) ?? classrooms[0]
+  const selectedClassroom = classrooms.find((item) => item.id === classroomId) ?? classrooms[0]
   const summaryItems = [
     { label: '학습자', suffix: '명', value: selectedClassroom?.learnerCount ?? 0 },
     { label: '평균 진도', suffix: '%', value: selectedClassroom?.progressRate ?? 0 },
@@ -38,14 +39,14 @@ export function InstructorLearningStatusPage() {
     return () => controller.abort()
   }, [repository])
 
+  useEffect(() => {
+    if (selectedClassroom) rememberClassroomId(selectedClassroom.id)
+  }, [selectedClassroom])
+
   return (
     <PageContainer>
       <PageHeader
-        actions={
-          <p className="type-caption font-medium text-stone-400">
-            마지막 갱신 정보 없음
-          </p>
-        }
+        actions={<><p className="type-caption font-medium text-stone-400">마지막 갱신 정보 없음</p>{selectedClassroom ? <ButtonLink to={classroomReportsPath(selectedClassroom.id)} variant="secondary"><FileSearch size={14} />학생 리포트</ButtonLink> : null}</>}
         title="학습 현황"
         titleAccessory={
           <label>
@@ -53,7 +54,7 @@ export function InstructorLearningStatusPage() {
             <select
               className="h-9 min-w-40 rounded-lg border border-stone-200 bg-white px-3 type-caption font-semibold text-stone-500"
               disabled={classrooms.length === 0}
-              onChange={(event) => setSearchParams({ classroomId: event.target.value }, { replace: true })}
+              onChange={(event) => navigate(classroomAnalyticsPath(event.target.value), { replace: true })}
               value={selectedClassroom?.id ?? ''}
             >
               {classrooms.length === 0 ? (
@@ -79,16 +80,6 @@ export function InstructorLearningStatusPage() {
               {item.value}
               <span className="ml-0.5 type-section-title">{item.suffix}</span>
             </p>
-            {item.label === '7일 이상 미접속' ? (
-              <button
-                className="mt-2 inline-flex items-center gap-1 type-caption font-semibold text-brand-700 disabled:cursor-not-allowed disabled:text-stone-300"
-                disabled
-                type="button"
-              >
-                리마인더 보내기
-                <ArrowRight aria-hidden="true" size={13} />
-              </button>
-            ) : null}
           </article>
         ))}
       </section>
@@ -100,9 +91,9 @@ export function InstructorLearningStatusPage() {
           title="자료별 열람 현황"
         />
         <EmptyAnalyticsPanel
-          description="학습자가 질문한 주제를 집계해 표시합니다."
-          icon={HelpCircle}
-          title="AI 질문 많은 주제"
+          description="학습자가 질문한 횟수를 관련 자료 페이지별로 집계해 표시합니다."
+          icon={FileQuestion}
+          title="페이지별 AI 질문 수"
         />
       </section>
     </PageContainer>
