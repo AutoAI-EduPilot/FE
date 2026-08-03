@@ -19,6 +19,8 @@ jobs:
     name: deploy-fe-dev
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      VITE_API_BASE_URL: /api
 
     steps:
       - name: Checkout repository
@@ -44,8 +46,6 @@ jobs:
 
       - name: Build
         run: npm run build
-        env:
-          VITE_API_BASE_URL: /api
 
       - name: Copy dist to server
         uses: appleboy/scp-action@v1
