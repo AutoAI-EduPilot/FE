@@ -98,7 +98,9 @@ describe('InstructorClassroomEditPage', () => {
     expect(screen.getByText('7QK4-MZ2A')).toBeInTheDocument()
     expect(screen.getByText('김학습')).toBeInTheDocument()
     expect(screen.getByText('김')).toBeInTheDocument()
-    expect(screen.getByText(/2026.*오전 10:00/)).not.toHaveTextContent('10:00:00')
+    const learnerRow = screen.getByText('김학습').closest('.grid')
+    expect(learnerRow).toHaveTextContent('2026')
+    expect(learnerRow).not.toHaveTextContent(/\d{1,2}:\d{2}:\d{2}/)
     expect(screen.getByRole('button', { name: '제외' })).toBeDisabled()
     expect(
       screen.getByRole('heading', { name: '위험 구역' }),
