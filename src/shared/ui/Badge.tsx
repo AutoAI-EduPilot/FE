@@ -10,7 +10,7 @@ export function Badge({ children, tone = 'neutral' }: PropsWithChildren<BadgePro
   return (
     <span
       className={[
-        'inline-flex min-h-6 items-center rounded-lg border px-2 py-0.5 text-xs font-semibold',
+        'inline-flex min-h-6 items-center rounded-lg border px-2 py-0.5 type-caption font-semibold',
         toneClasses[tone],
       ].join(' ')}
     >

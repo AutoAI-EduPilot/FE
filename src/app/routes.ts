@@ -4,6 +4,16 @@ export const routes = {
   forgotPassword: '/forgot-password',
   signup: '/signup',
   classrooms: '/classrooms',
+  classroomDetail: '/classrooms/:classroomId',
+  classroomEdit: '/classrooms/:classroomId/edit',
+  calendar: '/calendar',
+  notes: '/notes',
+  reviewQuizzes: '/review-quizzes',
+  exams: '/exams',
+  examDetail: '/exams/:examId',
+  learningStatus: '/learning-status',
+  announcements: '/announcements',
+  entranceRequests: '/entrance-requests',
   materials: '/materials',
   materialDetail: '/materials/:materialId',
   sessions: '/sessions',
@@ -12,6 +22,18 @@ export const routes = {
   quizDetail: '/quizzes/:quizId',
   diagnosis: '/sessions/:sessionId/diagnosis/:diagnosisId',
 } as const
+
+export function classroomDetailPath(classroomId: string | number): string {
+  return `/classrooms/${classroomId}`
+}
+
+export function classroomEditPath(classroomId: string | number): string {
+  return `/classrooms/${classroomId}/edit`
+}
+
+export function learningStatusPath(classroomId: string | number): string {
+  return `${routes.learningStatus}?classroomId=${encodeURIComponent(String(classroomId))}`
+}
 
 export function materialDetailPath(materialId: string | number): string {
   return `/materials/${materialId}`
@@ -23,6 +45,10 @@ export function sessionDetailPath(sessionId: string | number): string {
 
 export function quizDetailPath(quizId: string | number): string {
   return `/quizzes/${quizId}`
+}
+
+export function examDetailPath(examId: string | number): string {
+  return `/exams/${examId}`
 }
 
 export function diagnosisPath(

@@ -353,7 +353,7 @@ export function SessionDetailPage() {
           <Suspense
             fallback={
               <div
-                className="flex h-full min-h-0 items-center justify-center border-r border-stone-200 bg-white text-sm text-stone-500"
+                className="flex h-full min-h-0 items-center justify-center border-r border-stone-200 bg-white type-body text-stone-500"
                 role="status"
               >
                 PDF 뷰어를 준비하고 있습니다.
@@ -372,6 +372,7 @@ export function SessionDetailPage() {
           </Suspense>
 
           <ChatPanel
+            request={apiRequest}
             chat={chat}
             className="rounded-none border-y-0 border-r-0"
             currentPage={currentPage}
@@ -379,7 +380,7 @@ export function SessionDetailPage() {
               <div className="grid gap-2">
                 {isSelectingQuizType ? (
                   <div className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2.5">
-                    <p className="text-sm font-semibold text-brand-950">
+                    <p className="type-body font-semibold text-brand-950">
                       어떤 유형의 퀴즈를 풀까요?
                     </p>
                     <div className="mt-2 grid grid-cols-2 gap-2">
@@ -439,7 +440,7 @@ export function SessionDetailPage() {
                 ) : null}
 
                 {error ? (
-                  <p className="text-xs font-medium text-rose-700" role="alert">
+                  <p className="type-caption font-medium text-rose-700" role="alert">
                     {error}
                   </p>
                 ) : null}

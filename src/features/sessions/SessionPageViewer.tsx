@@ -77,10 +77,10 @@ export function SessionPageViewer({
   return (
     <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-y-0 border-stone-200 bg-white xl:border-r">
       <div className="flex h-13 shrink-0 items-center gap-3 border-b border-stone-200 px-4">
-        <h2 className="hidden min-w-0 truncate text-[14.5px] font-semibold text-stone-950 sm:block">
+        <h2 className="hidden min-w-0 truncate type-body font-semibold text-stone-950 sm:block">
           {materialTitle ?? '학습 자료'}
         </h2>
-        <span className="shrink-0 text-xs text-stone-400">
+        <span className="shrink-0 type-caption text-stone-400">
           {currentPage} / {totalPages}쪽
         </span>
         <div
@@ -101,7 +101,7 @@ export function SessionPageViewer({
               label="축소"
               onClick={() => setZoom((value) => Math.max(50, value - 10))}
             />
-            <span className="min-w-10 text-center text-[12.5px] font-medium text-stone-600">
+            <span className="min-w-10 text-center type-caption font-medium text-stone-600">
               {zoom}%
             </span>
             <ToolbarIconButton
@@ -143,7 +143,7 @@ export function SessionPageViewer({
                 <button
                   aria-label={`${pageNumber}쪽으로 이동`}
                   className={cx(
-                    'aspect-[3/4] w-full rounded-md border text-[11px] font-semibold transition-colors',
+                    'aspect-[3/4] w-full rounded-md border type-micro font-semibold transition-colors',
                     'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600',
                     'disabled:cursor-not-allowed disabled:opacity-60',
                     pageNumber === currentPage
@@ -200,7 +200,7 @@ export function SessionPageViewer({
               label="이전"
               onClick={() => onMovePage(currentPage - 1)}
             />
-            <span className="min-w-14 text-center text-xs font-semibold text-stone-900">
+            <span className="min-w-14 text-center type-caption font-semibold text-stone-900">
               {currentPage} / {totalPages}
             </span>
             <PageStepButton
@@ -225,7 +225,7 @@ function ViewerState({
   return (
     <div
       className={cx(
-        'flex h-full max-h-[36rem] min-h-64 w-full max-w-md items-center justify-center rounded-sm border bg-white px-6 text-center text-sm shadow-sm',
+        'flex h-full max-h-[36rem] min-h-64 w-full max-w-md items-center justify-center rounded-sm border bg-white px-6 text-center type-body shadow-sm',
         isError
           ? 'border-rose-200 text-rose-700'
           : 'border-stone-200 text-stone-500',
@@ -276,7 +276,7 @@ function ToolbarButton({
       aria-label={disabled ? `${label} (사용 불가)` : label}
       aria-pressed={disabled ? undefined : isActive}
       className={cx(
-        'flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-[12.5px] font-medium hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-400 disabled:hover:bg-transparent',
+        'flex h-8 items-center gap-1.5 rounded-lg border px-2.5 type-caption font-medium hover:bg-stone-50 disabled:cursor-not-allowed disabled:text-stone-400 disabled:hover:bg-transparent',
         isActive
           ? 'border-brand-200 bg-brand-50 text-brand-700'
           : 'border-stone-200 text-stone-600',

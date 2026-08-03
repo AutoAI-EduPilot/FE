@@ -8,8 +8,11 @@ import type {
 import type { LoginFormValues, SignupFormValues } from './authValidation'
 
 export interface AuthUser {
+  affiliation?: string
+  avatarUrl?: string
   email: string
   id?: number
+  learningEmailOptIn?: boolean
   name: string
   role?: string
 }
@@ -40,6 +43,7 @@ export interface AuthContextValue {
   logout: () => Promise<void>
   signup: (values: SignupFormValues) => Promise<void>
   user: AuthUser | null
+  updateUser: (user: AuthUser) => void
   withdraw: (password: string) => Promise<void>
 }
 

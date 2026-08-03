@@ -22,6 +22,7 @@ import {
   ButtonLink,
   ErrorState,
   LoadingState,
+  PageContainer,
   PageHeader,
 } from '../../shared/ui'
 import { formatDate, formatFileSize } from '../../shared/lib/format'
@@ -151,11 +152,9 @@ export function MaterialDetailPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <PageContainer>
       <PageHeader
-        eyebrow="Material Detail"
         title={material.title}
-        description="자료 처리 상태와 학습 진입 가능 여부를 확인합니다."
         actions={<StatusBadge status={material.status} />}
       />
 
@@ -164,7 +163,7 @@ export function MaterialDetailPage() {
           <span className="flex size-9 items-center justify-center rounded-lg bg-stone-100 text-stone-500">
             <FileText aria-hidden="true" size={17} />
           </span>
-          <h2 className="text-base font-bold text-stone-950">자료 정보</h2>
+          <h2 className="type-section-title font-bold text-stone-950">자료 정보</h2>
         </div>
         <dl className="grid divide-y divide-stone-200 sm:grid-cols-2 sm:divide-y-0 lg:grid-cols-4">
           <DetailTerm label="상태" value={getMaterialStatusLabel(material.status)} />
@@ -181,7 +180,7 @@ export function MaterialDetailPage() {
         </dl>
 
         {material.failureReason ? (
-          <p className="border-t border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-800 sm:px-5">
+          <p className="border-t border-rose-200 bg-rose-50 px-4 py-3 type-body font-medium text-rose-800 sm:px-5">
             {material.failureReason}
           </p>
         ) : null}
@@ -190,9 +189,9 @@ export function MaterialDetailPage() {
       {memory ? (
         <section className="overflow-hidden rounded-xl border border-stone-200 bg-white">
           <div className="border-b border-stone-200 px-4 py-4 sm:px-5">
-            <h2 className="text-base font-bold text-stone-950">학습 분석</h2>
+            <h2 className="type-section-title font-bold text-stone-950">학습 분석</h2>
             {memory.memoryDigest ? (
-              <p className="mt-1 text-sm leading-6 text-stone-600">
+              <p className="mt-1 type-body leading-6 text-stone-600">
                 {memory.memoryDigest}
               </p>
             ) : null}
@@ -200,8 +199,8 @@ export function MaterialDetailPage() {
           <dl className="grid divide-y divide-stone-100 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
             {memory.strengths.length > 0 ? (
               <div className="px-4 py-4 sm:px-5">
-                <dt className="text-xs font-semibold text-emerald-700">강점</dt>
-                <dd className="mt-2 space-y-1 text-sm text-stone-700">
+                <dt className="type-caption font-semibold text-emerald-700">강점</dt>
+                <dd className="mt-2 space-y-1 type-body text-stone-700">
                   {memory.strengths.map((strength) => (
                     <p key={strength}>{strength}</p>
                   ))}
@@ -210,8 +209,8 @@ export function MaterialDetailPage() {
             ) : null}
             {memory.weaknesses.length > 0 ? (
               <div className="px-4 py-4 sm:px-5">
-                <dt className="text-xs font-semibold text-amber-700">보완할 부분</dt>
-                <dd className="mt-2 space-y-1 text-sm text-stone-700">
+                <dt className="type-caption font-semibold text-amber-700">보완할 부분</dt>
+                <dd className="mt-2 space-y-1 type-body text-stone-700">
                   {memory.weaknesses.map((weakness) => (
                     <p key={weakness}>{weakness}</p>
                   ))}
@@ -231,8 +230,8 @@ export function MaterialDetailPage() {
               size={18}
             />
             <div>
-              <h2 className="text-sm font-bold text-amber-950">활성 세션 충돌 안내</h2>
-              <p className="mt-1 text-sm text-amber-900">
+              <h2 className="type-body font-bold text-amber-950">활성 세션 충돌 안내</h2>
+              <p className="mt-1 type-body text-amber-900">
                 이 자료에는 이미 진행 중인 학습 세션이 있습니다.
               </p>
             </div>
@@ -249,8 +248,8 @@ export function MaterialDetailPage() {
       ) : (
         <section className="flex flex-col gap-4 rounded-xl border border-stone-200 bg-white px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div>
-            <h2 className="text-sm font-bold text-stone-950">학습 시작</h2>
-            <p className="mt-1 text-sm text-stone-500">
+            <h2 className="type-body font-bold text-stone-950">학습 시작</h2>
+            <p className="mt-1 type-body text-stone-500">
               자료 처리가 완료되면 이 자료로 새 학습 세션을 시작합니다.
             </p>
           </div>
@@ -263,21 +262,21 @@ export function MaterialDetailPage() {
             {isStarting ? '세션 생성 중' : '학습 시작'}
           </Button>
           {error ? (
-            <p className="text-sm font-medium text-rose-700" role="alert">
+            <p className="type-body font-medium text-rose-700" role="alert">
               {error}
             </p>
           ) : null}
         </section>
       )}
-    </div>
+    </PageContainer>
   )
 }
 
 function DetailTerm({ label, value }: { label: string; value: string }) {
   return (
     <div className="px-4 py-4 sm:border-r sm:border-stone-200 sm:px-5 last:sm:border-r-0">
-      <dt className="text-xs font-semibold text-stone-500">{label}</dt>
-      <dd className="mt-2 text-sm font-bold text-stone-950">{value}</dd>
+      <dt className="type-caption font-semibold text-stone-500">{label}</dt>
+      <dd className="mt-2 type-body font-bold text-stone-950">{value}</dd>
     </div>
   )
 }

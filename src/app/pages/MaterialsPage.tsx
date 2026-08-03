@@ -30,6 +30,7 @@ import {
   ButtonLink,
   EmptyState,
   ErrorState,
+  PageContainer,
   SkeletonRows,
   PageHeader,
   useToast,
@@ -173,11 +174,9 @@ export function MaterialsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <PageContainer>
       <PageHeader
-        eyebrow="Materials"
         title="자료"
-        description="PDF 자료를 추가하고 처리 상태를 확인합니다."
         actions={
           <>
             <Badge tone="success">준비 완료 {readyCount}</Badge>
@@ -189,8 +188,8 @@ export function MaterialsPage() {
       <section className="overflow-hidden rounded-xl border border-stone-200 bg-white">
         <div className="flex flex-col gap-3 border-b border-stone-200 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
           <div>
-            <h2 className="text-base font-bold text-stone-950">PDF 업로드</h2>
-            <p className="mt-1 text-sm text-stone-500">45MB 이하 PDF 파일</p>
+            <h2 className="type-section-title font-bold text-stone-950">PDF 업로드</h2>
+            <p className="mt-1 type-body text-stone-500">45MB 이하 PDF 파일</p>
           </div>
           <Button onClick={refreshProcessingStatuses} type="button" variant="secondary">
             <RefreshCw aria-hidden="true" size={15} />
@@ -225,11 +224,11 @@ export function MaterialsPage() {
               <Upload aria-hidden="true" size={17} />
             </span>
             <div className="min-w-0">
-              <p className="text-sm font-semibold text-stone-800">
+              <p className="type-body font-semibold text-stone-800">
                 파일을 끌어 놓거나 선택하세요.
               </p>
               <label
-                className="mt-1 block truncate text-xs text-stone-500"
+                className="mt-1 block truncate type-caption text-stone-500"
                 htmlFor="material-upload"
               >
                 {selectedFileName ?? '선택된 파일 없음'}
@@ -247,7 +246,7 @@ export function MaterialsPage() {
         </div>
 
         {uploadError ? (
-          <p className="mx-4 mb-4 text-sm font-medium text-rose-700 sm:mx-5 sm:mb-5" role="alert">
+          <p className="mx-4 mb-4 type-body font-medium text-rose-700 sm:mx-5 sm:mb-5" role="alert">
             {uploadError}
           </p>
         ) : null}
@@ -255,11 +254,11 @@ export function MaterialsPage() {
 
       <section className="overflow-hidden rounded-xl border border-stone-200 bg-white">
         <div className="flex items-center justify-between border-b border-stone-200 px-4 py-4 sm:px-5">
-          <h2 className="text-base font-bold text-stone-950">업로드된 자료</h2>
-          <span className="text-xs font-medium text-stone-500">{materials.length}개 자료</span>
+          <h2 className="type-section-title font-bold text-stone-950">업로드된 자료</h2>
+          <span className="type-caption font-medium text-stone-500">{materials.length}개 자료</span>
         </div>
 
-        <div className="hidden grid-cols-[minmax(0,1fr)_120px_140px_230px] gap-4 border-b border-stone-200 bg-stone-50 px-5 py-2 text-xs font-bold text-stone-500 lg:grid">
+        <div className="hidden grid-cols-[minmax(0,1fr)_120px_140px_230px] gap-4 border-b border-stone-200 bg-stone-50 px-5 py-2 type-caption font-bold text-stone-500 lg:grid">
           <span>자료</span>
           <span>상태</span>
           <span>업로드</span>
@@ -295,24 +294,24 @@ export function MaterialsPage() {
                   <FileText aria-hidden="true" size={17} />
                 </span>
                 <div className="min-w-0">
-                  <h3 className="break-words text-sm font-bold text-stone-950">
+                  <h3 className="break-words type-body font-bold text-stone-950">
                     {material.title}
                   </h3>
-                  <p className="mt-1 text-xs text-stone-500">
+                  <p className="mt-1 type-caption text-stone-500">
                     {material.fileSizeBytes
                       ? formatFileSize(material.fileSizeBytes)
                       : '파일 크기 정보 없음'}
                     {material.pageCount ? ` · ${material.pageCount}쪽` : ''}
                   </p>
                   {material.status === 'FAILED' ? (
-                    <p className="mt-2 text-xs font-medium text-rose-700">
+                    <p className="mt-2 type-caption font-medium text-rose-700">
                       {material.failureReason ??
                         '파일 업로드는 완료됐지만 PDF 분석에 실패했습니다.'}
                     </p>
                   ) : null}
                   {material.activeSessionId ? (
                     <div className="mt-2">
-                      <p className="text-xs font-semibold text-amber-800">
+                      <p className="type-caption font-semibold text-amber-800">
                         진행 중인 학습 세션이 있습니다.
                       </p>
                       <ButtonLink
@@ -332,7 +331,7 @@ export function MaterialsPage() {
               <div>
                 <StatusBadge status={material.status} />
               </div>
-              <p className="text-xs text-stone-500">
+              <p className="type-caption text-stone-500">
                 <span className="mr-2 font-semibold text-stone-700 lg:hidden">업로드</span>
                 {formatDate(material.createdAt)}
               </p>
@@ -360,7 +359,7 @@ export function MaterialsPage() {
         </div>
         )}
       </section>
-    </div>
+    </PageContainer>
   )
 }
 

@@ -33,7 +33,9 @@ import { routes } from '../routes'
 import { usePageTitle } from '../../shared/lib/usePageTitle'
 
 const initialValues: SignupFormValues = {
+  affiliation: '',
   email: '',
+  learningEmailOptIn: false,
   name: '',
   password: '',
   role: 'LEARNER',
@@ -205,7 +207,11 @@ export function SignupPage() {
     setIsSubmitting(true)
     setServerError(null)
     try {
-      await signup(values)
+      await signup({
+        ...values,
+        affiliation,
+        learningEmailOptIn: acceptsLearningEmails,
+      })
       navigate(routes.classrooms, { replace: true })
     } catch (error) {
       const formErrors = mapAuthErrorToFormErrors(error)
@@ -244,11 +250,11 @@ export function SignupPage() {
     return (
       <div>
         <div className="flex flex-col gap-1.5">
-          <p className="text-[13px] text-stone-400">회원가입 1 / 2</p>
-          <h1 className="text-2xl font-bold text-stone-900">
+          <p className="type-control text-stone-400">회원가입 1 / 2</p>
+          <h1 className="type-page-title font-bold text-stone-900">
             어떤 역할로 사용하시나요?
           </h1>
-          <p className="text-sm text-stone-400">
+          <p className="type-body text-stone-400">
             가입 후에도 설정에서 변경할 수 있어요
           </p>
         </div>
@@ -287,10 +293,10 @@ export function SignupPage() {
                   <option.icon aria-hidden="true" size={21} strokeWidth={1.8} />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <strong className="block text-[15.5px] font-bold text-stone-900">
+                  <strong className="block type-section-title font-bold text-stone-900">
                     {option.label}
                   </strong>
-                  <span className="mt-0.5 block text-[13px] leading-5 text-stone-600">
+                  <span className="mt-0.5 block type-control leading-5 text-stone-600">
                     {option.description}
                   </span>
                 </span>
@@ -319,7 +325,7 @@ export function SignupPage() {
           <ArrowRight aria-hidden="true" size={15} />
         </Button>
 
-        <p className="mt-6 text-center text-sm text-stone-600">
+        <p className="mt-6 text-center type-body text-stone-600">
           이미 계정이 있다면{' '}
           <Link
             to={routes.login}
@@ -335,13 +341,13 @@ export function SignupPage() {
   return (
     <div>
       <div className="flex flex-col gap-1.5">
-        <p className="text-[13px] text-stone-400">
+        <p className="type-control text-stone-400">
           회원가입 2 / 2 ·{' '}
           <strong className="font-semibold text-brand-600">
             {selectedRoleLabel}
           </strong>
         </p>
-        <h1 className="text-2xl font-bold text-stone-900">
+        <h1 className="type-page-title font-bold text-stone-900">
           계정 정보를 입력하세요
         </h1>
       </div>
@@ -350,14 +356,14 @@ export function SignupPage() {
         <div>
           <div className="flex items-baseline justify-between gap-3">
             <label
-              className="text-[13px] font-semibold text-stone-800"
+              className="type-control font-semibold text-stone-800"
               htmlFor="signup-name"
             >
               이름
             </label>
             {errors.name ? (
               <p
-                className="text-xs font-medium text-rose-700"
+                className="type-caption font-medium text-rose-700"
                 id="signup-name-error"
                 role="alert"
               >
@@ -380,14 +386,14 @@ export function SignupPage() {
         <div>
           <div className="flex items-baseline justify-between gap-3">
             <label
-              className="text-[13px] font-semibold text-stone-800"
+              className="type-control font-semibold text-stone-800"
               htmlFor="signup-email"
             >
               이메일
             </label>
             {errors.email ? (
               <p
-                className="text-xs font-medium text-rose-700"
+                className="type-caption font-medium text-rose-700"
                 id="signup-email-error"
                 role="alert"
               >
@@ -412,7 +418,7 @@ export function SignupPage() {
             emailAvailability !== 'idle' ? (
               <span
                 className={[
-                  'pointer-events-none absolute top-1/2 right-3.5 -translate-y-1/2 text-[11px] font-semibold',
+                  'pointer-events-none absolute top-1/2 right-3.5 -translate-y-1/2 type-micro font-semibold',
                   emailAvailability === 'available'
                     ? 'text-emerald-700'
                     : 'text-stone-500',
@@ -427,14 +433,14 @@ export function SignupPage() {
         <div>
           <div className="flex items-baseline justify-between gap-3">
             <label
-              className="text-[13px] font-semibold text-stone-800"
+              className="type-control font-semibold text-stone-800"
               htmlFor="signup-password"
             >
               비밀번호
             </label>
             {errors.password ? (
               <p
-                className="text-xs font-medium text-rose-700"
+                className="type-caption font-medium text-rose-700"
                 id="signup-password-error"
                 role="alert"
               >
@@ -489,7 +495,7 @@ export function SignupPage() {
             ))}
             <span
               className={[
-                'ml-1.5 min-w-9 text-right text-[11px] font-semibold',
+                'ml-1.5 min-w-9 text-right type-micro font-semibold',
                 passwordStrength.labelClassName,
               ].join(' ')}
             >
@@ -501,14 +507,14 @@ export function SignupPage() {
         <div>
           <div className="flex items-baseline justify-between gap-3">
             <label
-              className="text-[13px] font-semibold text-stone-800"
+              className="type-control font-semibold text-stone-800"
               htmlFor="signup-confirm-password"
             >
               비밀번호 확인
             </label>
             {confirmPasswordError ? (
               <p
-                className="text-xs font-medium text-rose-700"
+                className="type-caption font-medium text-rose-700"
                 id="signup-confirm-password-error"
                 role="alert"
               >
@@ -558,7 +564,7 @@ export function SignupPage() {
 
         <div className="relative" ref={affiliationContainerRef}>
           <label
-            className="text-[13px] font-semibold text-stone-800"
+            className="type-control font-semibold text-stone-800"
             htmlFor="signup-affiliation"
           >
             소속{' '}
@@ -603,7 +609,7 @@ export function SignupPage() {
               {filteredAffiliations.map((item, index) => (
                 <button
                   className={[
-                    'flex h-9 w-full items-center rounded-md px-3 text-left text-[13px] text-stone-700 hover:bg-stone-50',
+                    'flex h-9 w-full items-center rounded-md px-3 text-left type-control text-stone-700 hover:bg-stone-50',
                     index === 0 ? 'bg-stone-100 font-semibold text-stone-900' : '',
                   ].join(' ')}
                   key={item.name}
@@ -615,14 +621,14 @@ export function SignupPage() {
                   type="button"
                 >
                   {item.name}
-                  <span className="ml-auto text-[11px] font-normal text-stone-400">
+                  <span className="ml-auto type-micro font-normal text-stone-400">
                     {item.type}
                   </span>
                 </button>
               ))}
               <div className="mx-2 my-1 h-px bg-stone-100" />
               <button
-                className="flex h-9 w-full items-center rounded-md px-3 text-left text-[13px] font-semibold text-brand-700 hover:bg-brand-50"
+                className="flex h-9 w-full items-center rounded-md px-3 text-left type-control font-semibold text-brand-700 hover:bg-brand-50"
                 onClick={() => setIsAffiliationOpen(false)}
                 type="button"
               >
@@ -633,7 +639,7 @@ export function SignupPage() {
         </div>
 
         <div className="grid gap-2 pt-1">
-          <label className="flex cursor-pointer items-start gap-2.5 text-[13px] leading-5 text-stone-600">
+          <label className="flex cursor-pointer items-start gap-2.5 type-control leading-5 text-stone-600">
             <input
               checked={hasAcceptedTerms}
               className="size-4 shrink-0 rounded border-stone-300 accent-brand-600"
@@ -648,7 +654,7 @@ export function SignupPage() {
               <span className="font-semibold text-rose-600">*</span>
             </span>
           </label>
-          <label className="flex cursor-pointer items-start gap-2.5 text-[13px] leading-5 text-stone-600">
+          <label className="flex cursor-pointer items-start gap-2.5 type-control leading-5 text-stone-600">
             <input
               checked={acceptsLearningEmails}
               className="size-4 shrink-0 rounded border-stone-300 accent-brand-600"
@@ -658,7 +664,7 @@ export function SignupPage() {
             학습 소식 이메일 수신 (선택)
           </label>
           {termsError ? (
-            <p className="text-xs font-medium text-rose-700" role="alert">
+            <p className="type-caption font-medium text-rose-700" role="alert">
               {termsError}
             </p>
           ) : null}
@@ -692,7 +698,7 @@ export function SignupPage() {
       </form>
 
       {serverError ? (
-        <p className="mt-3 text-sm font-medium text-rose-700" role="alert">
+        <p className="mt-3 type-body font-medium text-rose-700" role="alert">
           {serverError}
         </p>
       ) : null}
@@ -718,7 +724,7 @@ function getEmailAvailabilityLabel(
 
 function fieldClassName(hasError: boolean, spacingClassName: string): string {
   return [
-    'block h-11 w-full rounded-[10px] border bg-white px-3.5 text-sm text-stone-950',
+    'block h-11 w-full rounded-[10px] border bg-white px-3.5 type-body text-stone-950',
     'placeholder:text-stone-400 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100',
     hasError ? 'border-rose-400' : 'border-stone-300',
     spacingClassName,

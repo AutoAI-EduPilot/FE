@@ -25,6 +25,7 @@ import {
   ButtonLink,
   ErrorState,
   LoadingState,
+  PageContainer,
   PageHeader,
 } from '../../shared/ui'
 import { diagnosisPath, routes } from '../routes'
@@ -171,11 +172,9 @@ export function QuizPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <PageContainer>
       <PageHeader
-        eyebrow="Quiz"
         title="퀴즈"
-        description={`퀴즈 ${quizId ?? '-'} 풀이와 피드백을 확인합니다.`}
       />
 
       <section className="overflow-hidden rounded-xl border border-stone-200 bg-white">
@@ -185,7 +184,7 @@ export function QuizPage() {
               <button
                 aria-selected={kind === question.kind}
                 className={[
-                  'min-h-9 rounded-lg border px-3 py-1.5 text-xs font-bold',
+                  'min-h-9 rounded-lg border px-3 py-1.5 type-caption font-bold',
                   'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
                   kind === question.kind
                     ? 'border-brand-700 bg-brand-50 text-brand-800'
@@ -202,7 +201,7 @@ export function QuizPage() {
             ))}
           </div>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-xs font-semibold text-stone-600">
+            <p className="type-caption font-semibold text-stone-600">
               문항 {currentQuestionIndex + 1} / {questions.length} · 답변{' '}
               {answeredCount} / {questions.length}
             </p>
@@ -230,7 +229,7 @@ export function QuizPage() {
           />
 
           {error ? (
-            <p className="mt-4 text-sm font-medium text-rose-700" role="alert">
+            <p className="mt-4 type-body font-medium text-rose-700" role="alert">
               {error}
             </p>
           ) : null}
@@ -281,8 +280,8 @@ export function QuizPage() {
             <div className="flex items-center gap-3">
               <CheckCircle2 aria-hidden="true" className="text-emerald-700" size={20} />
               <div>
-                <h2 className="text-base font-bold text-emerald-950">결과</h2>
-                <p className="mt-1 text-sm text-emerald-900">
+                <h2 className="type-section-title font-bold text-emerald-950">결과</h2>
+                <p className="mt-1 type-body text-emerald-900">
                   점수 {result.score}
                 </p>
               </div>
@@ -307,14 +306,14 @@ export function QuizPage() {
 
           <ul className="divide-y divide-stone-200">
             {result.feedback.map((feedback) => (
-              <li className="px-4 py-3 text-sm text-stone-700 sm:px-5" key={feedback.questionId}>
+              <li className="px-4 py-3 type-body text-stone-700 sm:px-5" key={feedback.questionId}>
                 {feedback.message}
               </li>
             ))}
           </ul>
         </section>
       ) : null}
-    </div>
+    </PageContainer>
   )
 }
 
@@ -332,12 +331,12 @@ function QuestionInput({
   if (question.kind === 'MCQ' || question.kind === 'OX') {
     return (
       <fieldset className="space-y-4">
-        <legend className="text-lg font-bold text-stone-950">{question.prompt}</legend>
+        <legend className="type-dialog-title font-bold text-stone-950">{question.prompt}</legend>
         <div className="grid gap-2 sm:grid-cols-2">
           {question.choices?.map((choice) => (
             <label
               className={[
-                'flex min-h-12 items-center gap-3 rounded-lg border px-3 py-2 text-sm font-medium',
+                'flex min-h-12 items-center gap-3 rounded-lg border px-3 py-2 type-body font-medium',
                 value === choice.id
                   ? 'border-brand-600 bg-brand-50 text-brand-900'
                   : 'border-stone-200 text-stone-700 hover:bg-stone-50',
@@ -364,9 +363,9 @@ function QuestionInput({
   if (question.kind === 'SHORT') {
     return (
       <label className="block">
-        <span className="text-lg font-bold text-stone-950">{question.prompt}</span>
+        <span className="type-dialog-title font-bold text-stone-950">{question.prompt}</span>
         <input
-          className="mt-4 min-h-10 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
+          className="mt-4 min-h-10 w-full rounded-lg border border-stone-300 px-3 py-2 type-body focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
           disabled={disabled}
           onChange={(event: ChangeEvent<HTMLInputElement>) => onChange(event.target.value)}
           value={value}
@@ -377,9 +376,9 @@ function QuestionInput({
 
   return (
     <label className="block">
-      <span className="text-lg font-bold text-stone-950">{question.prompt}</span>
+      <span className="type-dialog-title font-bold text-stone-950">{question.prompt}</span>
       <textarea
-        className="mt-4 min-h-36 w-full rounded-lg border border-stone-300 px-3 py-2 text-sm focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
+        className="mt-4 min-h-36 w-full rounded-lg border border-stone-300 px-3 py-2 type-body focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
         disabled={disabled}
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => onChange(event.target.value)}
         value={value}

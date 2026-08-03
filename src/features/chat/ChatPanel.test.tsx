@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { SessionsRepository } from '../sessions'
@@ -88,6 +88,19 @@ describe('ChatPanel', () => {
     resolveTurn?.({ messages: [], uiActions: [] })
   })
 
+  it('starts a server-side conversation before clearing the visible chat', async () => {
+    const repository = createRepository({
+      listMessages: vi.fn().mockResolvedValue([{ content: '이전 답변', createdAt: '2026-08-03T00:00:00Z', id: '1', senderType: 'AI' }]),
+    })
+    render(<ChatHarness repository={repository} />)
+    expect(await screen.findByText('이전 답변')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '대화 새로 시작' }))
+
+    await waitFor(() => expect(repository.startNewConversation).toHaveBeenCalledWith('100'))
+    expect(screen.queryByText('이전 답변')).not.toBeInTheDocument()
+  })
+
   it('renders assistant messages as markdown but keeps user text literal', async () => {
     const repository = createRepository({
       listMessages: vi.fn().mockResolvedValue([
@@ -125,6 +138,10 @@ function createRepository(
     list: vi.fn(),
     listMessages: vi.fn().mockResolvedValue([]),
     listQuizzes: vi.fn(),
+    startNewConversation: vi.fn().mockResolvedValue({
+      conversationId: '1',
+      startedAt: '2026-08-03T00:00:00Z',
+    }),
     movePage: vi.fn(),
     stream: vi.fn().mockResolvedValue(undefined),
     submitTurn: vi.fn().mockResolvedValue({

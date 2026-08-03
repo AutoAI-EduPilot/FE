@@ -1,11 +1,18 @@
 import { UserX } from 'lucide-react'
-import { useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 
-import { getRoleLabel, useAuth } from '../../features/auth'
+import { createUserSettingsRepository, getRoleLabel, useAuth, type AiAnswerStyle } from '../../features/auth'
 import { ApiClientError, getRequestErrorMessage } from '../../shared/api'
 import { cx } from '../../shared/lib/cx'
-import { Button, Card, PageHeader, TextInput, useToast } from '../../shared/ui'
+import {
+  Button,
+  Card,
+  PageContainer,
+  PageHeader,
+  TextInput,
+  useToast,
+} from '../../shared/ui'
 import { routes } from '../routes'
 import { usePageTitle } from '../../shared/lib/usePageTitle'
 
@@ -13,9 +20,9 @@ type SettingsSection = 'account' | 'assistant' | 'notification' | 'profile'
 
 const SECTIONS: Array<{ id: SettingsSection; label: string }> = [
   { id: 'profile', label: '프로필' },
-  { id: 'account', label: '회원 탈퇴' },
   { id: 'notification', label: '알림' },
   { id: 'assistant', label: 'AI 학습 도우미' },
+  { id: 'account', label: '회원 탈퇴' },
 ]
 
 const ANSWER_STYLES = [
@@ -24,24 +31,59 @@ const ANSWER_STYLES = [
   { label: '자세하게', value: 'DETAILED' },
 ]
 
-// TODO(BE): 프로필 수정·환경설정 API가 없어 로컬 상태로만 동작한다.
-// 요청 스펙은 docs/be-api-requests.md §3-1, §3-2 참고.
-const PENDING_API_NOTICE = '백엔드 연동 대기 중인 항목입니다. 저장되지 않습니다.'
-
 export function SettingsPage() {
   usePageTitle('설정')
-  const { user, withdraw } = useAuth()
+  const { apiRequest, rawApiRequest, updateUser, user, withdraw } = useAuth()
   const { show: showToast } = useToast()
   const navigate = useNavigate()
   const [section, setSection] = useState<SettingsSection>('profile')
   const [name, setName] = useState(user?.name ?? '')
-  const [affiliation, setAffiliation] = useState('')
+  const [affiliation, setAffiliation] = useState(user?.affiliation ?? '')
   const [newMaterialNotification, setNewMaterialNotification] = useState(true)
   const [studyReminder, setStudyReminder] = useState(false)
-  const [answerStyle, setAnswerStyle] = useState('NORMAL')
+  const [answerStyle, setAnswerStyle] = useState<AiAnswerStyle>('NORMAL')
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
   const [password, setPassword] = useState('')
   const [passwordError, setPasswordError] = useState<string | undefined>()
   const [isWithdrawing, setIsWithdrawing] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement | null>(null)
+  const repository = useMemo(() => createUserSettingsRepository(apiRequest, rawApiRequest), [apiRequest, rawApiRequest])
+
+  useEffect(() => {
+    repository.getPreferences().then((preferences) => {
+      setNewMaterialNotification(preferences.newMaterialNotification)
+      setStudyReminder(preferences.studyReminder)
+      setAnswerStyle(preferences.aiAnswerStyle)
+    }).catch(() => undefined)
+    if (!user?.avatarUrl) return
+    let objectUrl: string | null = null
+    repository.getAvatar().then((blob) => { objectUrl = URL.createObjectURL(blob); setAvatarUrl(objectUrl) }).catch(() => undefined)
+    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl) }
+  }, [repository, user?.avatarUrl])
+
+  async function saveSettings() {
+    if (!user || isSaving) return
+    setIsSaving(true)
+    try {
+      const [updatedUser] = await Promise.all([
+        repository.updateProfile({ affiliation: affiliation.trim(), name: name.trim() }),
+        repository.updatePreferences({ aiAnswerStyle: answerStyle, newMaterialNotification, studyReminder }),
+      ])
+      updateUser(updatedUser)
+      showToast('설정을 저장했습니다.', 'success')
+    } catch (error) { showToast(getRequestErrorMessage(error), 'danger') } finally { setIsSaving(false) }
+  }
+
+  async function uploadAvatar(file: File) {
+    try { await repository.uploadAvatar(file); const blob = await repository.getAvatar(); if (avatarUrl) URL.revokeObjectURL(avatarUrl); const next = URL.createObjectURL(blob); setAvatarUrl(next); if (user) updateUser({ ...user, avatarUrl: '/api/users/me/avatar' }); showToast('프로필 사진을 변경했습니다.', 'success') }
+    catch (error) { showToast(getRequestErrorMessage(error), 'danger') }
+  }
+
+  async function deleteAvatar() {
+    try { await repository.deleteAvatar(); if (avatarUrl) URL.revokeObjectURL(avatarUrl); setAvatarUrl(null); if (user) updateUser({ ...user, avatarUrl: undefined }); showToast('프로필 사진을 삭제했습니다.', 'success') }
+    catch (error) { showToast(getRequestErrorMessage(error), 'danger') }
+  }
 
   async function handleWithdraw(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -78,11 +120,9 @@ export function SettingsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <PageContainer>
       <PageHeader
-        eyebrow="Settings"
         title="설정"
-        description="계정 정보와 학습 도우미 동작을 관리합니다."
       />
 
       <div className="flex flex-col gap-7 lg:flex-row">
@@ -91,11 +131,16 @@ export function SettingsPage() {
             <button
               aria-current={section === item.id ? 'page' : undefined}
               className={cx(
-                'flex h-9 shrink-0 items-center rounded-lg px-3 text-[13.5px]',
+                'flex h-9 shrink-0 items-center rounded-lg px-3 type-control',
                 'focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600',
+                item.id === 'account' && 'text-rose-700 lg:mt-4 lg:border-t lg:border-stone-200 lg:pt-px',
                 section === item.id
-                  ? 'bg-stone-100 font-semibold text-stone-900'
-                  : 'font-medium text-stone-500 hover:bg-stone-50 hover:text-stone-800',
+                  ? item.id === 'account'
+                    ? 'bg-rose-50 font-semibold text-rose-700'
+                    : 'bg-stone-100 font-semibold text-stone-900'
+                  : item.id === 'account'
+                    ? 'font-medium hover:bg-rose-50'
+                    : 'font-medium text-stone-500 hover:bg-stone-50 hover:text-stone-800',
               )}
               key={item.id}
               onClick={() => setSection(item.id)}
@@ -110,19 +155,21 @@ export function SettingsPage() {
           {section === 'profile' ? (
             <ProfileSection
               affiliation={affiliation}
+              avatarUrl={avatarUrl}
               email={user?.email ?? ''}
               name={name}
               onAffiliationChange={setAffiliation}
               onNameChange={setName}
-              onNotice={() => showToast(PENDING_API_NOTICE, 'info')}
+              onDeleteAvatar={() => void deleteAvatar()}
+              onSelectAvatar={() => avatarInputRef.current?.click()}
               role={getRoleLabel(user?.role)}
             />
           ) : null}
 
           {section === 'account' ? (
             <section className="rounded-xl border border-rose-200 bg-white p-5 sm:p-6">
-              <h2 className="text-base font-bold text-rose-900">회원 탈퇴</h2>
-              <p className="mt-1 text-sm text-stone-500">
+              <h2 className="type-section-title font-bold text-rose-900">회원 탈퇴</h2>
+              <p className="mt-1 type-body text-stone-500">
                 탈퇴하면 자료와 학습 세션이 삭제되고 복구할 수 없습니다. 계속하려면
                 비밀번호를 입력하세요.
               </p>
@@ -180,18 +227,18 @@ export function SettingsPage() {
               {section !== 'notification' ? (
                 <div className="flex items-center gap-4 py-4">
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-stone-900">
+                    <p className="type-body font-semibold text-stone-900">
                       AI 답변 스타일
                     </p>
-                    <p className="mt-0.5 text-[12.5px] text-stone-400">
+                    <p className="mt-0.5 type-caption text-stone-400">
                       채팅 답변의 길이와 난이도를 조절해요
                     </p>
                   </div>
                   <label className="ml-auto shrink-0">
                     <span className="sr-only">AI 답변 스타일</span>
                     <select
-                      className="h-9 rounded-lg border border-stone-200 bg-white px-3 text-[12.5px] font-medium text-stone-700 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
-                      onChange={(event) => setAnswerStyle(event.target.value)}
+                      className="h-9 rounded-lg border border-stone-200 bg-white px-3 type-caption font-medium text-stone-700 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
+                      onChange={(event) => setAnswerStyle(event.target.value as AiAnswerStyle)}
                       value={answerStyle}
                     >
                       {ANSWER_STYLES.map((style) => (
@@ -208,8 +255,8 @@ export function SettingsPage() {
 
           {section === 'account' ? null : (
             <div className="flex items-center justify-end gap-3">
-              <p className="mr-auto text-xs text-stone-400">
-                저장 API 연동 대기 중입니다.
+              <p className="mr-auto type-caption text-stone-400">
+                변경사항은 계정에 저장됩니다.
               </p>
               <Button
                 onClick={() => {
@@ -222,49 +269,53 @@ export function SettingsPage() {
                 취소
               </Button>
               <Button
-                onClick={() => showToast(PENDING_API_NOTICE, 'info')}
+                disabled={isSaving || !name.trim()}
+                onClick={() => void saveSettings()}
                 type="button"
               >
-                저장
+                {isSaving ? '저장 중' : '저장'}
               </Button>
             </div>
           )}
         </div>
       </div>
-    </div>
+      <input accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadAvatar(file); event.target.value = '' }} ref={avatarInputRef} type="file" />
+    </PageContainer>
   )
 }
 
 function ProfileSection({
   affiliation,
+  avatarUrl,
   email,
   name,
   onAffiliationChange,
   onNameChange,
-  onNotice,
+  onDeleteAvatar,
+  onSelectAvatar,
   role,
 }: {
   affiliation: string
+  avatarUrl: string | null
   email: string
   name: string
   onAffiliationChange: (value: string) => void
   onNameChange: (value: string) => void
-  onNotice: () => void
+  onDeleteAvatar: () => void
+  onSelectAvatar: () => void
   role: string
 }) {
   return (
     <Card as="section" className="p-5 sm:p-6">
-      <h2 className="text-base font-bold text-stone-950">프로필</h2>
+      <h2 className="type-section-title font-bold text-stone-950">프로필</h2>
 
       <div className="mt-5 flex items-center gap-4.5">
-        <span className="flex size-16 shrink-0 items-center justify-center rounded-full bg-stone-200 text-[22px] font-bold text-stone-500">
-          {name.slice(0, 1) || '?'}
-        </span>
+        <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-stone-200 type-page-title font-bold text-stone-500">{avatarUrl ? <img alt="프로필" className="h-full w-full object-cover" src={avatarUrl} /> : name.slice(0, 1) || '?'}</span>
         <div className="flex gap-2">
-          <Button onClick={onNotice} size="sm" type="button" variant="secondary">
+          <Button onClick={onSelectAvatar} size="sm" type="button" variant="secondary">
             사진 변경
           </Button>
-          <Button onClick={onNotice} size="sm" type="button" variant="ghost">
+          <Button disabled={!avatarUrl} onClick={onDeleteAvatar} size="sm" type="button" variant="ghost">
             삭제
           </Button>
         </div>
@@ -319,8 +370,8 @@ function ToggleRow({
       )}
     >
       <div className="min-w-0">
-        <p className="text-sm font-semibold text-stone-900">{label}</p>
-        <p className="mt-0.5 text-[12.5px] text-stone-400">{description}</p>
+        <p className="type-body font-semibold text-stone-900">{label}</p>
+        <p className="mt-0.5 type-caption text-stone-400">{description}</p>
       </div>
       <button
         aria-checked={checked}

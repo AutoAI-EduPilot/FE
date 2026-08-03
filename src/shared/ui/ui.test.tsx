@@ -2,7 +2,15 @@ import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 
-import { Button, ButtonLink, EmptyState, ErrorState, TextInput } from './index'
+import {
+  Button,
+  ButtonLink,
+  EmptyState,
+  ErrorState,
+  PageContainer,
+  PageHeader,
+  TextInput,
+} from './index'
 
 describe('shared ui', () => {
   it('renders button variants and disabled state', () => {
@@ -13,6 +21,7 @@ describe('shared ui', () => {
     )
 
     expect(screen.getByRole('button', { name: '저장 준비 중' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '저장 준비 중' })).toHaveClass('type-body')
   })
 
   it('renders button links with router navigation', () => {
@@ -41,6 +50,19 @@ describe('shared ui', () => {
     expect(screen.getByRole('button', { name: '업로드 준비 중' })).toBeInTheDocument()
   })
 
+  it('applies the shared page layout spacing', () => {
+    render(
+      <PageContainer data-testid="page-container">
+        <h1>페이지 제목</h1>
+      </PageContainer>,
+    )
+
+    expect(screen.getByTestId('page-container')).toHaveClass(
+      'w-full',
+      'space-y-5',
+    )
+  })
+
   it('renders error state as an alert', () => {
     render(
       <ErrorState
@@ -63,5 +85,13 @@ describe('shared ui', () => {
     )
 
     expect(screen.getByLabelText('이메일')).toHaveAttribute('aria-describedby', 'email-description')
+    expect(screen.getByLabelText('이메일')).toHaveClass('type-body')
+    expect(screen.getByText('로그인에 사용할 이메일입니다.')).toHaveClass('type-caption')
+  })
+
+  it('uses the page title typography for shared page headers', () => {
+    render(<PageHeader title="내 강의실" />)
+
+    expect(screen.getByRole('heading', { name: '내 강의실' })).toHaveClass('type-page-title')
   })
 })

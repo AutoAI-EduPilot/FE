@@ -84,7 +84,8 @@ interface SessionQuizDto {
 }
 
 interface SessionQuizListDto {
-  quizzes: SessionQuizDto[]
+  items?: SessionQuizDto[]
+  quizzes?: SessionQuizDto[]
 }
 
 export interface SessionTurnRequest {
@@ -128,6 +129,10 @@ export interface SessionsRepository {
     sessionId: string,
     signal?: AbortSignal,
   ) => Promise<SessionQuizSummary[]>
+  startNewConversation: (
+    sessionId: string,
+    signal?: AbortSignal,
+  ) => Promise<{ conversationId: string; startedAt: string }>
   movePage: (
     sessionId: string,
     pageNumber: number,
@@ -204,7 +209,7 @@ export function createSessionsRepository(
         `/api/sessions/${encodeURIComponent(sessionId)}/quizzes`,
         { signal },
       )
-      return data.quizzes.map((quiz) => ({
+      return (data.quizzes ?? data.items ?? []).map((quiz) => ({
         createdAt: quiz.createdAt,
         maxScore: quiz.maxScore,
         passed: quiz.passed,
@@ -214,6 +219,19 @@ export function createSessionsRepository(
         submitted: quiz.submitted,
         title: quiz.title,
       }))
+    },
+    async startNewConversation(sessionId, signal) {
+      const { data } = await request<{
+        conversationId: number | string
+        startedAt: string
+      }>(`/api/sessions/${encodeURIComponent(sessionId)}/conversations`, {
+        method: 'POST',
+        signal,
+      })
+      return {
+        conversationId: String(data.conversationId),
+        startedAt: data.startedAt,
+      }
     },
     async movePage(sessionId, pageNumber, signal) {
       const { data } = await request<{

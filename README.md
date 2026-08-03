@@ -27,9 +27,14 @@ npm run dev
 
 | 이름 | 예시 | 설명 |
 | --- | --- | --- |
-| `VITE_API_BASE_URL` | `http://localhost:8080` | Spring Main Service의 base URL |
+| `VITE_API_BASE_URL` | `/api` | 브라우저가 호출할 Spring Main Service 경로 |
+| `VITE_DEV_PROXY_TARGET` | `https://edu-pilot.duckdns.org` | 로컬 `/api` 요청을 전달할 백엔드 |
 
-저장소에는 가짜 값만 포함된 `.env.example`을 커밋합니다. 토큰과 비밀값이 있는 로컬 환경 파일은 커밋하지 않습니다.
+기본 로컬 서버는 배포된 dev 백엔드를 프록시하므로 역할, 인증 쿠키,
+API 응답이 배포 화면과 같습니다. 로컬 Spring을 사용할 때만
+`VITE_DEV_PROXY_TARGET=http://localhost:8080`으로 변경하고, 화면 QA용
+mock은 `VITE_DEV_PROXY_TARGET=mock`을 명시한 경우에만 사용합니다.
+토큰과 비밀값이 있는 로컬 환경 파일은 커밋하지 않습니다.
 
 ## 프로젝트 구조
 
@@ -48,9 +53,18 @@ src/
 
 | Route | 목적 |
 | --- | --- |
-| `/` | `/materials`로 이동 |
+| `/` | `/classrooms`로 이동 |
 | `/login` | 로그인 및 저장 세션 복원 |
 | `/signup` | 회원가입 후 자동 로그인 |
+| `/classrooms` | 역할별 내 강의실 |
+| `/classrooms/:classroomId` | 역할별 강의실 상세와 주차별 자료 |
+| `/classrooms/:classroomId/edit` | 강의자 강의실 정보·학습자 관리 |
+| `/calendar` | 역할별 강의 일정. 강의자는 일정 관리 가능 |
+| `/notes` | 학습자가 세션에서 저장한 노트 모음 |
+| `/review-quizzes` | 학습자가 세션에서 만든 복습 퀴즈 모음 |
+| `/learning-status` | 강의자 학습 현황 |
+| `/announcements` | 강의자 공지 관리 |
+| `/entrance-requests` | 강의자 입장 요청 관리 |
 | `/materials` | 자료 목록과 PDF 업로드 |
 | `/materials/:materialId` | 자료 상세와 학습 세션 생성 |
 | `/sessions` | 세션 목록과 재진입 |
@@ -72,6 +86,10 @@ EduPilot FE는 운영형 SaaS 학습 도구 방향을 기본으로 합니다. �
 
 - 배포 Swagger와 FE 연결 상태는
   [Swagger API 연결 상태](docs/swagger-api-connection-status.md)에서 관리합니다.
+- 화면은 구현되어 있지만 BE 계약이 없는 기능은
+  [BE 필요 API 목록](docs/be-api-requests.md)에서 관리합니다.
+- 브랜치·PR·이슈 정리 점검 결과는
+  [FE GitHub 정리 점검](docs/github-repository-audit-2026-08-02.md)에서 관리합니다.
 - 모든 브라우저 요청은 `VITE_API_BASE_URL`에 설정한 Spring Main Service로 보냅니다.
 - `apiRequest`는 `/api/...` 형태의 상대 경로만 허용합니다. 절대 URL이나 FastAPI URL을 직접 전달할 수 없습니다.
 - 요청에는 기본적으로 `credentials: include`를 적용합니다.
