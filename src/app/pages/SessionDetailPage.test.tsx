@@ -15,6 +15,7 @@ import { SessionDetailPage } from './SessionDetailPage'
 
 beforeEach(() => {
   installApiFixtureServer()
+  rememberClassroomId('12')
   Object.defineProperty(window, 'innerWidth', {
     configurable: true,
     value: 1600,
@@ -94,7 +95,9 @@ describe('SessionDetailPage', () => {
         screen.getByRole('progressbar', { name: '학습 진행률 2 / 5쪽' }),
       ).toBeInTheDocument(),
     )
-    expect(screen.queryByText('현재 페이지를 설명할까요?')).not.toBeInTheDocument()
+    expect(
+      await screen.findByText('현재 페이지를 설명할까요?'),
+    ).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '목차' }))
     fireEvent.click(screen.getByRole('button', { name: '4쪽으로 이동' }))
     await waitFor(() =>
@@ -162,10 +165,13 @@ describe('SessionDetailPage', () => {
     ).toBeInTheDocument()
   })
 
-  it('renders the submitted quiz history with score badges', async () => {
+  it('groups current-classroom materials and quizzes by week', async () => {
     renderSessionDetail()
 
-    expect(await screen.findByText('퀴즈 기록')).toBeInTheDocument()
+    expect(await screen.findByText('1주차')).toBeInTheDocument()
+    expect(screen.getByText('2주차')).toBeInTheDocument()
+    expect(screen.getAllByText('시험 대비 요약.pdf')).toHaveLength(2)
+    expect(screen.getByText('강의 노트 5주차.pdf')).toBeInTheDocument()
     expect(screen.getByText('학습 확인 퀴즈')).toBeInTheDocument()
     expect(screen.getByText('객관식')).toBeInTheDocument()
     expect(screen.getByText('48점')).toBeInTheDocument()

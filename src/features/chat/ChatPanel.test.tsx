@@ -1,4 +1,5 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 import type { SessionsRepository, SessionTurnResult } from '../sessions'
@@ -11,12 +12,16 @@ afterEach(() => {
 })
 
 function ChatHarness({
+  conversationAction,
   currentPage,
+  onExplainCurrentPage,
   onTurnCompleted,
   repository,
   sessionId = '100',
 }: {
+  conversationAction?: ReactNode
   currentPage?: number
+  onExplainCurrentPage?: () => void
   onTurnCompleted?: (result: SessionTurnResult) => void
   repository: SessionsRepository
   sessionId?: string
@@ -25,7 +30,9 @@ function ChatHarness({
   return (
     <ChatPanel
       chat={chat}
+      conversationAction={conversationAction}
       currentPage={currentPage}
+      onExplainCurrentPage={onExplainCurrentPage}
       onTurnCompleted={onTurnCompleted}
       sessionId={sessionId}
     />
@@ -33,6 +40,19 @@ function ChatHarness({
 }
 
 describe('ChatPanel', () => {
+  it('renders learning decisions inside the conversation log', async () => {
+    render(
+      <ChatHarness
+        conversationAction={<button type="button">퀴즈를 진행할까요?</button>}
+        repository={createRepository()}
+      />,
+    )
+
+    const action = await screen.findByRole('button', { name: '퀴즈를 진행할까요?' })
+    expect(screen.getByRole('log')).toContainElement(action)
+    expect(action.closest('[aria-label="AI 진행 안내"]')).toBeInTheDocument()
+  })
+
   it('validates empty questions before sending a turn', async () => {
     render(<ChatHarness repository={createRepository()} />)
     await screen.findByText('보고 있는 페이지를 함께 읽고 답변해요')
@@ -166,6 +186,29 @@ describe('ChatPanel', () => {
 
     await waitFor(() => expect(repository.startNewConversation).toHaveBeenCalledWith('100'))
     expect(screen.queryByText('이전 답변')).not.toBeInTheDocument()
+  })
+
+  it('routes the explain quick action through the learning event callback', async () => {
+    const onExplainCurrentPage = vi.fn()
+    const repository = createRepository({
+      listMessages: vi.fn().mockResolvedValue([{
+        content: '이전 설명',
+        createdAt: '2026-08-05T00:00:00Z',
+        id: '1',
+        senderType: 'AI',
+      }]),
+    })
+    render(
+      <ChatHarness
+        onExplainCurrentPage={onExplainCurrentPage}
+        repository={repository}
+      />,
+    )
+
+    fireEvent.click(await screen.findByRole('button', { name: '쉽게 설명해줘' }))
+
+    expect(onExplainCurrentPage).toHaveBeenCalledOnce()
+    expect(repository.submitTurn).not.toHaveBeenCalled()
   })
 
   it('renders assistant messages as markdown but keeps user text literal', async () => {

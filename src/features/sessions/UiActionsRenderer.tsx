@@ -24,10 +24,10 @@ export function UiActionsRenderer({
         if (action.kind === 'BINARY_DECISION') {
           return (
             <div
-              className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2.5"
+              className="min-w-64"
               key={`${action.kind}-${action.label}`}
             >
-              <p className="type-body font-semibold text-brand-950">{action.label}</p>
+              <p className="type-body font-semibold text-stone-900">{action.label}</p>
               <div className="mt-2 flex gap-2">
                 <button
                   className={`${decisionButtonClassName} border-brand-600 bg-brand-700 text-white hover:bg-brand-800`}
@@ -54,10 +54,10 @@ export function UiActionsRenderer({
         if (action.kind === 'DIAGNOSIS_QUESTION') {
           return (
             <div
-              className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5"
+              className="min-w-64"
               key={`${action.kind}-${action.diagnosisId}`}
             >
-              <p className="type-body font-semibold text-amber-950">{action.label}</p>
+              <p className="type-body font-semibold text-stone-900">{action.label}</p>
               <button
                 className={`${decisionButtonClassName} mt-2 w-full border-amber-600 bg-amber-600 text-white hover:bg-amber-700`}
                 disabled={disabled}

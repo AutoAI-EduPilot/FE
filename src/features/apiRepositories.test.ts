@@ -399,6 +399,38 @@ describe('remote feature repositories', () => {
     )
   })
 
+  it('creates selectable O/X choices with the documented boolean answer values', async () => {
+    const request = vi.fn().mockResolvedValue(
+      success({
+        questions: [
+          {
+            maxScore: 100,
+            questionId: 'q-ox',
+            questionText: '이 설명은 맞습니까?',
+          },
+        ],
+        quizId: 51,
+        quizType: 'OX',
+        sessionId: 100,
+        submitted: false,
+        title: 'OX 확인 퀴즈',
+      }),
+    )
+    const repository = createQuizRepository(request as AuthenticatedRequest)
+
+    await expect(repository.getById('51')).resolves.toMatchObject({
+      questions: [
+        {
+          choices: [
+            { id: 'true', label: 'O' },
+            { id: 'false', label: 'X' },
+          ],
+          kind: 'OX',
+        },
+      ],
+    })
+  })
+
   it('loads learner memory using the material query parameter', async () => {
     const request = vi.fn().mockResolvedValue(
       success({

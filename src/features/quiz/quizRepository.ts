@@ -145,11 +145,23 @@ function mapQuestion(
   quizKind: QuizKind,
 ): PublicQuizQuestion {
   return {
-    choices: question.options?.map(mapChoice),
+    choices: mapQuestionChoices(question.options, quizKind),
     id: String(question.questionId),
     kind: quizKind,
     prompt: question.questionText,
   }
+}
+
+function mapQuestionChoices(
+  options: QuizChoiceDto[] | undefined,
+  quizKind: QuizKind,
+): QuizChoice[] | undefined {
+  if (options && options.length > 0) return options.map(mapChoice)
+  if (quizKind !== 'OX') return undefined
+  return [
+    { id: 'true', label: 'O' },
+    { id: 'false', label: 'X' },
+  ]
 }
 
 function mapChoice(choice: QuizChoiceDto): QuizChoice {

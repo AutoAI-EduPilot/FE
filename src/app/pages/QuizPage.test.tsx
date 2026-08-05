@@ -16,10 +16,10 @@ afterEach(() => {
   vi.unstubAllEnvs()
 })
 
-function renderQuizPage() {
+function renderQuizPage(path = '/quizzes/50') {
   return render(
     <TestAuthProvider>
-      <MemoryRouter initialEntries={['/quizzes/50']}>
+      <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/quizzes/:quizId" element={<QuizPage />} />
         </Routes>
@@ -36,6 +36,19 @@ async function answerAllQuestions() {
 }
 
 describe('QuizPage', () => {
+  it('allows O or X to be selected when the API omits options', async () => {
+    renderQuizPage('/quizzes/51')
+
+    const trueChoice = await screen.findByLabelText('O')
+    const falseChoice = screen.getByLabelText('X')
+    expect(trueChoice).not.toBeChecked()
+    expect(falseChoice).not.toBeChecked()
+
+    fireEvent.click(trueChoice)
+    expect(trueChoice).toBeChecked()
+    expect(screen.getByText('문항 1 / 1 · 답변 1 / 1')).toBeInTheDocument()
+  })
+
   it('validates an empty answer from an API quiz', async () => {
     renderQuizPage()
     await screen.findByText('문항 1 / 2 · 답변 0 / 2')
