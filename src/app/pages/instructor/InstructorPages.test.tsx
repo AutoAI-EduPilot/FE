@@ -3,6 +3,7 @@ import {
   fireEvent,
   render,
   screen,
+  waitFor,
   within,
 } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -31,7 +32,7 @@ function renderCalendar() {
         role: 'INSTRUCTOR',
       }}
     >
-      <InstructorCalendarPage />
+      <ToastProvider><InstructorCalendarPage /></ToastProvider>
     </AuthProvider>,
   )
 }
@@ -108,7 +109,17 @@ function stubClassroomsApi(status: 'ACTIVE' | 'COMPLETED' = 'ACTIVE') {
         status: 200,
       })
 
+    if (url.includes('/analytics')) return envelope({
+      aiQuestionCountLast7Days: 17,
+      averageProgressRate: 38,
+      inactiveLearnerCountLast7Days: 4,
+      lastUpdatedAt: '2026-08-04T06:00:00Z',
+      learnerCount: 42,
+      materials: [],
+      questionsByPage: [],
+    })
     if (url.includes('/invite-code')) return envelope({ inviteCode: '7QK4-MZ2A' })
+    if (url.includes('/students')) return envelope({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0 })
     if (url.includes('/weeks')) return envelope({ items: [] })
     if (url.includes('/api/classrooms')) {
       return envelope({
@@ -133,6 +144,30 @@ function stubClassroomsApi(status: 'ACTIVE' | 'COMPLETED' = 'ACTIVE') {
         totalPages: 1,
       })
     }
+    return envelope(null)
+  })
+}
+
+function stubCalendarApi() {
+  return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const url = String(input instanceof Request ? input.url : input)
+    const method = input instanceof Request ? input.method : init?.method ?? 'GET'
+    const envelope = (data: unknown) => new Response(
+      JSON.stringify({ data, message: 'ok', success: true }),
+      { headers: { 'Content-Type': 'application/json' }, status: 200 },
+    )
+    if (method === 'GET' && url.includes('/api/users/me/schedule?')) return envelope({ items: [] })
+    if (method === 'POST' && url.endsWith('/api/users/me/schedule')) {
+      return envelope({
+        endsAt: '2099-08-03T09:00:00.000Z',
+        hasTime: true,
+        kind: 'PERSONAL',
+        scheduleId: 'personal-1',
+        startsAt: '2099-08-03T09:00:00.000Z',
+        title: '중간고사 범위 공지',
+      })
+    }
+    if (method === 'DELETE' && url.endsWith('/api/users/me/schedule/personal-1')) return envelope(null)
     return envelope(null)
   })
 }
@@ -343,7 +378,8 @@ describe('instructor pages', () => {
     expect(within(sunday).getByText('9')).toHaveClass('text-rose-600')
   })
 
-  it('adds and removes a calendar schedule', () => {
+  it('adds and removes a calendar schedule through the personal schedule API', async () => {
+    const fetchMock = stubCalendarApi()
     renderCalendar()
 
     fireEvent.click(screen.getByRole('button', { name: '일정 추가' }))
@@ -357,11 +393,9 @@ describe('instructor pages', () => {
     fireEvent.change(screen.getByLabelText('날짜와 시간'), {
       target: { value: '2099-08-03T09:00' },
     })
-    fireEvent.change(screen.getByLabelText('일정 유형'), {
-      target: { value: 'NOTICE' },
-    })
     fireEvent.click(screen.getByRole('button', { name: '추가' }))
 
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: '일정 추가' })).not.toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: '목록' }))
     fireEvent.click(
       screen.getByRole('button', { name: /중간고사 범위 공지/ }),
@@ -371,8 +405,9 @@ describe('instructor pages', () => {
     ).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: '일정 삭제' }))
-    expect(screen.queryByText('중간고사 범위 공지')).not.toBeInTheDocument()
+    await waitFor(() => expect(screen.queryByText('중간고사 범위 공지')).not.toBeInTheDocument())
     expect(window.localStorage.length).toBe(0)
+    fetchMock.mockRestore()
   })
 
   it('supports all-day and ranged calendar schedules', () => {
@@ -396,8 +431,8 @@ describe('instructor pages', () => {
     )
 
     expect(await screen.findByLabelText('강의실 선택')).toHaveValue('12')
-    expect(screen.getByText('자료구조의 자료별 열람 인원이 표시됩니다.')).toBeInTheDocument()
-    expect(screen.getByText('마지막 갱신 정보 없음')).toBeInTheDocument()
+    expect(await screen.findByText('17')).toBeInTheDocument()
+    expect(screen.getByText(/마지막 갱신/)).toBeInTheDocument()
     expect(screen.getByText('페이지별 AI 질문 수')).toBeInTheDocument()
     expect(
       screen.queryByRole('button', { name: '리마인더 보내기' }),

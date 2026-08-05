@@ -29,30 +29,30 @@ describe('reports repository', () => {
 
     expect(request).toHaveBeenCalledWith('/api/classrooms/12/students/31/reports', {
       body: {
-        criterionIds: undefined,
         requestId: 'request-1',
-        scope: { type: 'WEEK', weekNumber: 2 },
+        scope: 'WEEK',
+        weekNumber: 2,
       },
       method: 'POST',
     })
   })
 
-  it('keeps insufficient-data scores null and uses server stage and trend values', async () => {
+  it('maps the deployed completed-report contract without turning null scores into zero', async () => {
     const request = vi.fn().mockResolvedValue({
       data: {
         classroomId: 12,
-        criterionResults: [{
+        criteria: [{
           criterionKey: 'quiz_accuracy',
-          criterionName: '퀴즈 정확도',
           evidenceIds: [],
           narrative: '평가할 문항이 충분하지 않습니다.',
           score: null,
           status: 'INSUFFICIENT_DATA',
           trend: 'STABLE',
         }],
+        evidence: [{ evidenceId: 'e-1', occurredAt: '2026-08-04T00:00:00Z', publicLabel: '퀴즈 3회', sourceType: 'QUIZ_SUBMISSION' }],
         overallScore: null,
+        overallStage: '보완 필요',
         reportId: 'report-2',
-        stage: '보완 필요',
         status: 'COMPLETED',
         studentId: 31,
         trend: 'DECLINING',
@@ -64,8 +64,53 @@ describe('reports repository', () => {
 
     expect(report.overallScore).toBeNull()
     expect(report.criterionResults[0]?.score).toBeNull()
+    expect(report.criterionResults[0]?.criterionName).toBe('quiz_accuracy')
+    expect(report.evidence[0]).toEqual(expect.objectContaining({ fact: '퀴즈 3회', label: '퀴즈 3회' }))
     expect(report.stage).toBe('보완 필요')
     expect(report.trend).toBe('DECLINING')
     expect(request).toHaveBeenCalledWith('/api/reports/report-2', { signal: undefined })
+  })
+
+  it('maps completed versions and restores an active generation from the list response', async () => {
+    const request = vi.fn().mockResolvedValue({
+      data: {
+        activeGeneration: { pollAfterSeconds: 5, reportId: 'report-active', status: 'PROCESSING' },
+        items: [{ createdAt: '2026-08-04T00:00:00Z', overallScore: 82, overallStage: '양호', reportId: 'report-1', version: 1 }],
+      },
+    })
+    const repository = createReportsRepository(request as AuthenticatedRequest)
+
+    await expect(repository.listReports('12', '31')).resolves.toEqual({
+      activeGeneration: expect.objectContaining({ reportId: 'report-active', status: 'PROCESSING' }),
+      items: [expect.objectContaining({ reportId: 'report-1', stage: '양호', status: 'COMPLETED' })],
+    })
+    expect(request).toHaveBeenCalledWith('/api/classrooms/12/students/31/reports', { signal: undefined })
+  })
+
+  it('maps report criteria field names in both directions', async () => {
+    const request = vi.fn()
+      .mockResolvedValueOnce({ data: { items: [{ active: true, allowedSources: ['SESSION'], builtin: true, criterionId: null, criterionKey: 'engagement', description: '참여도', minEvidence: 2, name: '학습 참여', rubric: { summary: '활동을 평가' }, version: 'v1', weight: 1 }] } })
+      .mockResolvedValueOnce({ data: { active: true, allowedSources: ['SESSION'], builtin: false, criterionId: 10, criterionKey: 'weekly', description: '주간', minEvidence: 2, name: '주간 학습', rubric: { summary: '일관성을 평가' }, version: 'v1', weight: 1 } })
+    const repository = createReportsRepository(request as AuthenticatedRequest)
+
+    await expect(repository.listCriteria('12')).resolves.toEqual([
+      expect.objectContaining({ builtin: true, id: null, key: 'engagement', minimumEvidence: 2, sourceTypes: ['SESSION'] }),
+    ])
+    await repository.createCriterion('12', { description: '주간', key: 'weekly', minimumEvidence: 2, name: '주간 학습', rubric: '일관성을 평가', sourceTypes: ['SESSION'], weight: 1 })
+
+    expect(request).toHaveBeenNthCalledWith(1, '/api/classrooms/12/report-criteria', { signal: undefined })
+    expect(request).toHaveBeenNthCalledWith(2, '/api/classrooms/12/report-criteria', {
+      body: {
+        active: undefined,
+        allowedSources: ['SESSION'],
+        criterionKey: 'weekly',
+        description: '주간',
+        minEvidence: 2,
+        name: '주간 학습',
+        rubric: { summary: '일관성을 평가' },
+        weight: 1,
+      },
+      method: 'POST',
+    })
   })
 })

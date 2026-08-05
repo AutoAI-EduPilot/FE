@@ -15,6 +15,10 @@ import { SessionDetailPage } from './SessionDetailPage'
 
 beforeEach(() => {
   installApiFixtureServer()
+  Object.defineProperty(window, 'innerWidth', {
+    configurable: true,
+    value: 1600,
+  })
 })
 
 afterEach(() => {
@@ -51,6 +55,29 @@ describe('SessionDetailPage', () => {
     ).toHaveAttribute('href', '/classrooms/12')
   })
 
+  it('closes and restores the resource list', async () => {
+    renderSessionDetail()
+
+    fireEvent.click(await screen.findByRole('button', { name: '자료 목록 닫기' }))
+    expect(screen.queryByRole('link', { name: '주차 페이지로' })).not.toBeInTheDocument()
+
+    fireEvent.click(await screen.findByRole('button', { name: '자료 목록' }))
+    expect(screen.getByRole('link', { name: '주차 페이지로' })).toBeInTheDocument()
+  })
+
+  it('reflects the page confirmed by a chat turn in the visible viewer', async () => {
+    renderSessionDetail()
+
+    await screen.findByRole('progressbar', { name: '학습 진행률 1 / 5쪽' })
+    const input = screen.getByLabelText('질문')
+    fireEvent.change(input, { target: { value: '다음 페이지로 이동해 주세요.' } })
+    fireEvent.keyDown(input, { key: 'Enter' })
+
+    expect(
+      await screen.findByRole('progressbar', { name: '학습 진행률 2 / 5쪽' }),
+    ).toBeInTheDocument()
+  })
+
   it('updates pages only after the page API succeeds', async () => {
     renderSessionDetail()
 
@@ -61,7 +88,7 @@ describe('SessionDetailPage', () => {
         { timeout: 3_000 },
       ),
     ).toBeInTheDocument()
-    fireEvent.keyDown(window, { key: 'ArrowRight' })
+    fireEvent.click(screen.getByRole('button', { name: '다음' }))
     await waitFor(() =>
       expect(
         screen.getByRole('progressbar', { name: '학습 진행률 2 / 5쪽' }),
@@ -82,10 +109,13 @@ describe('SessionDetailPage', () => {
 
     await screen.findByRole('progressbar', { name: '학습 진행률 1 / 5쪽' })
     const separator = screen.getByRole('separator', { name: 'PDF와 AI 채팅 너비 조절' })
-    expect(separator).toHaveAttribute('aria-valuenow', '660')
+    expect(separator).not.toHaveAttribute('aria-valuenow')
 
     fireEvent.keyDown(separator, { key: 'ArrowRight' })
-    expect(separator).toHaveAttribute('aria-valuenow', '636')
+    expect(separator).toHaveAttribute('aria-valuenow', '633')
+
+    fireEvent.doubleClick(separator)
+    expect(separator).not.toHaveAttribute('aria-valuenow')
   })
 
   it('renders a session 404 state', async () => {
@@ -111,7 +141,7 @@ describe('SessionDetailPage', () => {
     expect(screen.getByText('퀴즈를 진행할까요?')).toBeInTheDocument()
   })
 
-  it('opens the quiz-type selector and navigates to the created quiz', async () => {
+  it('opens the generated quiz inside the PDF workspace and returns to the PDF', async () => {
     renderSessionDetail()
 
     fireEvent.click(await screen.findByRole('button', { name: '네' }))
@@ -123,7 +153,13 @@ describe('SessionDetailPage', () => {
     ).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: '객관식' }))
-    expect(await screen.findByText('퀴즈 화면')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'PDF로 돌아가기' })).toBeInTheDocument()
+    expect(await screen.findByText('문항 1 / 2 · 답변 0 / 2')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'PDF로 돌아가기' }))
+    expect(
+      await screen.findByRole('progressbar', { name: '학습 진행률 1 / 5쪽' }),
+    ).toBeInTheDocument()
   })
 
   it('renders the submitted quiz history with score badges', async () => {
@@ -133,6 +169,9 @@ describe('SessionDetailPage', () => {
     expect(screen.getByText('학습 확인 퀴즈')).toBeInTheDocument()
     expect(screen.getByText('객관식')).toBeInTheDocument()
     expect(screen.getByText('48점')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: /학습 확인 퀴즈/ }))
+    expect(await screen.findByRole('button', { name: 'PDF로 돌아가기' })).toBeInTheDocument()
   })
 
   it('dismisses the widget when the no/WAIT branch is chosen', async () => {

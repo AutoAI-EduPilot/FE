@@ -5,8 +5,9 @@ import {
   useState,
   type ChangeEvent,
   type FormEvent,
+  type ReactNode,
 } from 'react'
-import { useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router-dom'
 
 import { useAuth } from '../../features/auth'
 import { getRequestErrorMessage } from '../../shared/api'
@@ -39,8 +40,24 @@ const quizKindLabels: Record<QuizKind, string> = {
 }
 
 export function QuizPage() {
-  usePageTitle('퀴즈')
-  const { quizId } = useParams()
+  return <QuizWorkspace />
+}
+
+interface QuizWorkspaceProps {
+  embedded?: boolean
+  onBackToPdf?: () => void
+  quizId?: string
+}
+
+export function QuizWorkspace({
+  embedded = false,
+  onBackToPdf,
+  quizId: quizIdProp,
+}: QuizWorkspaceProps) {
+  usePageTitle(embedded ? '학습 공간' : '퀴즈')
+  const { quizId: routeQuizId } = useParams()
+  const quizId = quizIdProp ?? routeQuizId
+  const navigate = useNavigate()
   const { apiRequest } = useAuth()
   const repository = useMemo(
     () => createQuizRepository(apiRequest),
@@ -124,59 +141,63 @@ export function QuizPage() {
 
   if (!quizId) {
     return (
-      <ErrorState
-        title="퀴즈를 찾을 수 없습니다."
-        description="퀴즈 식별자가 없습니다."
-        action={<ButtonLink to={routes.sessions}>세션 목록으로</ButtonLink>}
-      />
+      <QuizFrame embedded={embedded} onBackToPdf={onBackToPdf}>
+        <ErrorState
+          title="퀴즈를 찾을 수 없습니다."
+          description="퀴즈 식별자가 없습니다."
+          action={getBackAction(embedded, onBackToPdf)}
+        />
+      </QuizFrame>
     )
   }
 
   if (quiz === undefined) {
-    return <LoadingState message="퀴즈 문항을 불러오는 중입니다." />
+    return (
+      <QuizFrame embedded={embedded} onBackToPdf={onBackToPdf}>
+        <LoadingState message="퀴즈 문항을 불러오는 중입니다." />
+      </QuizFrame>
+    )
   }
 
   if (!quiz) {
     return (
-      <ErrorState
-        title="퀴즈를 찾을 수 없습니다."
-        description={error ?? '세션에서 퀴즈를 다시 선택하세요.'}
-        action={
-          error ? (
-            <Button
-              onClick={() => {
-                setError(null)
-                setQuiz(undefined)
-                setReloadKey((key) => key + 1)
-              }}
-              type="button"
-            >
-              다시 시도
-            </Button>
-          ) : (
-            <ButtonLink to={routes.sessions}>세션 목록으로</ButtonLink>
-          )
-        }
-      />
+      <QuizFrame embedded={embedded} onBackToPdf={onBackToPdf}>
+        <ErrorState
+          title="퀴즈를 찾을 수 없습니다."
+          description={error ?? '세션에서 퀴즈를 다시 선택하세요.'}
+          action={
+            error ? (
+              <Button
+                onClick={() => {
+                  setError(null)
+                  setQuiz(undefined)
+                  setReloadKey((key) => key + 1)
+                }}
+                type="button"
+              >
+                다시 시도
+              </Button>
+            ) : getBackAction(embedded, onBackToPdf)
+          }
+        />
+      </QuizFrame>
     )
   }
 
   if (!question) {
     return (
-      <ErrorState
-        title="공개된 퀴즈 문항이 없습니다."
-        description="퀴즈 생성 상태를 확인한 뒤 다시 시도하세요."
-        action={<ButtonLink to={routes.sessions}>세션 목록으로</ButtonLink>}
-      />
+      <QuizFrame embedded={embedded} onBackToPdf={onBackToPdf}>
+        <ErrorState
+          title="공개된 퀴즈 문항이 없습니다."
+          description="퀴즈 생성 상태를 확인한 뒤 다시 시도하세요."
+          action={getBackAction(embedded, onBackToPdf)}
+        />
+      </QuizFrame>
     )
   }
 
   return (
-    <PageContainer>
-      <PageHeader
-        title="퀴즈"
-      />
-
+    <QuizFrame embedded={embedded} onBackToPdf={onBackToPdf}>
       <section className="overflow-hidden rounded-xl border border-stone-200 bg-white">
         <div className="border-b border-stone-200 px-4 py-4 sm:px-5">
           <div className="flex flex-wrap gap-1.5" role="tablist">
@@ -288,19 +309,38 @@ export function QuizPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               {shouldShowDiagnosisEntry(result) && diagnosisEntry ? (
-                <ButtonLink
-                  to={diagnosisPath(
-                    diagnosisEntry.sessionId,
-                    diagnosisEntry.diagnosisId,
-                  )}
-                  variant="secondary"
-                >
-                  진단으로 이어가기
-                </ButtonLink>
+                embedded ? (
+                  <Button
+                    onClick={() => navigate(diagnosisPath(
+                      diagnosisEntry.sessionId,
+                      diagnosisEntry.diagnosisId,
+                    ))}
+                    type="button"
+                    variant="secondary"
+                  >
+                    진단으로 이어가기
+                  </Button>
+                ) : (
+                  <ButtonLink
+                    to={diagnosisPath(
+                      diagnosisEntry.sessionId,
+                      diagnosisEntry.diagnosisId,
+                    )}
+                    variant="secondary"
+                  >
+                    진단으로 이어가기
+                  </ButtonLink>
+                )
               ) : null}
-              <ButtonLink to={routes.sessions} variant="secondary">
-                세션으로 돌아가기
-              </ButtonLink>
+              {embedded && onBackToPdf ? (
+                <Button onClick={onBackToPdf} type="button" variant="secondary">
+                  PDF로 돌아가기
+                </Button>
+              ) : (
+                <ButtonLink to={routes.sessions} variant="secondary">
+                  세션으로 돌아가기
+                </ButtonLink>
+              )}
             </div>
           </div>
 
@@ -313,7 +353,56 @@ export function QuizPage() {
           </ul>
         </section>
       ) : null}
-    </PageContainer>
+    </QuizFrame>
+  )
+}
+
+function QuizFrame({
+  children,
+  embedded,
+  onBackToPdf,
+}: {
+  children: ReactNode
+  embedded: boolean
+  onBackToPdf?: () => void
+}) {
+  if (!embedded) {
+    return (
+      <PageContainer>
+        <PageHeader title="퀴즈" />
+        {children}
+      </PageContainer>
+    )
+  }
+
+  return (
+    <section className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden bg-white">
+      <div className="flex h-13 shrink-0 items-center gap-3 border-b border-stone-200 px-4">
+        <Button
+          onClick={onBackToPdf}
+          size="sm"
+          type="button"
+          variant="secondary"
+        >
+          <ChevronLeft aria-hidden="true" size={15} />
+          PDF로 돌아가기
+        </Button>
+        <h2 className="type-body font-semibold text-stone-950">퀴즈</h2>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5">
+        {children}
+      </div>
+    </section>
+  )
+}
+
+function getBackAction(embedded: boolean, onBackToPdf?: () => void) {
+  return embedded && onBackToPdf ? (
+    <Button onClick={onBackToPdf} type="button" variant="secondary">
+      PDF로 돌아가기
+    </Button>
+  ) : (
+    <ButtonLink to={routes.sessions}>세션 목록으로</ButtonLink>
   )
 }
 

@@ -26,9 +26,10 @@ import {
   type CalendarEventKind,
   type CreateCalendarEventInput,
 } from '../../../features/calendar'
+import { getRequestErrorMessage } from '../../../shared/api'
 import { usePageTitle } from '../../../shared/lib/usePageTitle'
 import { cx } from '../../../shared/lib/cx'
-import { Button, PageContainer, PageHeader } from '../../../shared/ui'
+import { Button, PageContainer, PageHeader, useToast } from '../../../shared/ui'
 
 type CalendarView = 'list' | 'month' | 'week'
 
@@ -37,9 +38,10 @@ const WEEKDAY_LABELS = ['월', '화', '수', '목', '금', '토', '일']
 export function InstructorCalendarPage() {
   usePageTitle('캘린더')
   const { apiRequest, user } = useAuth()
+  const { show: showToast } = useToast()
   const { classroomId = '' } = useParams()
   const isInstructor = isInstructorRole(user?.role)
-  const { addEvent, events, removeEvent } = useCalendarEvents(
+  const { addEvent, events, removeEvent, updateEvent } = useCalendarEvents(
     user?.id ?? user?.email,
     apiRequest,
   )
@@ -48,6 +50,7 @@ export function InstructorCalendarPage() {
   const [view, setView] = useState<CalendarView>('month')
   const [isPickerOpen, setIsPickerOpen] = useState(false)
   const [isComposerOpen, setIsComposerOpen] = useState(false)
+  const [editingEvent, setEditingEvent] = useState<CalendarEvent | null>(null)
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
   const [pickerYear, setPickerYear] = useState(cursor.getFullYear())
   const pickerRef = useRef<HTMLDivElement | null>(null)
@@ -118,7 +121,7 @@ export function InstructorCalendarPage() {
           <>
             <SegmentedControl onChange={setView} value={view} />
             {isInstructor ? (
-              <Button onClick={() => setIsComposerOpen(true)} size="sm">
+              <Button onClick={() => { setEditingEvent(null); setIsComposerOpen(true) }} size="sm">
                 <Plus aria-hidden="true" size={14} />
                 일정 추가
               </Button>
@@ -198,12 +201,21 @@ export function InstructorCalendarPage() {
 
       {isInstructor && isComposerOpen ? (
         <ScheduleComposer
+          initialEvent={editingEvent ?? undefined}
           initialDate={getInitialScheduleDate(cursor, today)}
-          onClose={() => setIsComposerOpen(false)}
-          onSubmit={(input) => {
-            const event = addEvent(input)
-            setCursor(startOfMonth(new Date(event.startsAt)))
-            setIsComposerOpen(false)
+          onClose={() => { setEditingEvent(null); setIsComposerOpen(false) }}
+          onSubmit={async (input) => {
+            try {
+              const event = editingEvent
+                ? await updateEvent(editingEvent, input)
+                : await addEvent(input)
+              setCursor(startOfMonth(new Date(event.startsAt)))
+              setEditingEvent(null)
+              setIsComposerOpen(false)
+              showToast(editingEvent ? '일정을 수정했습니다.' : '일정을 추가했습니다.', 'success')
+            } catch (requestError) {
+              showToast(getRequestErrorMessage(requestError), 'danger')
+            }
           }}
         />
       ) : null}
@@ -212,9 +224,19 @@ export function InstructorCalendarPage() {
         <ScheduleDetailDialog
           event={selectedEvent}
           onClose={() => setSelectedEvent(null)}
-          onRemove={isInstructor ? () => {
-            removeEvent(selectedEvent.id)
+          onEdit={isInstructor && selectedEvent.kind === 'PERSONAL' ? () => {
+            setEditingEvent(selectedEvent)
             setSelectedEvent(null)
+            setIsComposerOpen(true)
+          } : undefined}
+          onRemove={isInstructor && selectedEvent.kind === 'PERSONAL' ? async () => {
+            try {
+              await removeEvent(selectedEvent)
+              setSelectedEvent(null)
+              showToast('일정을 삭제했습니다.', 'success')
+            } catch (requestError) {
+              showToast(getRequestErrorMessage(requestError), 'danger')
+            }
           } : undefined}
         />
       ) : null}
@@ -538,23 +560,25 @@ function CalendarEventButton({
 }
 
 function ScheduleComposer({
+  initialEvent,
   initialDate,
   onClose,
   onSubmit,
 }: {
+  initialEvent?: CalendarEvent
   initialDate: Date
   onClose: () => void
-  onSubmit: (input: CreateCalendarEventInput) => void
+  onSubmit: (input: CreateCalendarEventInput) => Promise<void>
 }) {
-  const [title, setTitle] = useState('')
-  const [kind, setKind] = useState<CalendarEventKind>('PERSONAL')
-  const [startsAt, setStartsAt] = useState(() => toDateTimeLocal(initialDate))
-  const [endsAt, setEndsAt] = useState(() => toDateTimeLocal(new Date(initialDate.getTime() + 60 * 60 * 1000)))
-  const [hasDuration, setHasDuration] = useState(false)
-  const [hasTime, setHasTime] = useState(true)
+  const [title, setTitle] = useState(initialEvent?.title ?? '')
+  const [startsAt, setStartsAt] = useState(() => initialEvent ? toDateTimeLocal(new Date(initialEvent.startsAt)) : toDateTimeLocal(initialDate))
+  const [endsAt, setEndsAt] = useState(() => initialEvent ? toDateTimeLocal(new Date(initialEvent.endsAt)) : toDateTimeLocal(new Date(initialDate.getTime() + 60 * 60 * 1000)))
+  const [hasDuration, setHasDuration] = useState(() => Boolean(initialEvent && initialEvent.endsAt !== initialEvent.startsAt))
+  const [hasTime, setHasTime] = useState(initialEvent?.hasTime ?? true)
+  const [isSubmitting, setIsSubmitting] = useState(false)
   const rangeError = hasDuration && startsAt && endsAt && endsAt < startsAt
 
-  function submit(event: FormEvent<HTMLFormElement>) {
+  async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (!title.trim() || !startsAt) return
     if (rangeError) return
@@ -563,13 +587,13 @@ function ScheduleComposer({
     const parsedEnd = hasDuration
       ? new Date(hasTime ? endsAt : `${endsAt}T23:59:59`)
       : undefined
-    onSubmit({
-      endsAt: parsedEnd?.toISOString(),
+    setIsSubmitting(true)
+    await onSubmit({
+      endsAt: parsedEnd?.toISOString() ?? parsedDate.toISOString(),
       hasTime,
-      kind,
       startsAt: parsedDate.toISOString(),
       title: title.trim(),
-    })
+    }).finally(() => setIsSubmitting(false))
   }
 
   return (
@@ -585,7 +609,7 @@ function ScheduleComposer({
       >
         <div className="flex items-center justify-between gap-4">
           <h2 className="type-dialog-title font-bold text-stone-950" id="schedule-composer-title">
-            일정 추가
+            {initialEvent ? '일정 수정' : '일정 추가'}
           </h2>
           <button
             aria-label="일정 추가 닫기"
@@ -626,27 +650,12 @@ function ScheduleComposer({
           {hasDuration ? <label className="type-control font-semibold text-stone-800">종료{hasTime ? ' 날짜와 시간' : '일'}<input aria-invalid={Boolean(rangeError)} className={cx('mt-1 h-11 w-full rounded-lg border bg-white px-3 type-body outline-none focus:ring-2', rangeError ? 'border-rose-400 focus:border-rose-500 focus:ring-rose-100' : 'border-stone-300 focus:border-brand-600 focus:ring-brand-100')} min={startsAt || undefined} onChange={(event) => setEndsAt(event.target.value)} type={hasTime ? 'datetime-local' : 'date'} value={endsAt} /></label> : null}
         </div>
         {rangeError ? <p className="mt-2 type-caption font-medium text-rose-600">종료 시각은 시작 시각보다 빠를 수 없습니다.</p> : null}
-        <div className="mt-4">
-          <label className="type-control font-semibold text-stone-800">
-            일정 유형
-            <select
-              className="mt-1 h-11 w-full rounded-lg border border-stone-300 bg-white px-3 type-body outline-none focus:border-brand-600 focus:ring-2 focus:ring-brand-100"
-              onChange={(event) => setKind(event.target.value as CalendarEventKind)}
-              value={kind}
-            >
-              <option value="PERSONAL">개인 일정</option>
-              <option value="MATERIAL">자료 공개</option>
-              <option value="NOTICE">공지</option>
-            </select>
-          </label>
-        </div>
-
         <div className="mt-6 flex justify-end gap-2">
           <Button onClick={onClose} variant="ghost">
             취소
           </Button>
-          <Button disabled={!title.trim() || !startsAt || Boolean(rangeError)} type="submit">
-            추가
+          <Button disabled={!title.trim() || !startsAt || Boolean(rangeError) || isSubmitting} type="submit">
+            {isSubmitting ? '저장 중' : initialEvent ? '변경 저장' : '추가'}
           </Button>
         </div>
       </form>
@@ -685,11 +694,13 @@ function ToggleControl({
 function ScheduleDetailDialog({
   event,
   onClose,
+  onEdit,
   onRemove,
 }: {
   event: CalendarEvent
   onClose: () => void
-  onRemove?: () => void
+  onEdit?: () => void
+  onRemove?: () => Promise<void>
 }) {
   return (
     <div
@@ -723,17 +734,20 @@ function ScheduleDetailDialog({
         <p className="mt-4 rounded-lg bg-stone-50 px-3.5 py-3 type-body font-medium text-stone-700">
           {formatEventRange(event)}
         </p>
-        <div className="mt-5 flex justify-end">
-          {event.source === 'remote' || !onRemove ? (
+        <div className="mt-5 flex justify-end gap-2">
+          {!onRemove ? (
             <p className="type-caption text-stone-400">강의실 일정은 주차 또는 공지에서 관리합니다.</p>
           ) : (
+          <>
+          {onEdit ? <Button onClick={onEdit} variant="secondary">일정 수정</Button> : null}
           <Button
             className="border-rose-700 bg-rose-700 hover:bg-rose-800"
-            onClick={onRemove}
+            onClick={() => void onRemove()}
           >
             <Trash2 aria-hidden="true" size={14} />
             일정 삭제
           </Button>
+          </>
           )}
         </div>
       </div>

@@ -155,6 +155,43 @@ export async function handleApiFixtureRequest(
     return apiSuccess({ items: [] })
   }
 
+  if (request.method === 'POST' && path === '/api/users/me/schedule') {
+    const body = await readJson<{ endsAt: string; hasTime: boolean; startsAt: string; title: string }>(request)
+    return apiSuccess({ ...body, kind: 'PERSONAL', scheduleId: 'personal-1' })
+  }
+
+  if (request.method === 'PATCH' && path === '/api/users/me/schedule/personal-1') {
+    const body = await readJson<{ endsAt?: string; hasTime?: boolean; startsAt?: string; title?: string }>(request)
+    return apiSuccess({
+      endsAt: body.endsAt ?? '2099-08-03T10:00:00.000Z',
+      hasTime: body.hasTime ?? true,
+      kind: 'PERSONAL',
+      scheduleId: 'personal-1',
+      startsAt: body.startsAt ?? '2099-08-03T09:00:00.000Z',
+      title: body.title ?? '개인 일정',
+    })
+  }
+
+  if (request.method === 'DELETE' && path === '/api/users/me/schedule/personal-1') {
+    return apiSuccess(null)
+  }
+
+  if (request.method === 'GET' && /^\/api\/classrooms\/\d+\/analytics$/.test(path)) {
+    return apiSuccess({
+      aiQuestionCountLast7Days: 0,
+      averageProgressRate: 0,
+      inactiveLearnerCountLast7Days: 0,
+      lastUpdatedAt: '2026-08-04T12:00:00Z',
+      learnerCount: 0,
+      materials: [],
+      questionsByPage: [],
+    })
+  }
+
+  if (request.method === 'GET' && /^\/api\/classrooms\/\d+\/students\?/.test(path)) {
+    return apiSuccess(paged([]))
+  }
+
   if (request.method === 'GET' && path === '/api/materials?page=0&size=20') {
     return apiSuccess(paged(materialListFixture))
   }
@@ -502,7 +539,7 @@ function turnResponse(body: { eventType?: string }): Response {
         senderType: 'AI',
       },
     ],
-    state: {},
+    state: { currentPage: 2, pageStatus: 'IN_PROGRESS' },
     uiActions: [],
   })
 }

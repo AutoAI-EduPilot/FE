@@ -1,7 +1,12 @@
 import {
+  ChevronLeft,
+  ChevronRight,
   Download,
   List,
   Minus,
+  MoveHorizontal,
+  MoveVertical,
+  PanelLeftOpen,
   Plus,
   type LucideIcon,
 } from 'lucide-react'
@@ -24,8 +29,11 @@ interface SessionPageViewerProps {
   isPending?: boolean
   materialTitle?: string
   onMovePage: (page: number) => void
+  onOpenResources?: () => void
   totalPages: number
 }
+
+type PageFitMode = 'page' | 'height' | 'width'
 
 export function SessionPageViewer({
   currentPage,
@@ -34,11 +42,13 @@ export function SessionPageViewer({
   isPending = false,
   materialTitle,
   onMovePage,
+  onOpenResources,
   totalPages,
 }: SessionPageViewerProps) {
   const [zoom, setZoom] = useState(100)
   const [pageWidth, setPageWidth] = useState(560)
   const [pageAspectRatio, setPageAspectRatio] = useState(1 / Math.sqrt(2))
+  const [pageFitMode, setPageFitMode] = useState<PageFitMode>('page')
   const [isOutlineVisible, setIsOutlineVisible] = useState(false)
   const viewerRef = useRef<HTMLElement | null>(null)
   const pageContainerRef = useRef<HTMLDivElement | null>(null)
@@ -57,12 +67,13 @@ export function SessionPageViewer({
     const updatePageWidth = () => {
       if (container.clientWidth < 220 || container.clientHeight < 280) return
       const availableWidth = container.clientWidth - 48
-      const availableHeight = container.clientHeight - 80
-      const fittedWidth = Math.min(
-        availableWidth,
-        availableHeight * pageAspectRatio,
-      )
-      setPageWidth(Math.max(220, Math.min(760, fittedWidth)))
+      const availableHeight = container.clientHeight - 48
+      const fittedWidth = pageFitMode === 'width'
+        ? availableWidth
+        : pageFitMode === 'height'
+          ? availableHeight * pageAspectRatio
+          : Math.min(availableWidth, availableHeight * pageAspectRatio)
+      setPageWidth(Math.max(220, fittedWidth))
     }
     updatePageWidth()
     const observer = new ResizeObserver(updatePageWidth)
@@ -72,7 +83,7 @@ export function SessionPageViewer({
       observer.disconnect()
       window.removeEventListener('resize', updatePageWidth)
     }
-  }, [pageAspectRatio])
+  }, [pageAspectRatio, pageFitMode])
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -117,6 +128,11 @@ export function SessionPageViewer({
     URL.revokeObjectURL(objectUrl)
   }
 
+  function applyPageFit(mode: Exclude<PageFitMode, 'page'>) {
+    setZoom(100)
+    setPageFitMode(mode)
+  }
+
   return (
     <section aria-label="PDF 뷰어" className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-y-0 border-stone-200 bg-white" ref={viewerRef}>
       <div className="flex h-13 shrink-0 items-center gap-3 border-b border-stone-200 px-4">
@@ -138,6 +154,14 @@ export function SessionPageViewer({
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-1.5">
+          {onOpenResources ? (
+            <ToolbarButton
+              icon={PanelLeftOpen}
+              label="자료 목록"
+              onClick={onOpenResources}
+              showLabel={false}
+            />
+          ) : null}
           <div className="flex h-8 items-center gap-1 rounded-lg border border-stone-200 px-1.5">
             <ToolbarIconButton
               icon={Minus}
@@ -154,16 +178,32 @@ export function SessionPageViewer({
             />
           </div>
           <ToolbarButton
+            icon={MoveVertical}
+            isActive={pageFitMode === 'height'}
+            label="높이 맞춤"
+            onClick={() => applyPageFit('height')}
+            showLabel={false}
+          />
+          <ToolbarButton
+            icon={MoveHorizontal}
+            isActive={pageFitMode === 'width'}
+            label="너비 맞춤"
+            onClick={() => applyPageFit('width')}
+            showLabel={false}
+          />
+          <ToolbarButton
             icon={List}
             isActive={isOutlineVisible}
             label="목차"
             onClick={() => setIsOutlineVisible((visible) => !visible)}
+            showLabel={false}
           />
           <ToolbarButton
             disabled={!file}
             icon={Download}
             label="원본 내려받기"
             onClick={downloadOriginal}
+            showLabel={false}
           />
         </div>
       </div>
@@ -199,6 +239,12 @@ export function SessionPageViewer({
                 renderTextLayer
                 width={pageWidth * (zoom / 100)}
               />
+            <PageNavigation
+              currentPage={currentPage}
+              isPending={isPending}
+              onMovePage={onMovePage}
+              totalPages={totalPages}
+            />
           </div>
         </Document>
       ) : (
@@ -223,10 +269,47 @@ export function SessionPageViewer({
                   : (fileError ?? 'PDF 원본을 표시할 수 없습니다.')
               }
             />
+            <PageNavigation
+              currentPage={currentPage}
+              isPending={isPending}
+              onMovePage={onMovePage}
+              totalPages={totalPages}
+            />
           </div>
         </div>
       )}
     </section>
+  )
+}
+
+function PageNavigation({
+  currentPage,
+  isPending,
+  onMovePage,
+  totalPages,
+}: {
+  currentPage: number
+  isPending: boolean
+  onMovePage: (page: number) => void
+  totalPages: number
+}) {
+  return (
+    <div className="absolute right-4 bottom-4 z-40 flex items-center gap-1 rounded-lg border border-stone-200 bg-white/95 p-1 shadow-lg backdrop-blur-sm">
+      <ToolbarButton
+        disabled={isPending || currentPage <= 1}
+        icon={ChevronLeft}
+        label="이전"
+        onClick={() => onMovePage(currentPage - 1)}
+        showLabel={false}
+      />
+      <ToolbarButton
+        disabled={isPending || currentPage >= totalPages}
+        icon={ChevronRight}
+        label="다음"
+        onClick={() => onMovePage(currentPage + 1)}
+        showLabel={false}
+      />
+    </div>
   )
 }
 
@@ -349,12 +432,14 @@ function ToolbarButton({
   isActive = false,
   label,
   onClick,
+  showLabel = true,
 }: {
   disabled?: boolean
   icon: LucideIcon
   isActive?: boolean
   label: string
   onClick?: () => void
+  showLabel?: boolean
 }) {
   return (
     <button
@@ -368,10 +453,11 @@ function ToolbarButton({
       )}
       disabled={disabled}
       onClick={onClick}
+      title={label}
       type="button"
     >
       <Icon aria-hidden="true" size={13} />
-      <span className="hidden sm:inline">{label}</span>
+      {showLabel ? <span className="hidden sm:inline">{label}</span> : null}
     </button>
   )
 }

@@ -67,6 +67,8 @@ interface SessionTurnDto {
   messages?: SessionMessageDto[]
   state?: {
     activeQuizId?: number | string | null
+    currentPage?: number
+    pageStatus?: string
     pendingDiagnosis?: PendingDiagnosisDto | null
   }
   uiActions?: UiActionDto[]
@@ -288,9 +290,11 @@ export function createSessionsRepository(
         },
       )
       return {
-        activeQuizId: toOptionalString(data.state?.activeQuizId),
+        activeQuizId: mapNullableId(data.state, 'activeQuizId'),
+        currentPage: data.state?.currentPage,
         messages: (data.messages ?? []).map(mapMessage),
-        pendingDiagnosis: mapPendingDiagnosis(data.state?.pendingDiagnosis),
+        pageStatus: data.state?.pageStatus,
+        pendingDiagnosis: mapNullableDiagnosis(data.state),
         uiActions: mapUiActions(data.uiActions),
       }
     },
@@ -466,6 +470,25 @@ function toOptionalString(
   value: number | string | null | undefined,
 ): string | undefined {
   return value === null || value === undefined ? undefined : String(value)
+}
+
+function mapNullableId(
+  state: SessionTurnDto['state'],
+  key: 'activeQuizId',
+): string | null | undefined {
+  if (!state || !Object.prototype.hasOwnProperty.call(state, key)) return undefined
+  return state[key] === null ? null : toOptionalString(state[key])
+}
+
+function mapNullableDiagnosis(
+  state: SessionTurnDto['state'],
+): PendingDiagnosisReference | null | undefined {
+  if (!state || !Object.prototype.hasOwnProperty.call(state, 'pendingDiagnosis')) {
+    return undefined
+  }
+  return state.pendingDiagnosis === null
+    ? null
+    : mapPendingDiagnosis(state.pendingDiagnosis)
 }
 
 function toApiId(value: string): number | string {

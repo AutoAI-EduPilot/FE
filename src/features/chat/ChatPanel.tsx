@@ -9,21 +9,21 @@ import {
 } from 'lucide-react'
 import {
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
   type FormEvent,
+  type KeyboardEvent,
   type ReactNode,
 } from 'react'
-import Markdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
-
 import { cx } from '../../shared/lib/cx'
 import { getRequestErrorMessage } from '../../shared/api'
 import { formatTime } from '../../shared/lib/format'
-import { Button } from '../../shared/ui'
+import { Button, MarkdownContent } from '../../shared/ui'
 import type { AuthenticatedRequest } from '../auth'
 import { createNotesRepository, type Note } from '../notes'
+import type { SessionTurnResult } from '../sessions'
 import type { ChatMessage } from './chatTypes'
 import { getChatErrorMessage, type SessionChat } from './useSessionChat'
 
@@ -37,6 +37,8 @@ interface ChatPanelProps {
   headerAction?: ReactNode
   /** 최초 안내 상태를 벗어나는 질문·새 대화 시작을 부모에 알린다. */
   onConversationStarted?: () => void
+  /** 서버가 확정한 턴 상태를 세션 화면과 동기화한다. */
+  onTurnCompleted?: (result: SessionTurnResult) => void
   /** 시안 빠른 칩의 "퀴즈 내줘" — 세션 화면의 유형 선택(W4)을 연다. */
   onRequestQuiz?: () => void
   request?: AuthenticatedRequest
@@ -49,6 +51,8 @@ const QUICK_ACTIONS = [
   { kind: 'quiz', label: '퀴즈 내줘' },
   { kind: 'prompt', label: '쉽게 설명해줘' },
 ] as const
+
+const MAX_QUESTION_INPUT_HEIGHT = 160
 
 function createRequestId(): string {
   return typeof crypto.randomUUID === 'function'
@@ -63,6 +67,7 @@ export function ChatPanel({
   headerAction,
   onConversationStarted,
   onRequestQuiz,
+  onTurnCompleted,
   request,
   sessionId,
 }: ChatPanelProps) {
@@ -74,7 +79,8 @@ export function ChatPanel({
   const [hiddenMessageCount, setHiddenMessageCount] = useState(0)
   const [isStartingConversation, setIsStartingConversation] = useState(false)
   const [messageActionStatus, setMessageActionStatus] = useState('')
-  const logEndRef = useRef<HTMLDivElement | null>(null)
+  const logRef = useRef<HTMLDivElement | null>(null)
+  const questionInputRef = useRef<HTMLTextAreaElement | null>(null)
   const notesRepository = useMemo(
     () => request ? createNotesRepository(request) : null,
     [request],
@@ -90,8 +96,21 @@ export function ChatPanel({
   }, [notesRepository, sessionId])
 
   useEffect(() => {
-    logEndRef.current?.scrollIntoView({ block: 'end' })
+    const log = logRef.current
+    if (log) log.scrollTop = log.scrollHeight
   }, [chat.messages.length, chat.isTurnPending])
+
+  useLayoutEffect(() => {
+    const input = questionInputRef.current
+    if (!input) return
+
+    input.style.height = 'auto'
+    const nextHeight = Math.min(input.scrollHeight, MAX_QUESTION_INPUT_HEIGHT)
+    input.style.height = `${nextHeight}px`
+    input.style.overflowY = input.scrollHeight > MAX_QUESTION_INPUT_HEIGHT
+      ? 'auto'
+      : 'hidden'
+  }, [question])
 
   async function sendQuestion(text: string) {
     const trimmedQuestion = text.trim()
@@ -115,20 +134,35 @@ export function ChatPanel({
     setError(null)
 
     try {
-      await chat.submitTurn({
-        eventType: 'USER_QUESTION',
-        payload: {
-          includeCurrentPage: true,
-          message: trimmedQuestion,
+      await chat.submitTurn(
+        {
+          eventType: 'USER_QUESTION',
+          payload: {
+            includeCurrentPage: true,
+            message: trimmedQuestion,
+          },
+          requestId,
         },
-        requestId,
-      })
+        onTurnCompleted,
+      )
     } catch (requestError) {
       setError(getChatErrorMessage(requestError))
     }
   }
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    void sendQuestion(question)
+  }
+
+  function handleQuestionKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (
+      event.key !== 'Enter' ||
+      event.shiftKey ||
+      event.nativeEvent.isComposing
+    ) {
+      return
+    }
     event.preventDefault()
     void sendQuestion(question)
   }
@@ -265,6 +299,7 @@ export function ChatPanel({
       <div
         aria-live="polite"
         className="grid min-h-0 flex-1 content-start gap-3.5 overflow-y-auto px-4 py-4"
+        ref={logRef}
         role="log"
       >
         <p className="justify-self-center text-center type-caption text-stone-400">
@@ -319,7 +354,6 @@ export function ChatPanel({
           </div>
         ) : null}
 
-        <div ref={logEndRef} />
       </div>
 
       {hasAssistantReply && !chat.isTurnPending ? (
@@ -352,14 +386,16 @@ export function ChatPanel({
           </label>
           <textarea
             aria-invalid={error ? true : undefined}
-            className="min-h-8 flex-1 resize-none bg-transparent px-1.5 py-1.5 type-body text-stone-950 placeholder:text-stone-400 focus:outline-none disabled:cursor-not-allowed"
+            className="min-h-8 max-h-40 flex-1 resize-none bg-transparent px-1.5 py-1.5 type-body text-stone-950 placeholder:text-stone-400 focus:outline-none disabled:cursor-not-allowed"
             disabled={chat.isTurnPending}
             id="chat-question"
             onChange={(event) => {
               setQuestion(event.target.value)
               setError(null)
             }}
+            onKeyDown={handleQuestionKeyDown}
             placeholder="현재 페이지에 대해 질문…"
+            ref={questionInputRef}
             rows={1}
             value={question}
           />
@@ -516,14 +552,6 @@ function MessageBubble({
         </div>
       </article>
       {time ? <span className="type-micro text-stone-400">{time}</span> : null}
-    </div>
-  )
-}
-
-function MarkdownContent({ content }: { content: string }) {
-  return (
-    <div className="min-w-0 overflow-x-auto break-words type-body leading-6 text-inherit [&_a]:text-brand-600 [&_a]:underline [&_blockquote]:my-2 [&_blockquote]:border-l-2 [&_blockquote]:border-stone-300 [&_blockquote]:pl-3 [&_code]:rounded [&_code]:bg-white [&_code]:px-1 [&_code]:py-0.5 [&_code]:type-control [&_h1]:mt-2 [&_h1]:type-section-title [&_h1]:font-bold [&_h2]:mt-2 [&_h2]:type-body [&_h2]:font-bold [&_h3]:mt-2 [&_h3]:font-bold [&_hr]:my-3 [&_hr]:border-stone-200 [&_li]:my-0.5 [&_ol]:list-decimal [&_ol]:pl-5 [&_p+p]:mt-2 [&_pre]:my-2 [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-white [&_pre]:p-2 [&_strong]:font-bold [&_table]:my-3 [&_table]:min-w-full [&_table]:border-collapse [&_table]:bg-white [&_table]:type-caption [&_td]:border [&_td]:border-stone-200 [&_td]:px-2.5 [&_td]:py-2 [&_th]:whitespace-nowrap [&_th]:border [&_th]:border-stone-200 [&_th]:bg-stone-50 [&_th]:px-2.5 [&_th]:py-2 [&_th]:text-left [&_th]:font-bold [&_ul]:list-disc [&_ul]:pl-5">
-      <Markdown remarkPlugins={[remarkGfm]}>{content}</Markdown>
     </div>
   )
 }

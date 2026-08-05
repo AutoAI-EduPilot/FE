@@ -97,9 +97,10 @@ export function InstructorStudentReportsPage() {
   const requestIdRef = useRef<string | null>(null)
 
   const loadReports = useCallback(async (signal?: AbortSignal) => {
-    const items = await repository.listReports(classroomId, studentId, signal)
-    setReports(items)
-    return items
+    const result = await repository.listReports(classroomId, studentId, signal)
+    setReports(result.items)
+    setActiveReport((current) => current ?? result.activeGeneration)
+    return result.items
   }, [classroomId, repository, studentId])
 
   useEffect(() => {
@@ -107,7 +108,11 @@ export function InstructorStudentReportsPage() {
     rememberClassroomId(classroomId)
     const controller = new AbortController()
     Promise.all([repository.listReports(classroomId, studentId, controller.signal), classroomsRepository.listWeeks(classroomId, controller.signal)])
-      .then(([nextReports, nextWeeks]) => { setReports(nextReports); setWeeks(nextWeeks) })
+      .then(([nextReports, nextWeeks]) => {
+        setReports(nextReports.items)
+        setActiveReport(nextReports.activeGeneration)
+        setWeeks(nextWeeks)
+      })
       .catch((requestError) => {
         if (!controller.signal.aborted) setError(getRequestErrorMessage(requestError))
       })
@@ -231,9 +236,16 @@ export function InstructorReportDetailPage() {
   if (!report) return <ErrorState action={<ButtonLink to={classroomStudentReportsPath(classroomId, studentId)}>리포트 목록</ButtonLink>} description={error ?? '리포트가 없거나 접근 권한이 없습니다.'} title="리포트를 불러오지 못했습니다" />
   if (report.status !== 'COMPLETED') return <ErrorState action={<ButtonLink to={classroomStudentReportsPath(classroomId, studentId)}>생성 상태 확인</ButtonLink>} description={report.failureMessage ?? '완료된 리포트만 상세 내용을 확인할 수 있습니다.'} title="리포트가 아직 준비되지 않았습니다" />
 
+  const hasInsufficientData = report.overallScore === null
+    || report.criterionResults.some((result) => result.status === 'INSUFFICIENT_DATA')
+  const overallStage = report.overallScore === null
+    ? '관찰 데이터 축적 중'
+    : report.stage ?? '단계 정보 없음'
+
   return <PageContainer>
     <PageHeader actions={<ButtonLink to={classroomStudentReportsPath(classroomId, studentId)} variant="secondary">버전 목록</ButtonLink>} title={report.studentName ? `${report.studentName} 리포트` : '학생 리포트'} titleAccessory={<span className="type-caption text-stone-500">버전 {report.version ?? '-'}</span>} />
-    <section className="grid gap-3 sm:grid-cols-3"><Metric label="종합 단계" value={report.stage ?? '데이터 부족'} /><Metric label="종합 점수" value={report.overallScore === null ? '데이터 부족' : `${report.overallScore}점`} /><Metric label="추세" value={getTrendLabel(report.trend)} trend={report.trend} /></section>
+    {hasInsufficientData ? <section className="rounded-lg border border-amber-200 bg-amber-50 px-5 py-4" role="status"><p className="type-body font-semibold text-amber-950">관찰 데이터 축적 중</p><p className="mt-1 type-caption leading-5 text-amber-800">근거가 부족한 항목은 점수로 환산하지 않습니다. 추가 학습 기록이 쌓인 뒤 리포트를 다시 생성해 주세요.</p></section> : null}
+    <section className="grid gap-3 sm:grid-cols-3"><Metric label="종합 단계" value={overallStage} /><Metric label="종합 점수" value={report.overallScore === null ? '데이터 부족' : `${report.overallScore}점`} /><Metric label="추세" value={report.overallScore === null ? '데이터 부족' : getTrendLabel(report.trend)} trend={report.overallScore === null ? undefined : report.trend} /></section>
     {report.overview ? <section className="border-y border-stone-200 py-5"><h2 className="type-section-title font-bold">종합 해석</h2><p className="mt-2 type-body leading-6 text-stone-600">{report.overview}</p></section> : null}
     <section aria-labelledby="criteria-results-title"><h2 className="type-section-title font-bold" id="criteria-results-title">평가 항목</h2><div className="mt-3 grid gap-3 lg:grid-cols-3">{report.criterionResults.map((result) => <CriterionResultCard evidence={report.evidence} key={result.criterionKey} result={result} />)}</div></section>
     <section className="grid gap-3 lg:grid-cols-2"><StatementSection evidence={report.evidence} items={report.strengths} title="강점" /><StatementSection evidence={report.evidence} items={report.improvements} title="보완점" /><StatementSection evidence={report.evidence} items={report.misconceptionCandidates} title="오개념 후보" /><StatementSection evidence={report.evidence} items={report.recommendedActions} title="추천 지도 행동" /></section>
@@ -254,6 +266,7 @@ export function InstructorReportCriteriaPage() {
   const [isLoading, setIsLoading] = useState(reportsEnabled)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const activeCustomCriterionCount = criteria.filter((item) => item.active && !item.builtin).length
 
   useEffect(() => {
     if (!classroomId || !reportsEnabled) return
@@ -266,10 +279,19 @@ export function InstructorReportCriteriaPage() {
 
   async function createCriterion(event: FormEvent) {
     event.preventDefault()
-    if (!name.trim() || !description.trim() || !rubric.trim() || isSaving || criteria.filter((item) => item.active).length >= 20) return
+    if (!name.trim() || !description.trim() || !rubric.trim() || isSaving || activeCustomCriterionCount >= 20) return
     setIsSaving(true)
     try {
-      const created = await repository.createCriterion(classroomId, { active: true, description: description.trim(), minimumEvidence: 2, name: name.trim(), rubric: rubric.trim(), sourceTypes: ['QUIZ', 'QA', 'DIAGNOSIS', 'REPAIR', 'MEMORY', 'EXAM'], weight: 1 })
+      const created = await repository.createCriterion(classroomId, {
+        active: true,
+        description: description.trim(),
+        key: createCriterionKey(name),
+        minimumEvidence: 2,
+        name: name.trim(),
+        rubric: rubric.trim(),
+        sourceTypes: ['SESSION', 'QA_QUESTION', 'QUIZ_SUBMISSION', 'DIAGNOSIS', 'MEMORY', 'EXAM_SUBMISSION'],
+        weight: 1,
+      })
       setCriteria((items) => [...items, created])
       setName(''); setDescription(''); setRubric('')
       show('평가 기준을 추가했습니다.', 'success')
@@ -278,6 +300,7 @@ export function InstructorReportCriteriaPage() {
   }
 
   async function toggleCriterion(criterion: ReportCriterion) {
+    if (criterion.id === null || criterion.builtin) return
     try {
       const updated = await repository.updateCriterion(classroomId, criterion.id, { active: !criterion.active })
       setCriteria((items) => items.map((item) => item.id === updated.id ? updated : item))
@@ -289,15 +312,15 @@ export function InstructorReportCriteriaPage() {
     {!reportsEnabled ? <ReportsUnavailableState /> : null}
     {reportsEnabled && isLoading ? <LoadingState message="평가 기준을 불러오는 중입니다." /> : null}
     {reportsEnabled && !isLoading ? <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-      <section className="overflow-hidden rounded-lg border border-stone-200 bg-white"><div className="border-b border-stone-200 bg-stone-50 px-5 py-3"><h2 className="type-body font-bold">활성 기준 {criteria.filter((item) => item.active).length}/20</h2></div>{criteria.length === 0 ? <EmptyState description="기본 9개 기준은 서버 정책에 따라 제공되며 강의실별 기준을 추가할 수 있습니다." title="추가 평가 기준이 없습니다" /> : criteria.map((criterion) => <div className="flex items-start gap-4 border-b border-stone-100 px-5 py-4 last:border-0" key={criterion.id}><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><strong className="type-body">{criterion.name}</strong><Badge tone={criterion.active ? 'success' : 'neutral'}>{criterion.active ? '사용 중' : '비활성'}</Badge></div><p className="mt-1 type-caption leading-5 text-stone-500">{criterion.description}</p><p className="mt-2 type-micro text-stone-400">최소 근거 {criterion.minimumEvidence}개 · 버전 {criterion.version}</p></div><Button onClick={() => void toggleCriterion(criterion)} size="sm" variant="secondary">{criterion.active ? '비활성화' : '활성화'}</Button></div>)}</section>
-      <form className="h-fit rounded-lg border border-stone-200 bg-white p-5" onSubmit={createCriterion}><div className="flex items-center gap-2"><Plus size={16} /><h2 className="type-section-title font-bold">기준 추가</h2></div><label className="mt-4 block type-control font-semibold">이름<input className="mt-1 h-10 w-full rounded-lg border border-stone-300 px-3 type-body" maxLength={60} onChange={(event) => setName(event.target.value)} value={name} /></label><label className="mt-4 block type-control font-semibold">설명<textarea className="mt-1 min-h-20 w-full resize-none rounded-lg border border-stone-300 px-3 py-2 type-body" onChange={(event) => setDescription(event.target.value)} value={description} /></label><label className="mt-4 block type-control font-semibold">평가 기준<textarea className="mt-1 min-h-28 w-full resize-none rounded-lg border border-stone-300 px-3 py-2 type-body" onChange={(event) => setRubric(event.target.value)} value={rubric} /></label><Button className="mt-4 w-full" disabled={!name.trim() || !description.trim() || !rubric.trim() || isSaving || criteria.filter((item) => item.active).length >= 20} type="submit">{isSaving ? '저장 중' : '기준 추가'}</Button>{criteria.filter((item) => item.active).length >= 20 ? <p className="mt-2 type-caption text-amber-700">활성 평가 기준은 최대 20개입니다.</p> : null}</form>
+      <section className="overflow-hidden rounded-lg border border-stone-200 bg-white"><div className="border-b border-stone-200 bg-stone-50 px-5 py-3"><h2 className="type-body font-bold">활성 커스텀 기준 {activeCustomCriterionCount}/20</h2></div>{criteria.length === 0 ? <EmptyState description="기본 평가 기준은 서버 정책에 따라 제공되며 강의실별 기준을 추가할 수 있습니다." title="추가 평가 기준이 없습니다" /> : criteria.map((criterion) => <div className="flex items-start gap-4 border-b border-stone-100 px-5 py-4 last:border-0" key={criterion.id ?? `builtin-${criterion.key}`}><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><strong className="type-body">{criterion.name}</strong><Badge tone={criterion.active ? 'success' : 'neutral'}>{criterion.active ? '사용 중' : '비활성'}</Badge>{criterion.builtin ? <Badge tone="neutral">기본</Badge> : null}</div><p className="mt-1 type-caption leading-5 text-stone-500">{criterion.description}</p><p className="mt-2 type-micro text-stone-400">최소 근거 {criterion.minimumEvidence}개 · 버전 {criterion.version || '-'}</p></div>{criterion.builtin ? null : <Button onClick={() => void toggleCriterion(criterion)} size="sm" variant="secondary">{criterion.active ? '비활성화' : '활성화'}</Button>}</div>)}</section>
+      <form className="h-fit rounded-lg border border-stone-200 bg-white p-5" onSubmit={createCriterion}><div className="flex items-center gap-2"><Plus size={16} /><h2 className="type-section-title font-bold">기준 추가</h2></div><label className="mt-4 block type-control font-semibold">이름<input className="mt-1 h-10 w-full rounded-lg border border-stone-300 px-3 type-body" maxLength={60} onChange={(event) => setName(event.target.value)} value={name} /></label><label className="mt-4 block type-control font-semibold">설명<textarea className="mt-1 min-h-20 w-full resize-none rounded-lg border border-stone-300 px-3 py-2 type-body" onChange={(event) => setDescription(event.target.value)} value={description} /></label><label className="mt-4 block type-control font-semibold">평가 기준<textarea className="mt-1 min-h-28 w-full resize-none rounded-lg border border-stone-300 px-3 py-2 type-body" onChange={(event) => setRubric(event.target.value)} value={rubric} /></label><Button className="mt-4 w-full" disabled={!name.trim() || !description.trim() || !rubric.trim() || isSaving || activeCustomCriterionCount >= 20} type="submit">{isSaving ? '저장 중' : '기준 추가'}</Button>{activeCustomCriterionCount >= 20 ? <p className="mt-2 type-caption text-amber-700">활성 커스텀 평가 기준은 최대 20개입니다.</p> : null}</form>
     </div> : null}
     {error ? <p className="type-body text-rose-700" role="alert">{error}</p> : null}
   </PageContainer>
 }
 
 function ReportsUnavailableState() {
-  return <ErrorState description="BE Report 외부 API가 Swagger에 배포된 뒤 VITE_API_CAPABILITIES에 reports를 추가하면 활성화됩니다. 테스트용 데이터는 표시하지 않습니다." title="리포트 API 준비 중" />
+  return <ErrorState description="현재 빌드에서 리포트 기능이 비활성화되어 있습니다. VITE_API_CAPABILITIES에 reports를 추가해 다시 빌드해 주세요." title="리포트 기능 비활성화" />
 }
 
 function ScopeButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
@@ -332,9 +355,11 @@ function StatementSection({ evidence, items, title }: { evidence: StudentReport[
 function EvidenceDetails({ evidence, evidenceIds }: { evidence: StudentReport['evidence']; evidenceIds: string[] }) {
   const matches = evidence.filter((item) => evidenceIds.includes(item.evidenceId))
   if (matches.length === 0) return null
-  return <details className="mt-3"><summary className="cursor-pointer type-caption font-semibold text-brand-700">근거 {matches.length}개</summary><ul className="mt-2 space-y-2">{matches.map((item) => <li className="rounded-md bg-stone-50 px-3 py-2 type-caption leading-5 text-stone-600" key={item.evidenceId}><strong className="text-stone-800">{item.label}</strong><span className="ml-2 text-stone-400">{item.sourceType} · {formatDateTime(item.occurredAt)}</span><p>{item.fact}</p></li>)}</ul></details>
+  return <details className="mt-3"><summary className="cursor-pointer type-caption font-semibold text-brand-700">근거 {matches.length}개</summary><ul className="mt-2 space-y-2">{matches.map((item) => <li className="rounded-md bg-stone-50 px-3 py-2 type-caption leading-5 text-stone-600" key={item.evidenceId}><strong className="text-stone-800">{item.label}</strong><span className="ml-2 text-stone-400">{getEvidenceSourceLabel(item.sourceType)} · {formatDateTime(item.occurredAt)}</span><p>{item.fact}</p></li>)}</ul></details>
 }
 
 function isReportPending(report: StudentReport): boolean { return report.status === 'PENDING' || report.status === 'PROCESSING' }
 function createRequestId(): string { return typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `report-${Date.now()}` }
+function createCriterionKey(name: string): string { return `custom_${name.trim().toLowerCase().replace(/[^a-z0-9가-힣]+/g, '_').replace(/^_|_$/g, '')}_${Date.now().toString(36)}`.slice(0, 50) }
 function getTrendLabel(trend?: string | null): string { if (!trend) return '추세 정보 없음'; const values: Record<string, string> = { DECLINING: '하락', DOWN: '하락', FLAT: '유지', IMPROVING: '상승', STABLE: '유지', UP: '상승' }; return values[trend.toUpperCase()] ?? trend }
+function getEvidenceSourceLabel(sourceType: string): string { const values: Record<string, string> = { DIAGNOSIS: '오답 진단', EXAM_SUBMISSION: '별도 시험', MEMORY: '학습자 메모리', QA_QUESTION: '학습 질문', QUIZ_SUBMISSION: '통합학습 퀴즈', SESSION: '학습 세션' }; return values[sourceType.toUpperCase()] ?? sourceType }

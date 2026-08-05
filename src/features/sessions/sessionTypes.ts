@@ -61,9 +61,11 @@ export interface SessionMessage {
 }
 
 export interface SessionTurnResult {
-  activeQuizId?: string
+  activeQuizId?: string | null
+  currentPage?: number
   messages: SessionMessage[]
-  pendingDiagnosis?: PendingDiagnosisReference
+  pageStatus?: string
+  pendingDiagnosis?: PendingDiagnosisReference | null
   uiActions: UiAction[]
 }
 

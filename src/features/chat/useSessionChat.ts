@@ -21,7 +21,10 @@ export interface SessionChat {
   startNewConversation: () => Promise<void>
   streamNotice: string | null
   streamUiActions: UiAction[]
-  submitTurn: (turn: SessionTurnRequest) => Promise<SessionTurnResult>
+  submitTurn: (
+    turn: SessionTurnRequest,
+    onResult?: (result: SessionTurnResult) => void,
+  ) => Promise<SessionTurnResult>
 }
 
 export function useSessionChat(
@@ -83,7 +86,10 @@ export function useSessionChat(
   }, [])
 
   const submitTurn = useCallback(
-    async (turn: SessionTurnRequest) => {
+    async (
+      turn: SessionTurnRequest,
+      onResult?: (result: SessionTurnResult) => void,
+    ) => {
       setIsTurnPending(true)
       setStreamNotice('실시간 응답을 연결하는 중입니다.')
       setStreamUiActions([])
@@ -141,6 +147,7 @@ export function useSessionChat(
 
       try {
         const result = await repository.submitTurn(sessionId, turn)
+        onResult?.(result)
         appendMessages(result.messages)
         setStreamUiActions(result.uiActions)
         setStreamNotice(null)

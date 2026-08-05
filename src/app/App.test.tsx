@@ -137,7 +137,7 @@ describe('AppRoutes', () => {
     expect(screen.getByRole('option', { name: '강의실 없음' })).toBeInTheDocument()
   })
 
-  it('keeps instructor reports unavailable until the backend capability is deployed', () => {
+  it('loads the instructor report screen from the deployed backend contract', async () => {
     renderRoute('/classrooms/12/reports', {
       email: 'instructor@example.com',
       name: '강의자',
@@ -145,11 +145,57 @@ describe('AppRoutes', () => {
     })
 
     expect(screen.getByRole('heading', { name: '학습 리포트' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: '리포트 API 준비 중' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '리포트를 생성할 학습자가 없습니다' })).toBeInTheDocument()
     expect(screen.queryByText('0점')).not.toBeInTheDocument()
   })
 
-  it('shows upcoming calendar schedules in the notification panel', () => {
+  it('does not present insufficient report data as a score or definitive stage', async () => {
+    installApiFixtureServer((request) => {
+      const url = new URL(request.url)
+      if (request.method === 'GET' && url.pathname === '/api/reports/55') {
+        return apiSuccess({
+          classroomId: 12,
+          criteria: [{
+            criterionKey: 'concept_understanding',
+            criterionName: '개념 이해도',
+            evidenceIds: ['e-1'],
+            narrative: '판단할 기록이 더 필요합니다.',
+            score: null,
+            status: 'INSUFFICIENT_DATA',
+            trend: 'STABLE',
+          }],
+          evidence: [{
+            evidenceId: 'e-1',
+            occurredAt: '2026-08-05T00:00:00Z',
+            publicLabel: '1주차 질문 기록',
+            sourceType: 'QA_QUESTION',
+          }],
+          overallScore: null,
+          overallStage: '보완 필요',
+          reportId: 55,
+          status: 'COMPLETED',
+          studentId: 31,
+          studentName: '김학습',
+        })
+      }
+      return undefined
+    })
+
+    renderRoute('/classrooms/12/students/31/reports/55', {
+      email: 'instructor@example.com',
+      name: '강의자',
+      role: 'INSTRUCTOR',
+    })
+
+    expect(await screen.findAllByText('관찰 데이터 축적 중')).toHaveLength(2)
+    expect(screen.getAllByText('데이터 부족')).toHaveLength(3)
+    expect(screen.queryByText('0점')).not.toBeInTheDocument()
+    expect(screen.queryByText('보완 필요')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByText('근거 1개'))
+    expect(screen.getByText(/학습 질문/)).toBeInTheDocument()
+  })
+
+  it('shows upcoming calendar schedules in the notification panel', async () => {
     renderRoute('/calendar', {
       email: 'instructor@example.com',
       id: 7,
@@ -166,7 +212,7 @@ describe('AppRoutes', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: '추가' }))
 
-    fireEvent.click(screen.getByRole('button', { name: '알림 1개' }))
+    fireEvent.click(await screen.findByRole('button', { name: '알림 1개' }))
     const notificationPanel = screen.getByRole('dialog', { name: '예정 알림' })
     expect(notificationPanel).toBeInTheDocument()
     expect(notificationPanel).toHaveTextContent('자료 공개 확인')
