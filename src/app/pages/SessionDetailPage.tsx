@@ -3,13 +3,15 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { CheckCircle2 } from 'lucide-react'
 
 import { useAuth } from '../../features/auth'
-import { getRememberedClassroomId } from '../../features/classrooms'
+import {
+  createClassroomsRepository,
+  getRememberedClassroomId,
+  rememberClassroomId,
+  type ClassroomWeek,
+} from '../../features/classrooms'
 import { ApiClientError, getRequestErrorMessage } from '../../shared/api'
 import { ChatPanel, useSessionChat } from '../../features/chat'
-import {
-  createMaterialsRepository,
-  type StudyMaterial,
-} from '../../features/materials'
+import { createMaterialsRepository } from '../../features/materials'
 import type { QuizKind } from '../../features/quiz'
 import {
   createSessionsRepository,
@@ -17,7 +19,7 @@ import {
   SessionResourcePanel,
   UiActionsRenderer,
   type LearningSession,
-  type SessionQuizSummary,
+  type SessionResourceWeek,
   type SessionTurnResult,
   type UiActionEvent,
 } from '../../features/sessions'
@@ -67,6 +69,10 @@ export function SessionDetailPage() {
     () => createMaterialsRepository(apiRequest, rawApiRequest),
     [apiRequest, rawApiRequest],
   )
+  const classroomsRepository = useMemo(
+    () => createClassroomsRepository(apiRequest),
+    [apiRequest],
+  )
   const [session, setSession] = useState<
     LearningSession | null | undefined
   >(undefined)
@@ -76,9 +82,9 @@ export function SessionDetailPage() {
   const [isActionPending, setIsActionPending] = useState(false)
   const [isSelectingQuizType, setIsSelectingQuizType] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
-  const [quizHistory, setQuizHistory] = useState<SessionQuizSummary[]>([])
   const [embeddedQuizId, setEmbeddedQuizId] = useState<string | null>(null)
-  const [materials, setMaterials] = useState<StudyMaterial[]>([])
+  const [resourceWeeks, setResourceWeeks] = useState<SessionResourceWeek[]>([])
+  const [resourceReloadKey, setResourceReloadKey] = useState(0)
   const [materialFile, setMaterialFile] = useState<Blob | null | undefined>()
   const [materialFileError, setMaterialFileError] = useState<string | null>(null)
   const [chatPanelWidth, setChatPanelWidth] = useState<number | null>(null)
@@ -86,38 +92,14 @@ export function SessionDetailPage() {
   const [isResourcePanelOpen, setIsResourcePanelOpen] = useState(
     () => window.innerWidth >= 1536,
   )
-  const [sessionsPastInitialChat, setSessionsPastInitialChat] = useState<ReadonlySet<string>>(
-    () => new Set(),
-  )
   const workspaceRef = useRef<HTMLDivElement | null>(null)
   const chat = useSessionChat(sessionsRepository, sessionId ?? '')
-  const classroomId = getRememberedClassroomId()
-  const weekPagePath = classroomId
-    ? classroomDetailPath(classroomId)
+  const [resolvedClassroomId, setResolvedClassroomId] = useState<string | null>(
+    () => getRememberedClassroomId(),
+  )
+  const weekPagePath = resolvedClassroomId
+    ? classroomDetailPath(resolvedClassroomId)
     : routes.classrooms
-
-  useEffect(() => {
-    const controller = new AbortController()
-    materialsRepository
-      .list(controller.signal)
-      .then(setMaterials)
-      .catch(() => {
-        // 리소스 패널은 부가 정보 — 실패 시 조용히 생략
-      })
-    return () => controller.abort()
-  }, [materialsRepository])
-
-  useEffect(() => {
-    if (!sessionId) return
-    const controller = new AbortController()
-    sessionsRepository
-      .listQuizzes(sessionId, controller.signal)
-      .then(setQuizHistory)
-      .catch(() => {
-        // 퀴즈 기록은 부가 정보 — 실패 시 조용히 생략
-      })
-    return () => controller.abort()
-  }, [reloadKey, sessionId, sessionsRepository])
 
   useEffect(() => {
     if (!sessionId) return
@@ -198,6 +180,76 @@ export function SessionDetailPage() {
   }, [materialsRepository, session?.materialId])
 
   useEffect(() => {
+    const activeSessionId = session?.id
+    const activeMaterialId = session?.materialId
+    if (!activeSessionId || !activeMaterialId) return
+
+    const controller = new AbortController()
+    const loadClassroomResources = async () => {
+      try {
+        const context = await findClassroomContext(
+          classroomsRepository,
+          activeMaterialId,
+          getRememberedClassroomId(),
+          controller.signal,
+        )
+        if (!context || controller.signal.aborted) {
+          setResourceWeeks([])
+          return
+        }
+
+        rememberClassroomId(context.classroomId)
+        setResolvedClassroomId(context.classroomId)
+
+        const listedSessions = await sessionsRepository.list(controller.signal)
+        const sessions = [
+          { id: activeSessionId, materialId: activeMaterialId },
+          ...listedSessions.filter((item) => item.id !== activeSessionId),
+        ]
+        const sessionByMaterial = selectSessionsByMaterial(sessions)
+        const quizzesBySession = new Map(
+          await Promise.all(
+            Array.from(sessionByMaterial.values()).map(async (item) => [
+              item.id,
+              await sessionsRepository.listQuizzes(item.id, controller.signal),
+            ] as const),
+          ),
+        )
+
+        if (controller.signal.aborted) return
+        setResourceWeeks(context.weeks.map((week) => ({
+          id: week.id,
+          materials: week.materials.map((material) => {
+            const materialSession = sessionByMaterial.get(material.id)
+            return {
+              id: material.id,
+              quizzes: materialSession
+                ? (quizzesBySession.get(materialSession.id) ?? [])
+                : [],
+              sessionId: materialSession?.id,
+              status: material.status,
+              title: material.title,
+            }
+          }),
+          title: week.title,
+          weekNumber: week.weekNumber,
+        })))
+      } catch {
+        if (!controller.signal.aborted) setResourceWeeks([])
+      }
+    }
+
+    void loadClassroomResources()
+    return () => controller.abort()
+  }, [
+    classroomsRepository,
+    resourceReloadKey,
+    session?.id,
+    session?.materialId,
+    sessionsRepository,
+  ])
+
+  useEffect(() => {
     const workspace = workspaceRef.current
     if (!workspace || typeof ResizeObserver === 'undefined') return
 
@@ -260,15 +312,6 @@ export function SessionDetailPage() {
   const activeSession = session
   const totalPages = activeSession.totalPages ?? Math.max(activeSession.currentPage, 1)
 
-  function leaveInitialChatState() {
-    setSessionsPastInitialChat((current) => {
-      if (current.has(activeSession.id)) return current
-      const next = new Set(current)
-      next.add(activeSession.id)
-      return next
-    })
-  }
-
   function applyTurnResult(result: SessionTurnResult) {
     const nextPage = result.currentPage === undefined
       ? undefined
@@ -292,7 +335,6 @@ export function SessionDetailPage() {
 
   async function handlePageMove(nextPage: number) {
     if (isActionPending) return
-    leaveInitialChatState()
     const nextSafePage = movePage(nextPage, totalPages)
     setIsActionPending(true)
     setError(null)
@@ -347,7 +389,6 @@ export function SessionDetailPage() {
   }
 
   async function handleEvent(event: UiActionEvent) {
-    leaveInitialChatState()
     switch (event) {
       case 'MOVE_NEXT_PAGE':
         await handlePageMove(currentPage + 1)
@@ -389,15 +430,31 @@ export function SessionDetailPage() {
     }
   }
 
+  async function refreshLearningProgress() {
+    try {
+      const nextSession = await sessionsRepository.getById(activeSession.id)
+      if (nextSession) {
+        setSession((current) => ({
+          ...nextSession,
+          materialTitle: current?.materialTitle ?? nextSession.materialTitle,
+          totalPages: current?.totalPages ?? nextSession.totalPages,
+        }))
+        setCurrentPage(nextSession.currentPage)
+      }
+      setResourceReloadKey((key) => key + 1)
+      setError(null)
+    } catch (requestError) {
+      setError(getRequestErrorMessage(requestError))
+    }
+  }
+
   const availableUiActions = chat.streamUiActions.length > 0
     ? chat.streamUiActions
     : (activeSession.uiActions ?? [])
-  const isInitialChatState = !chat.isLoadingHistory
-    && !sessionsPastInitialChat.has(activeSession.id)
-    && chat.messages.length === 0
-  const visibleUiActions = availableUiActions.filter((action) => (
-    isInitialChatState || !isInitialPageExplanationAction(action)
-  ))
+  const hasConversationAction = isSelectingQuizType
+    || availableUiActions.length > 0
+    || Boolean(activeSession.activeQuizId && !embeddedQuizId)
+    || Boolean(error)
 
   function resizeChatPanel(clientX: number) {
     const workspace = workspaceRef.current
@@ -452,16 +509,15 @@ export function SessionDetailPage() {
             activeMaterialId={activeSession.materialId}
             backLabel="주차 페이지로"
             backTo={weekPagePath}
-            materials={materials}
             onClose={() => setIsResourcePanelOpen(false)}
             progressLabel={`${currentPage}/${totalPages}`}
-            quizHistory={quizHistory}
             onOpenQuiz={setEmbeddedQuizId}
             resourcePath={(material) =>
-              material.activeSessionId
-                ? sessionDetailPath(material.activeSessionId)
+              material.sessionId
+                ? sessionDetailPath(material.sessionId)
                 : materialViewerPath(material.id)
             }
+            weeks={resourceWeeks}
           />
         ) : null}
 
@@ -486,6 +542,7 @@ export function SessionDetailPage() {
               <QuizWorkspace
                 embedded
                 onBackToPdf={() => setEmbeddedQuizId(null)}
+                onSubmitted={() => void refreshLearningProgress()}
                 quizId={embeddedQuizId}
               />
             ) : (
@@ -527,12 +584,11 @@ export function SessionDetailPage() {
             request={apiRequest}
             chat={chat}
             className="!rounded-none !border-0"
-            currentPage={currentPage}
-            footer={
+            conversationAction={hasConversationAction ? (
               <div className="grid gap-2">
                 {isSelectingQuizType ? (
-                  <div className="rounded-lg border border-brand-200 bg-brand-50 px-3 py-2.5">
-                    <p className="type-body font-semibold text-brand-950">
+                  <div>
+                    <p className="type-body font-semibold text-stone-900">
                       어떤 유형의 퀴즈를 풀까요?
                     </p>
                     <div className="mt-2 grid grid-cols-2 gap-2">
@@ -552,7 +608,7 @@ export function SessionDetailPage() {
                   </div>
                 ) : (
                   <UiActionsRenderer
-                    actions={visibleUiActions}
+                    actions={availableUiActions}
                     disabled={isActionPending || chat.isTurnPending}
                     onEvent={(event) => void handleEvent(event)}
                     onOpenDiagnosis={(diagnosisId) =>
@@ -578,7 +634,8 @@ export function SessionDetailPage() {
                   </p>
                 ) : null}
               </div>
-            }
+            ) : undefined}
+            currentPage={currentPage}
             headerAction={activeSession.status === 'ACTIVE' ? (
               <Button
                 disabled={isActionPending || chat.isTurnPending}
@@ -595,7 +652,9 @@ export function SessionDetailPage() {
                 학습 완료
               </Button>
             ) : undefined}
-            onConversationStarted={leaveInitialChatState}
+            onExplainCurrentPage={() => {
+              void handleEvent('EXPLAIN_CURRENT_PAGE')
+            }}
             onRequestQuiz={() => setIsSelectingQuizType(true)}
             onTurnCompleted={applyTurnResult}
             sessionId={activeSession.id}
@@ -612,6 +671,54 @@ function createTurnRequestId(): string {
     : `turn-${Date.now()}`
 }
 
-function isInitialPageExplanationAction(action: { kind: string; yesEvent?: string }): boolean {
-  return action.kind === 'BINARY_DECISION' && action.yesEvent === 'EXPLAIN_CURRENT_PAGE'
+type ClassroomsRepository = ReturnType<typeof createClassroomsRepository>
+
+async function findClassroomContext(
+  repository: ClassroomsRepository,
+  materialId: string,
+  preferredClassroomId: string | null,
+  signal: AbortSignal,
+): Promise<{ classroomId: string; weeks: ClassroomWeek[] } | null> {
+  if (preferredClassroomId) {
+    try {
+      const weeks = await repository.listWeeks(preferredClassroomId, signal)
+      if (weeksContainMaterial(weeks, materialId)) {
+        return { classroomId: preferredClassroomId, weeks }
+      }
+    } catch {
+      if (signal.aborted) return null
+    }
+  }
+
+  const classrooms = await repository.list('', signal)
+  for (const classroom of classrooms) {
+    if (classroom.id === preferredClassroomId) continue
+    try {
+      const weeks = await repository.listWeeks(classroom.id, signal)
+      if (weeksContainMaterial(weeks, materialId)) {
+        return { classroomId: classroom.id, weeks }
+      }
+    } catch {
+      if (signal.aborted) return null
+    }
+  }
+  return null
+}
+
+function weeksContainMaterial(weeks: ClassroomWeek[], materialId: string): boolean {
+  return weeks.some((week) =>
+    week.materials.some((material) => material.id === materialId),
+  )
+}
+
+function selectSessionsByMaterial(
+  sessions: Array<Pick<LearningSession, 'id' | 'materialId'>>,
+): Map<string, Pick<LearningSession, 'id' | 'materialId'>> {
+  const selected = new Map<string, Pick<LearningSession, 'id' | 'materialId'>>()
+  sessions.forEach((item) => {
+    if (item.materialId && !selected.has(item.materialId)) {
+      selected.set(item.materialId, item)
+    }
+  })
+  return selected
 }

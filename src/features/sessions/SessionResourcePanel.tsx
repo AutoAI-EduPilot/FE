@@ -1,38 +1,48 @@
 import { ChevronDown, ChevronLeft, PanelLeftClose } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
-import type { StudyMaterial } from '../materials'
 import { cx } from '../../shared/lib/cx'
 import type { SessionQuizSummary } from './sessionTypes'
+
+export interface SessionResourceMaterial {
+  id: string
+  quizzes: SessionQuizSummary[]
+  sessionId?: string
+  status: 'PROCESSING' | 'READY' | 'FAILED'
+  title: string
+}
+
+export interface SessionResourceWeek {
+  id: string
+  materials: SessionResourceMaterial[]
+  title: string
+  weekNumber: number
+}
 
 interface SessionResourcePanelProps {
   activeMaterialId?: string
   backLabel: string
   backTo: string
-  materials: StudyMaterial[]
   onClose: () => void
   onOpenQuiz: (quizId: string) => void
   progressLabel?: string
-  quizHistory: SessionQuizSummary[]
-  resourcePath: (material: StudyMaterial) => string
+  resourcePath: (material: SessionResourceMaterial) => string
+  weeks: SessionResourceWeek[]
 }
 
 export function SessionResourcePanel({
   activeMaterialId,
   backLabel,
   backTo,
-  materials,
   onClose,
   onOpenQuiz,
   progressLabel,
-  quizHistory,
   resourcePath,
+  weeks,
 }: SessionResourcePanelProps) {
-  const readyMaterials = materials.filter(
-    (material) => material.status === 'READY',
-  )
-  const otherMaterials = materials.filter(
-    (material) => material.status !== 'READY',
+  const materialCount = weeks.reduce(
+    (count, week) => count + week.materials.length,
+    0,
   )
 
   return (
@@ -57,81 +67,88 @@ export function SessionResourcePanel({
       </div>
 
       <p className="px-2 pt-3.5 pb-1.5 type-caption font-semibold tracking-[0.04em] text-stone-400">
-        내 자료
+        강의실 자료
       </p>
-      <ul className="grid gap-0.5">
-        {readyMaterials.map((material) => (
-          <li key={material.id}>
-            <ResourceRow
-              isActive={material.id === activeMaterialId}
-              progressLabel={
-                material.id === activeMaterialId ? progressLabel : undefined
-              }
-              to={resourcePath(material)}
-              title={material.title}
-            />
-          </li>
-        ))}
-        {readyMaterials.length === 0 ? (
-          <li className="px-2 py-1.5 type-caption text-stone-400">
-            준비된 자료가 없습니다.
-          </li>
-        ) : null}
-      </ul>
-
-      {otherMaterials.length > 0 ? (
-        <>
-          <p className="px-2 pt-3.5 pb-1.5 type-caption font-semibold tracking-[0.04em] text-stone-400">
-            처리 중 · 실패
-          </p>
-          <ul className="grid gap-0.5">
-            {otherMaterials.map((material) => (
-              <li key={material.id}>
-                <ResourceRow
-                  isMuted
-                  to={resourcePath(material)}
-                  title={material.title}
-                />
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
-
-      {quizHistory.length > 0 ? (
-        <>
-          <p className="px-2 pt-3.5 pb-1.5 type-caption font-semibold tracking-[0.04em] text-stone-400">
-            퀴즈 기록
-          </p>
-          <ul className="grid gap-0.5">
-            {quizHistory.map((quiz) => (
-              <li key={quiz.quizId}>
-                <button
-                  className="flex min-h-9 w-full items-start gap-2 rounded-lg px-2 py-2 text-left type-caption text-stone-600 hover:bg-white hover:text-stone-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
-                  onClick={() => onOpenQuiz(quiz.quizId)}
-                  type="button"
-                >
-                  <span className="min-w-0 flex-1 break-all leading-5">{quiz.title}</span>
-                  <span className="shrink-0 type-micro text-stone-400">
-                    {getQuizKindLabel(quiz.quizType)}
-                  </span>
-                  {quiz.score !== undefined ? (
-                    <span className="shrink-0 font-semibold text-brand-700">
-                      {quiz.score}점
-                    </span>
+      <div className="grid gap-3">
+        {weeks.map((week) => (
+          <section key={week.id}>
+            <div className="flex items-baseline gap-1.5 px-2 py-1">
+              <h2 className="type-caption font-bold text-stone-700">
+                {week.weekNumber}주차
+              </h2>
+              <p className="min-w-0 truncate type-micro text-stone-400">
+                {week.title}
+              </p>
+            </div>
+            <ul className="grid gap-0.5">
+              {week.materials.map((material) => (
+                <li key={material.id}>
+                  <ResourceRow
+                    isActive={material.id === activeMaterialId}
+                    isMuted={material.status !== 'READY'}
+                    progressLabel={
+                      material.id === activeMaterialId ? progressLabel : undefined
+                    }
+                    to={resourcePath(material)}
+                    title={material.title}
+                  />
+                  {material.quizzes.length > 0 ? (
+                    <ul className="ml-8 grid gap-0.5 border-l border-stone-200 pl-1.5">
+                      {material.quizzes.map((quiz) => (
+                        <li key={quiz.quizId}>
+                          <QuizRow onOpen={() => onOpenQuiz(quiz.quizId)} quiz={quiz} />
+                        </li>
+                      ))}
+                    </ul>
                   ) : null}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </>
-      ) : null}
+                </li>
+              ))}
+              {week.materials.length === 0 ? (
+                <li className="px-2 py-1 type-micro text-stone-400">
+                  등록된 자료가 없습니다.
+                </li>
+              ) : null}
+            </ul>
+          </section>
+        ))}
+        {weeks.length === 0 ? (
+          <p className="px-2 py-1.5 type-caption text-stone-400">
+            현재 강의실의 자료를 찾을 수 없습니다.
+          </p>
+        ) : null}
+      </div>
 
       <p className="mt-auto flex items-center gap-1 px-2 pt-4 type-caption text-stone-400">
-        자료 {materials.length}개
+        자료 {materialCount}개
         <ChevronDown aria-hidden="true" size={13} />
       </p>
     </aside>
+  )
+}
+
+function QuizRow({
+  onOpen,
+  quiz,
+}: {
+  onOpen: () => void
+  quiz: SessionQuizSummary
+}) {
+  return (
+    <button
+      className="flex min-h-8 w-full items-start gap-1.5 rounded-md px-2 py-1.5 text-left type-caption text-stone-500 hover:bg-white hover:text-stone-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
+      onClick={onOpen}
+      type="button"
+    >
+      <span className="min-w-0 flex-1 break-words leading-5">{quiz.title}</span>
+      <span className="shrink-0 type-micro text-stone-400">
+        {getQuizKindLabel(quiz.quizType)}
+      </span>
+      {quiz.score !== undefined ? (
+        <span className="shrink-0 font-semibold text-brand-700">
+          {quiz.score}점
+        </span>
+      ) : null}
+    </button>
   )
 }
 
@@ -171,7 +188,7 @@ function ResourceRow({
       >
         {getMaterialKind(title)}
       </span>
-      <span className="min-w-0 flex-1 break-all leading-5">{title}</span>
+      <span className="min-w-0 flex-1 break-words leading-5">{title}</span>
       {progressLabel ? (
         <span className="shrink-0 type-micro font-semibold text-brand-600">
           {progressLabel}

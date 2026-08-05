@@ -148,6 +148,44 @@ export async function handleApiFixtureRequest(
     return apiSuccess(paged([]))
   }
 
+  if (request.method === 'GET' && path === '/api/classrooms/12/weeks') {
+    return apiSuccess({
+      items: [
+        {
+          displayOrder: 1,
+          materials: [
+            {
+              materialId: 10,
+              pageCount: 5,
+              processingStatus: 'READY',
+              title: '시험 대비 요약.pdf',
+              uploadedAt: '2026-07-22T00:00:00Z',
+            },
+          ],
+          status: 'PUBLISHED',
+          title: '핵심 개념',
+          weekId: 91,
+          weekNumber: 1,
+        },
+        {
+          displayOrder: 2,
+          materials: [
+            {
+              materialId: 11,
+              processingStatus: 'PROCESSING',
+              title: '강의 노트 5주차.pdf',
+              uploadedAt: '2026-07-23T00:00:00Z',
+            },
+          ],
+          status: 'SCHEDULED',
+          title: '심화 학습',
+          weekId: 92,
+          weekNumber: 2,
+        },
+      ],
+    })
+  }
+
   if (
     request.method === 'GET' &&
     path.startsWith('/api/users/me/schedule?')
@@ -296,7 +334,17 @@ export async function handleApiFixtureRequest(
 
   if (request.method === 'PATCH' && path === '/api/sessions/100/page') {
     const body = await readJson<{ pageNumber: number }>(request)
-    return apiSuccess({ currentPage: body.pageNumber, uiActions: [] })
+    return apiSuccess({
+      currentPage: body.pageNumber,
+      uiActions: [
+        {
+          content: '현재 페이지를 설명할까요?',
+          noEvent: 'WAIT',
+          type: 'BINARY_DECISION',
+          yesEvent: 'EXPLAIN_CURRENT_PAGE',
+        },
+      ],
+    })
   }
 
   if (request.method === 'POST' && path === '/api/sessions/100/turns') {
@@ -315,6 +363,23 @@ export async function handleApiFixtureRequest(
 
   if (request.method === 'GET' && path === '/api/quizzes/50') {
     return apiSuccess(quizFixture)
+  }
+
+  if (request.method === 'GET' && path === '/api/quizzes/51') {
+    return apiSuccess({
+      questions: [
+        {
+          maxScore: 100,
+          questionId: 'ox-1',
+          questionText: '현재 설명은 참입니까?',
+        },
+      ],
+      quizId: 51,
+      quizType: 'OX',
+      sessionId: 100,
+      submitted: false,
+      title: 'OX 확인 퀴즈',
+    })
   }
 
   if (request.method === 'POST' && path === '/api/quizzes/50/submit') {

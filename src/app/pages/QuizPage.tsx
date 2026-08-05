@@ -46,12 +46,14 @@ export function QuizPage() {
 interface QuizWorkspaceProps {
   embedded?: boolean
   onBackToPdf?: () => void
+  onSubmitted?: (result: PublicQuizResult) => void
   quizId?: string
 }
 
 export function QuizWorkspace({
   embedded = false,
   onBackToPdf,
+  onSubmitted,
   quizId: quizIdProp,
 }: QuizWorkspaceProps) {
   usePageTitle(embedded ? '학습 공간' : '퀴즈')
@@ -129,9 +131,11 @@ export function QuizWorkspace({
 
     setIsSubmitting(true)
     try {
-      setResult(await repository.submit(quiz, answers))
+      const nextResult = await repository.submit(quiz, answers)
+      setResult(nextResult)
       setIsSubmitted(true)
       setError(null)
+      onSubmitted?.(nextResult)
     } catch (requestError) {
       setError(getRequestErrorMessage(requestError))
     } finally {

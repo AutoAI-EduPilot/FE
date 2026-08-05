@@ -30,13 +30,13 @@ import { getChatErrorMessage, type SessionChat } from './useSessionChat'
 interface ChatPanelProps {
   chat: SessionChat
   className?: string
+  /** 서버 결정·퀴즈 유형 선택을 대화 로그의 AI 메시지로 표시한다. */
+  conversationAction?: ReactNode
   currentPage?: number
-  /** 서버 위젯·퀴즈 유형 선택 등 대화 흐름에 붙는 액션 (입력창 바로 위) */
-  footer?: ReactNode
   /** 세션 완료처럼 대화 전체에 적용되는 명령 (채팅 헤더 우측) */
   headerAction?: ReactNode
-  /** 최초 안내 상태를 벗어나는 질문·새 대화 시작을 부모에 알린다. */
-  onConversationStarted?: () => void
+  /** 현재 페이지 설명을 일반 QA가 아닌 학습 진행 이벤트로 요청한다. */
+  onExplainCurrentPage?: () => void
   /** 서버가 확정한 턴 상태를 세션 화면과 동기화한다. */
   onTurnCompleted?: (result: SessionTurnResult) => void
   /** 시안 빠른 칩의 "퀴즈 내줘" — 세션 화면의 유형 선택(W4)을 연다. */
@@ -63,9 +63,9 @@ function createRequestId(): string {
 export function ChatPanel({
   chat,
   className,
-  footer,
+  conversationAction,
   headerAction,
-  onConversationStarted,
+  onExplainCurrentPage,
   onRequestQuiz,
   onTurnCompleted,
   request,
@@ -98,7 +98,7 @@ export function ChatPanel({
   useEffect(() => {
     const log = logRef.current
     if (log) log.scrollTop = log.scrollHeight
-  }, [chat.messages.length, chat.isTurnPending])
+  }, [chat.messages.length, chat.isTurnPending, conversationAction])
 
   useLayoutEffect(() => {
     const input = questionInputRef.current
@@ -123,7 +123,6 @@ export function ChatPanel({
 
     const requestId = createRequestId()
 
-    onConversationStarted?.()
     chat.appendLocalMessage({
       content: trimmedQuestion,
       id: `user-${requestId}`,
@@ -173,7 +172,7 @@ export function ChatPanel({
       return
     }
     if (kind === 'prompt') {
-      void sendQuestion('쉽게 설명해줘')
+      onExplainCurrentPage?.()
       return
     }
 
@@ -208,7 +207,6 @@ export function ChatPanel({
     setIsStartingConversation(true)
     try {
       await chat.startNewConversation()
-      onConversationStarted?.()
       setHiddenMessageCount(0)
       setError(null)
     } catch (requestError) {
@@ -354,6 +352,17 @@ export function ChatPanel({
           </div>
         ) : null}
 
+        {conversationAction && !chat.isTurnPending ? (
+          <div className="flex flex-col items-start gap-1">
+            <article
+              aria-label="AI 진행 안내"
+              className="max-w-[90%] rounded-xl rounded-bl-[4px] bg-stone-100 px-3.5 py-2.5 text-stone-900"
+            >
+              {conversationAction}
+            </article>
+          </div>
+        ) : null}
+
       </div>
 
       {hasAssistantReply && !chat.isTurnPending ? (
@@ -370,8 +379,6 @@ export function ChatPanel({
           ))}
         </div>
       ) : null}
-
-      {footer ? <div className="shrink-0 px-4 pb-1">{footer}</div> : null}
 
       <form className="shrink-0 p-3" onSubmit={handleSubmit}>
         <div

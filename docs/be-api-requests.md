@@ -104,6 +104,45 @@ PATCH /api/classrooms/{classroomId}/weeks/{weekNumber}/status
   현재 페이지 첨부·해제 상태를 FE 요청 payload에 연결했다.
 - `대화 새로 시작`: `POST /api/sessions/{sessionId}/conversations`에 연결했다.
 
+## P0. 통합학습 후속 단계 계약 보완
+
+노션 `통합학습 에이전트 명세서` 4번 시나리오는 페이지 설명 뒤 오케스트레이터가
+현재 페이지 중요도를 판단해 퀴즈 여부를 결정하도록 정의한다. 현재 공개 계약은
+설명 완료 시 항상 퀴즈를 제안하는 W3 규칙이어서 명세와 다르다. 기존 turns API의
+응답 계약을 다음처럼 보완해야 하며 새 endpoint는 필요하지 않다.
+
+```http
+POST /api/sessions/{sessionId}/turns
+eventType: EXPLAIN_CURRENT_PAGE
+```
+
+- 응답은 `state.pageStatus=EXPLAINED`와 정확히 하나의 다음 단계 `uiActions`를
+  반환하고 세션 상세에도 같은 액션을 저장한다.
+- 중요 페이지면 `BINARY_DECISION("퀴즈를 진행할까요?",
+  SHOW_QUIZ_TYPE_SELECT, MOVE_NEXT_PAGE)`를 반환한다.
+- 퀴즈가 불필요한 페이지면 `BINARY_DECISION("다음 페이지로 이동할까요?",
+  MOVE_NEXT_PAGE, WAIT)`를 반환한다.
+- 중요도 점수와 내부 판단 근거는 FE에 노출할 필요가 없으며 서버가 최종 액션만
+  확정한다.
+
+저득점의 진단·오개념 교정 이후 재평가 퀴즈를 생성하는 공개 이벤트도 현재 없다.
+같은 turns API에 아래 이벤트를 추가하거나, 기존 `QUIZ_TYPE_SELECTED`에
+`sourceQuizId`와 재평가 목적을 명시할 수 있어야 한다.
+
+```json
+{
+  "eventType": "REMEDIATION_QUIZ_REQUESTED",
+  "payload": {
+    "sourceQuizId": 50
+  }
+}
+```
+
+응답은 기존 퀴즈 생성과 같이 `state.activeQuizId`를 반환하고, 재평가 결과도 기존
+제출·진단·교정 파이프라인에 누적해야 한다. 자연어로 "설명해줘", "퀴즈 내줘"를
+입력한 경우 현재 `USER_QUESTION` 정책과 도구 선택이 충돌할 수 있으므로 BE의
+StateReducer 또는 명령 분류 단계에서 지원 이벤트로 정규화하는 규칙도 필요하다.
+
 ## P2. 운영 편의
 
 ```http
