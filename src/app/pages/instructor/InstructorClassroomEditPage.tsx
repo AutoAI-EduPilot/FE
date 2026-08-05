@@ -15,8 +15,9 @@ import {
   createClassroomsRepository,
   rememberClassroomId,
   type Classroom,
+  type ClassroomStudent,
   type ClassroomWeek,
-  type JoinRequest,
+  type ClassroomWeekStatus,
 } from '../../../features/classrooms'
 import { getRequestErrorMessage } from '../../../shared/api'
 import { usePageTitle } from '../../../shared/lib/usePageTitle'
@@ -29,7 +30,7 @@ import {
 } from '../../../shared/ui'
 import { routes } from '../../routes'
 
-type WeekDisplayStatus = 'PUBLISHED' | 'PRIVATE' | 'BREAK'
+type WeekDisplayStatus = ClassroomWeekStatus
 
 export function InstructorClassroomEditPage() {
   usePageTitle('강의실 삭제')
@@ -48,16 +49,16 @@ export function InstructorClassroomEditPage() {
   const [classroom, setClassroom] = useState<Classroom | null>(null)
   const [weeks, setWeeks] = useState<ClassroomWeek[]>([])
   const [weekTitles, setWeekTitles] = useState<Record<number, string>>({})
-  const [learners, setLearners] = useState<JoinRequest[]>([])
+  const [learners, setLearners] = useState<ClassroomStudent[]>([])
   const [inviteCode, setInviteCode] = useState('')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
+  const [startDate, setStartDate] = useState('')
   const [weekCount, setWeekCount] = useState(1)
   const [weekOrder, setWeekOrder] = useState<number[]>([])
   const [weekStatuses, setWeekStatuses] = useState<Record<number, WeekDisplayStatus>>({})
   const [draggedWeek, setDraggedWeek] = useState<number | null>(null)
   const [openWeekMenu, setOpenWeekMenu] = useState<number | null>(null)
-  const [hasLocalOnlyWeekChanges, setHasLocalOnlyWeekChanges] = useState(false)
   const [learnerQuery, setLearnerQuery] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -68,7 +69,7 @@ export function InstructorClassroomEditPage() {
     Promise.all([
       repository.get(classroomId),
       repository.listWeeks(classroomId),
-      repository.listJoinRequests(classroomId, 'APPROVED'),
+      repository.listStudents(classroomId),
       repository.getInviteCode(classroomId),
     ])
       .then(([nextClassroom, nextWeeks, nextLearners, nextInviteCode]) => {
@@ -81,15 +82,21 @@ export function InstructorClassroomEditPage() {
           ),
         )
         const nextWeekCount = Math.max(nextClassroom.weekCount, nextWeeks.length, 1)
-        setWeekOrder(Array.from({ length: nextWeekCount }, (_, index) => index + 1))
+        const existingOrder = [...nextWeeks]
+          .sort((left, right) => left.displayOrder - right.displayOrder)
+          .map((week) => week.weekNumber)
+        const missingWeeks = Array.from({ length: nextWeekCount }, (_, index) => index + 1)
+          .filter((weekNumber) => !existingOrder.includes(weekNumber))
+        setWeekOrder([...existingOrder, ...missingWeeks])
         setWeekStatuses(Object.fromEntries(nextWeeks.map((week) => [
           week.weekNumber,
-          week.status === 'PUBLISHED' ? 'PUBLISHED' : 'PRIVATE',
+          week.status,
         ])))
         setLearners(nextLearners)
         setInviteCode(nextInviteCode)
         setName(nextClassroom.name)
         setDescription(nextClassroom.description ?? '')
+        setStartDate(nextClassroom.startDate)
         setWeekCount(nextWeekCount)
       })
       .catch((requestError) => {
@@ -107,8 +114,7 @@ export function InstructorClassroomEditPage() {
     const query = learnerQuery.trim().toLocaleLowerCase('ko-KR')
     if (!query) return learners
     return learners.filter((request) => {
-      const learner = request.learner
-      return [learner?.name, learner?.email, learner?.affiliation]
+      return [request.name, request.email, request.affiliation]
         .filter(Boolean)
         .some((value) => value?.toLocaleLowerCase('ko-KR').includes(query))
     })
@@ -137,7 +143,6 @@ export function InstructorClassroomEditPage() {
       next.splice(targetIndex, 0, movedWeek)
       return next
     })
-    setHasLocalOnlyWeekChanges(true)
   }
 
   function startWeekDrag(event: DragEvent<HTMLButtonElement>, weekNumber: number) {
@@ -152,15 +157,25 @@ export function InstructorClassroomEditPage() {
     moveWeekTo(draggedWeek, weekNumber)
   }
 
+  async function persistWeekOrder() {
+    setDraggedWeek(null)
+    const orderedWeekIds = weekOrder
+      .map((weekNumber) => weekByNumber.get(weekNumber)?.id)
+      .filter((weekId): weekId is string => Boolean(weekId))
+    if (orderedWeekIds.length !== weeks.length || orderedWeekIds.length === 0) return
+    try {
+      const reordered = await repository.reorderWeeks(classroomId, orderedWeekIds)
+      setWeeks(reordered)
+      setWeekOrder([...reordered].sort((left, right) => left.displayOrder - right.displayOrder).map((week) => week.weekNumber))
+      showToast('주차 순서를 변경했습니다.', 'success')
+    } catch (requestError) {
+      setWeekOrder([...weeks].sort((left, right) => left.displayOrder - right.displayOrder).map((week) => week.weekNumber))
+      showToast(getRequestErrorMessage(requestError), 'danger')
+    }
+  }
+
   async function changeWeekStatus(weekNumber: number, status: WeekDisplayStatus) {
     setOpenWeekMenu(null)
-    if (status !== 'PUBLISHED') {
-      setWeekStatuses((current) => ({ ...current, [weekNumber]: status }))
-      setHasLocalOnlyWeekChanges(true)
-      showToast('비공개·휴강 상태 저장은 백엔드 API가 준비되면 반영됩니다.')
-      return
-    }
-
     const week = weekByNumber.get(weekNumber)
     if (!week) {
       setWeekStatuses((current) => ({ ...current, [weekNumber]: status }))
@@ -168,12 +183,10 @@ export function InstructorClassroomEditPage() {
     }
 
     try {
-      const updated = await repository.updateWeek(classroomId, weekNumber, {
-        releaseAt: new Date().toISOString(),
-      })
+      const updated = await repository.changeWeekStatus(classroomId, week.id, status)
       setWeeks((current) => current.map((item) => item.weekNumber === weekNumber ? updated : item))
-      setWeekStatuses((current) => ({ ...current, [weekNumber]: 'PUBLISHED' }))
-      showToast(`${weekNumber}주차를 공개했습니다.`, 'success')
+      setWeekStatuses((current) => ({ ...current, [weekNumber]: updated.status }))
+      showToast(`${weekNumber}주차 상태를 변경했습니다.`, 'success')
     } catch (requestError) {
       showToast(getRequestErrorMessage(requestError), 'danger')
     }
@@ -249,7 +262,7 @@ export function InstructorClassroomEditPage() {
         const nextTitle = weekTitles[weekNumber]?.trim() || `${weekNumber}주차`
         if (!existingWeek) {
           await repository.createWeek(classroomId, {
-            releaseAt: toReleaseAt(classroom.startDate, weekNumber - 1),
+            releaseAt: toReleaseAt(startDate, weekNumber - 1),
             title: nextTitle,
             weekNumber,
           })
@@ -262,18 +275,24 @@ export function InstructorClassroomEditPage() {
         await repository.deleteWeek(classroomId, week.weekNumber)
       }
 
+      const savedWeeks = await repository.listWeeks(classroomId)
+      const savedWeekByNumber = new Map(savedWeeks.map((week) => [week.weekNumber, week]))
+      const orderedWeekIds = weekOrder
+        .map((weekNumber) => savedWeekByNumber.get(weekNumber)?.id)
+        .filter((weekId): weekId is string => Boolean(weekId))
+      if (orderedWeekIds.length === savedWeeks.length && orderedWeekIds.length > 0) {
+        await repository.reorderWeeks(classroomId, orderedWeekIds)
+      }
+
       await repository.update(classroomId, {
         color: classroom.color,
         description: description.trim(),
-        endDate: getEndDate(classroom.startDate, weekCount),
+        endDate: getEndDate(startDate, weekCount),
         name: name.trim(),
+        shiftWeekReleaseDates: startDate !== classroom.startDate,
+        startDate,
       })
-      showToast(
-        hasLocalOnlyWeekChanges
-          ? '기본 정보는 저장했습니다. 주차 순서·비공개·휴강은 백엔드 API가 필요합니다.'
-          : '강의실 정보를 저장했습니다.',
-        hasLocalOnlyWeekChanges ? 'info' : 'success',
-      )
+      showToast('강의실 정보를 저장했습니다.', 'success')
       navigate(routes.classrooms)
     } catch (requestError) {
       showToast(getRequestErrorMessage(requestError), 'danger')
@@ -288,6 +307,18 @@ export function InstructorClassroomEditPage() {
       await repository.complete(classroom.id)
       showToast('강의실 운영을 종료했습니다.', 'success')
       navigate(routes.classrooms)
+    } catch (requestError) {
+      showToast(getRequestErrorMessage(requestError), 'danger')
+    }
+  }
+
+  async function removeLearner(learner: ClassroomStudent) {
+    if (!window.confirm(`${learner.name} 학습자를 강의실에서 제외할까요?`)) return
+    try {
+      await repository.removeStudent(classroomId, learner.id)
+      setLearners((current) => current.filter((item) => item.id !== learner.id))
+      setClassroom((current) => current ? { ...current, learnerCount: Math.max(0, current.learnerCount - 1) } : current)
+      showToast('학습자를 강의실에서 제외했습니다.', 'success')
     } catch (requestError) {
       showToast(getRequestErrorMessage(requestError), 'danger')
     }
@@ -338,7 +369,6 @@ export function InstructorClassroomEditPage() {
       >
         <div className="grid items-stretch gap-3 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(300px,0.95fr)_minmax(280px,0.78fr)_minmax(380px,1.2fr)]">
           <BasicInformationSection
-            classroom={classroom}
             description={description}
             inviteCode={inviteCode}
             name={name}
@@ -346,6 +376,8 @@ export function InstructorClassroomEditPage() {
             onDescriptionChange={setDescription}
             onNameChange={setName}
             onRegenerateInviteCode={() => void regenerateInviteCode()}
+            onStartDateChange={setStartDate}
+            startDate={startDate}
             weekCount={weekCount}
           />
 
@@ -364,6 +396,7 @@ export function InstructorClassroomEditPage() {
                     key={weekNumber}
                     onDragEnter={(event) => enterWeekDropTarget(event, weekNumber)}
                     onDragOver={(event) => { if (draggedWeek !== null) event.preventDefault() }}
+                    onDrop={(event) => { event.preventDefault(); void persistWeekOrder() }}
                   >
                     <div>
                       <button
@@ -416,6 +449,7 @@ export function InstructorClassroomEditPage() {
           <LearnerSection
             classroom={classroom}
             learners={learners}
+            onRemoveLearner={(learner) => void removeLearner(learner)}
             onQueryChange={setLearnerQuery}
             query={learnerQuery}
             visibleLearners={filteredLearners}
@@ -440,7 +474,6 @@ export function InstructorClassroomEditPage() {
 }
 
 function BasicInformationSection({
-  classroom,
   description,
   inviteCode,
   name,
@@ -448,9 +481,10 @@ function BasicInformationSection({
   onDescriptionChange,
   onNameChange,
   onRegenerateInviteCode,
+  onStartDateChange,
+  startDate,
   weekCount,
 }: {
-  classroom: Classroom
   description: string
   inviteCode: string
   name: string
@@ -458,6 +492,8 @@ function BasicInformationSection({
   onDescriptionChange: (value: string) => void
   onNameChange: (value: string) => void
   onRegenerateInviteCode: () => void
+  onStartDateChange: (value: string) => void
+  startDate: string
   weekCount: number
 }) {
   return (
@@ -487,21 +523,20 @@ function BasicInformationSection({
           <label className="type-caption font-semibold text-stone-700">
             수업 시작일
             <input
-              className="mt-1 h-10 w-full rounded-lg border border-stone-200 bg-stone-100 px-2 type-caption text-stone-500"
-              disabled
-              title="현재 API에서는 시작일을 변경할 수 없습니다."
+              className="mt-1 h-10 w-full rounded-lg border border-stone-300 bg-white px-2 type-caption text-stone-700 focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
+              onChange={(event) => onStartDateChange(event.target.value)}
               type="date"
-              value={classroom.startDate}
+              value={startDate}
             />
           </label>
           <div className="type-caption font-semibold text-stone-700">
             수업 종료일
             <output className="mt-1 flex h-10 items-center rounded-lg border border-stone-200 bg-stone-100 px-2 type-caption font-normal text-stone-500">
-              {getEndDate(classroom.startDate, weekCount)}
+              {getEndDate(startDate, weekCount)}
             </output>
           </div>
         </div>
-        <p className="type-micro leading-5 text-stone-400">시작일은 개설 후 변경할 수 없으며 종료일은 주차 수에 따라 계산됩니다.</p>
+        <p className="type-micro leading-5 text-stone-400">시작일을 변경하면 주차 공개 일정도 같은 간격으로 이동하며 종료일은 주차 수에 따라 계산됩니다.</p>
         <div>
           <p className="type-caption font-semibold text-stone-700">강의실 코드</p>
           <div className="mt-1 flex min-h-11 items-center gap-2 rounded-lg bg-stone-50 px-3">
@@ -530,10 +565,12 @@ function WeekStatusMenu({
   onStatusChange: (status: WeekDisplayStatus) => void
   status: WeekDisplayStatus
 }) {
-  const statusLabel = status === 'PUBLISHED' ? '공개 중' : status === 'BREAK' ? '휴강' : '비공개'
+  const statusLabel = status === 'PUBLISHED' ? '공개 중' : status === 'SCHEDULED' ? '예약' : status === 'BREAK' ? '휴강' : '비공개'
   const statusClassName = status === 'PUBLISHED'
     ? 'bg-brand-50 text-brand-700'
-    : status === 'BREAK'
+    : status === 'SCHEDULED'
+      ? 'bg-amber-50 text-amber-700'
+      : status === 'BREAK'
       ? 'bg-rose-50 text-rose-700'
       : 'bg-stone-100 text-stone-500'
 
@@ -552,6 +589,7 @@ function WeekStatusMenu({
       {isOpen ? (
         <div className="absolute top-8 right-0 z-20 w-36 rounded-lg border border-stone-200 bg-white p-1 shadow-lg">
           <button className="block h-8 w-full rounded px-2 text-left type-caption text-stone-700 hover:bg-stone-50" onClick={() => onStatusChange('PUBLISHED')} type="button">공개</button>
+          <button className="block h-8 w-full rounded px-2 text-left type-caption text-stone-700 hover:bg-stone-50" onClick={() => onStatusChange('SCHEDULED')} type="button">예약</button>
           <button className="block h-8 w-full rounded px-2 text-left type-caption text-stone-700 hover:bg-stone-50" onClick={() => onStatusChange('PRIVATE')} type="button">비공개</button>
           <button className="block h-8 w-full rounded px-2 text-left type-caption text-stone-700 hover:bg-stone-50" onClick={() => onStatusChange('BREAK')} type="button">휴강</button>
           <div className="my-1 border-t border-stone-100" />
@@ -566,14 +604,16 @@ function LearnerSection({
   classroom,
   learners,
   onQueryChange,
+  onRemoveLearner,
   query,
   visibleLearners,
 }: {
   classroom: Classroom
-  learners: JoinRequest[]
+  learners: ClassroomStudent[]
   onQueryChange: (value: string) => void
+  onRemoveLearner: (learner: ClassroomStudent) => void
   query: string
-  visibleLearners: JoinRequest[]
+  visibleLearners: ClassroomStudent[]
 }) {
   return (
     <section className="flex flex-col overflow-hidden rounded-lg border border-stone-200 bg-white xl:h-full xl:min-h-0">
@@ -599,20 +639,20 @@ function LearnerSection({
             <UserRoundX aria-hidden="true" className="text-stone-300" size={22} />
             <h3 className="mt-4 type-body font-bold text-stone-900">{query.trim() ? '일치하는 학습자가 없습니다' : '승인된 학습자가 없습니다'}</h3>
           </div>
-        ) : visibleLearners.map((request) => (
-          <div className="grid gap-2 border-b border-stone-100 px-4 py-2.5 type-caption last:border-0 lg:grid-cols-[1fr_1.25fr_1fr_1fr_54px] lg:items-center" key={request.requestId}>
+        ) : visibleLearners.map((learner) => (
+          <div className="grid gap-2 border-b border-stone-100 px-4 py-2.5 type-caption last:border-0 lg:grid-cols-[1fr_1.25fr_1fr_1fr_54px] lg:items-center" key={learner.id}>
             <div className="flex min-w-0 items-center gap-2">
-              <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-full bg-stone-100 type-micro font-bold text-stone-600">{getInitial(request.learner?.name)}</span>
-              <strong className="truncate text-stone-900">{request.learner?.name ?? '-'}</strong>
+              <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-full bg-stone-100 type-micro font-bold text-stone-600">{getInitial(learner.name)}</span>
+              <strong className="truncate text-stone-900">{learner.name}</strong>
             </div>
-            <span className="truncate text-stone-500">{request.learner?.email ?? '-'}</span>
-            <span className="truncate text-stone-500">{request.learner?.affiliation ?? '-'}</span>
-            <span className="type-micro text-stone-400">{formatEntryTime(request.processedAt ?? request.requestedAt)}</span>
-            <button className="justify-self-end type-micro font-semibold text-stone-300" disabled title="백엔드 수강생 제외 API가 필요합니다." type="button">제외</button>
+            <span className="truncate text-stone-500">{learner.email}</span>
+            <span className="truncate text-stone-500">{learner.affiliation ?? '-'}</span>
+            <span className="type-micro text-stone-400">{formatEntryTime(learner.joinedAt)}</span>
+            <button className="justify-self-end type-micro font-semibold text-rose-600 hover:text-rose-800" onClick={() => onRemoveLearner(learner)} type="button">제외</button>
           </div>
         ))}
       </div>
-      <div className="border-t border-stone-100 px-4 py-3 text-center type-micro text-stone-400">승인 이력을 기준으로 {learners.length}명을 표시합니다.</div>
+      <div className="border-t border-stone-100 px-4 py-3 text-center type-micro text-stone-400">현재 수강 중인 학습자 {learners.length}명을 표시합니다.</div>
     </section>
   )
 }
@@ -631,7 +671,7 @@ function toReleaseAt(startDate: string, weekIndex: number): string {
 }
 
 function getWeekDisplayStatus(week?: ClassroomWeek): WeekDisplayStatus {
-  return week?.status === 'PUBLISHED' ? 'PUBLISHED' : 'PRIVATE'
+  return week?.status ?? 'PRIVATE'
 }
 
 function getInitial(name?: string): string {

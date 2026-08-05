@@ -13,6 +13,7 @@ import {
   Button,
   ButtonLink,
   EmptyState,
+  MarkdownContent,
   PageContainer,
   PageHeader,
   useToast,
@@ -226,9 +227,10 @@ export function LearnerNotesPage() {
                   value={editingContent}
                 />
               ) : (
-                <p className="mt-4 line-clamp-4 whitespace-pre-wrap type-body leading-6 text-stone-700">
-                  {note.content}
-                </p>
+                <MarkdownContent
+                  className="mt-4 max-h-32 text-stone-700"
+                  content={note.content}
+                />
               )}
               <div className="mt-auto flex items-center gap-2 pt-4">
                 <ButtonLink

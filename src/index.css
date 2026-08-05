@@ -7,7 +7,7 @@
 
 @media (min-width: 1024px) {
   .study-session-content {
-    grid-template-columns: minmax(0, 1fr) 6px var(--chat-panel-width, 660px);
+    grid-template-columns: minmax(0, 1fr) 6px var(--chat-panel-width, minmax(0, 1fr));
     grid-template-rows: minmax(0, 1fr);
   }
 }
@@ -131,6 +131,13 @@ html.dark {
 html {
   min-width: 320px;
   background: #fff;
+}
+
+html.study-workspace-active,
+html.study-workspace-active body,
+html.study-workspace-active #root {
+  height: 100%;
+  overflow: hidden;
 }
 
 body {

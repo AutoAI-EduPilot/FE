@@ -137,7 +137,7 @@ describe('remote feature repositories', () => {
               senderType: 'AI',
             },
           ],
-          state: {},
+          state: { currentPage: 3, pageStatus: 'IN_PROGRESS' },
           uiActions: [],
         }),
       )
@@ -165,7 +165,9 @@ describe('remote feature repositories', () => {
         requestId: 'request-1',
       }),
     ).resolves.toMatchObject({
+      currentPage: 3,
       messages: [{ id: '501', senderType: 'AI' }],
+      pageStatus: 'IN_PROGRESS',
     })
     expect(request).toHaveBeenNthCalledWith(
       2,
@@ -189,6 +191,26 @@ describe('remote feature repositories', () => {
       '/api/sessions/100/conversations',
       { method: 'POST', signal: undefined },
     )
+  })
+
+  it('preserves explicit nulls that clear quiz and diagnosis state', async () => {
+    const request = vi.fn().mockResolvedValue(
+      success({
+        messages: [],
+        state: { activeQuizId: null, pendingDiagnosis: null },
+        uiActions: [],
+      }),
+    )
+    const repository = createSessionsRepository(request as AuthenticatedRequest)
+
+    await expect(repository.submitTurn('100', {
+      eventType: 'USER_QUESTION',
+      payload: { message: '계속 학습할게' },
+      requestId: 'clear-state-1',
+    })).resolves.toMatchObject({
+      activeQuizId: null,
+      pendingDiagnosis: null,
+    })
   })
 
   it('maps the non-paged session quiz history response', async () => {

@@ -31,6 +31,16 @@ describe('learner collection pages', () => {
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
+  it('renders saved note markdown and LaTeX', async () => {
+    mockLearnerCollectionApi({
+      noteContent: '# 공식\n\n피타고라스 정리는 $a^2 + b^2 = c^2$입니다.',
+    })
+    const { container } = renderPage(<LearnerNotesPage />)
+
+    expect(await screen.findByRole('heading', { name: '공식' })).toBeInTheDocument()
+    expect(container.querySelector('.katex')).toBeInTheDocument()
+  })
+
   it('collects quizzes from learning sessions', async () => {
     mockLearnerCollectionApi()
     renderPage(<LearnerReviewQuizzesPage />)
@@ -45,7 +55,7 @@ describe('learner collection pages', () => {
 })
 
 function mockLearnerCollectionApi(
-  options: { notesUnavailable?: boolean } = {},
+  options: { noteContent?: string; notesUnavailable?: boolean } = {},
 ) {
   vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
     const url = new URL(
@@ -75,7 +85,16 @@ function mockLearnerCollectionApi(
     if (url.pathname === '/api/sessions/100/notes') {
       if (options.notesUnavailable) return new Response(null, { status: 404 })
       return success({
-        items: [],
+        items: options.noteContent
+          ? [
+              {
+                content: options.noteContent,
+                noteId: 1,
+                pageNumber: 1,
+                sourceMessageId: 501,
+              },
+            ]
+          : [],
         page: 0,
         size: 100,
         totalElements: 0,

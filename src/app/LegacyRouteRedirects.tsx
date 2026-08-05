@@ -120,7 +120,7 @@ export function LegacyReportDetailRedirect() {
   }, [reportId, repository])
 
   if (!isApiCapabilityEnabled('reports')) {
-    return <ErrorState action={<ButtonLink to={routes.classrooms}>내 강의실로</ButtonLink>} description="리포트 API가 배포되면 기존 링크를 새 강의실 경로로 복원할 수 있습니다." title="리포트 API 준비 중" />
+    return <ErrorState action={<ButtonLink to={routes.classrooms}>내 강의실로</ButtonLink>} description="현재 빌드에서 리포트 기능이 비활성화되어 기존 링크를 복원할 수 없습니다." title="리포트 기능 비활성화" />
   }
   if (!reportId) return <Navigate replace to={routes.classrooms} />
   if (error) return <ErrorState action={<ButtonLink to={routes.classrooms}>내 강의실로</ButtonLink>} description={error} title="리포트 경로를 복원하지 못했습니다" />

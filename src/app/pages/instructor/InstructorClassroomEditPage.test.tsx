@@ -25,31 +25,27 @@ describe('InstructorClassroomEditPage', () => {
         return success({
           items: [
             {
+              displayOrder: 1,
               materials: [],
               releaseAt: '2026-08-03T00:00:00Z',
               status: 'PUBLISHED',
               title: '1주차',
+              weekId: 101,
               weekNumber: 1,
             },
           ],
         })
       }
-      if (url.pathname === '/api/classrooms/12/join-requests') {
+      if (url.pathname === '/api/classrooms/12/students') {
         return success({
           items: [
             {
-              classroomId: 12,
-              classroomName: '자료구조',
-              learner: {
-                affiliation: '서울대학교',
-                email: 'learner@example.com',
-                name: '김학습',
-                userId: 9,
-              },
-              processedAt: '2026-08-02T01:00:00Z',
-              requestedAt: '2026-08-01T01:00:00Z',
-              requestId: 31,
-              status: 'APPROVED',
+              affiliation: '서울대학교',
+              email: 'learner@example.com',
+              joinedAt: '2026-08-02T01:00:00Z',
+              name: '김학습',
+              status: 'ACTIVE',
+              studentId: 9,
             },
           ],
           page: 0,
@@ -60,6 +56,9 @@ describe('InstructorClassroomEditPage', () => {
       }
       if (url.pathname === '/api/classrooms/12/invite-code') {
         return success({ inviteCode: '7QK4-MZ2A' })
+      }
+      if (url.pathname === '/api/classrooms/12/weeks/101/status') {
+        return success({ displayOrder: 1, materials: [], status: 'BREAK', title: '1주차', weekId: 101, weekNumber: 1 })
       }
       return new Response(null, { status: 404 })
     })
@@ -106,7 +105,7 @@ describe('InstructorClassroomEditPage', () => {
     const learnerRow = screen.getByText('김학습').closest('.grid')
     expect(learnerRow).toHaveTextContent('2026')
     expect(learnerRow).not.toHaveTextContent(/\d{1,2}:\d{2}:\d{2}/)
-    expect(screen.getByRole('button', { name: '제외' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: '제외' })).toBeEnabled()
     expect(
       screen.getByRole('heading', { name: '위험 구역' }),
     ).toBeInTheDocument()
@@ -120,7 +119,7 @@ describe('InstructorClassroomEditPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '1주차 상태 메뉴' }))
     expect(screen.getByRole('button', { name: '삭제' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '휴강' }))
-    expect(screen.getByText('휴강')).toBeInTheDocument()
+    expect(await screen.findByText('휴강')).toBeInTheDocument()
 
     const dataTransfer = { effectAllowed: 'none', setData: vi.fn() }
     fireEvent.dragStart(screen.getByRole('button', { name: '1주차 순서 이동' }), { dataTransfer })
@@ -152,22 +151,27 @@ describe('InstructorClassroomEditPage', () => {
       if (url.pathname === '/api/classrooms/12/weeks' && method === 'GET') {
         return success({
           items: [{
+            displayOrder: 1,
             materials: [],
             releaseAt: '2026-08-03T00:00:00Z',
             status: 'PUBLISHED',
             title: '1주차',
+            weekId: 101,
             weekNumber: 1,
           }],
         })
       }
-      if (url.pathname === '/api/classrooms/12/join-requests') {
+      if (url.pathname === '/api/classrooms/12/students') {
         return success({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0 })
       }
       if (url.pathname === '/api/classrooms/12/invite-code') {
         return success({ inviteCode: '7QK4-MZ2A' })
       }
       if (url.pathname === '/api/classrooms/12/weeks/1' && method === 'PATCH') {
-        return success({ materials: [], status: 'PUBLISHED', title: '연결 리스트', weekNumber: 1 })
+        return success({ displayOrder: 1, materials: [], status: 'PUBLISHED', title: '연결 리스트', weekId: 101, weekNumber: 1 })
+      }
+      if (url.pathname === '/api/classrooms/12/weeks/reorder' && method === 'PATCH') {
+        return success({ items: [{ displayOrder: 1, materials: [], status: 'PUBLISHED', title: '연결 리스트', weekId: 101, weekNumber: 1 }] })
       }
       if (url.pathname === '/api/classrooms/12' && method === 'PATCH') {
         return success({ ...classroomFixture, weekCount: 1 })

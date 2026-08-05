@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
-import type { SessionsRepository } from '../sessions'
+import type { SessionsRepository, SessionTurnResult } from '../sessions'
 import { ChatPanel } from './ChatPanel'
 import { useSessionChat } from './useSessionChat'
 
@@ -12,15 +12,24 @@ afterEach(() => {
 
 function ChatHarness({
   currentPage,
+  onTurnCompleted,
   repository,
   sessionId = '100',
 }: {
   currentPage?: number
+  onTurnCompleted?: (result: SessionTurnResult) => void
   repository: SessionsRepository
   sessionId?: string
 }) {
   const chat = useSessionChat(repository, sessionId)
-  return <ChatPanel chat={chat} currentPage={currentPage} sessionId={sessionId} />
+  return (
+    <ChatPanel
+      chat={chat}
+      currentPage={currentPage}
+      onTurnCompleted={onTurnCompleted}
+      sessionId={sessionId}
+    />
+  )
 }
 
 describe('ChatPanel', () => {
@@ -64,6 +73,36 @@ describe('ChatPanel', () => {
           message: '이 페이지의 핵심은 무엇인가요?',
         },
       }),
+    )
+  })
+
+  it('sends with Enter, keeps Shift+Enter as a newline, and reports turn state', async () => {
+    const onTurnCompleted = vi.fn()
+    const repository = createRepository({
+      submitTurn: vi.fn().mockResolvedValue({
+        currentPage: 2,
+        messages: [],
+        pageStatus: 'IN_PROGRESS',
+        uiActions: [],
+      }),
+    })
+    render(
+      <ChatHarness
+        onTurnCompleted={onTurnCompleted}
+        repository={repository}
+      />,
+    )
+    await screen.findByText('보고 있는 페이지를 함께 읽고 답변해요')
+    const input = screen.getByLabelText('질문')
+
+    fireEvent.change(input, { target: { value: '첫 줄' } })
+    fireEvent.keyDown(input, { key: 'Enter', shiftKey: true })
+    expect(repository.submitTurn).not.toHaveBeenCalled()
+
+    fireEvent.keyDown(input, { key: 'Enter' })
+    await waitFor(() => expect(repository.submitTurn).toHaveBeenCalledOnce())
+    expect(onTurnCompleted).toHaveBeenCalledWith(
+      expect.objectContaining({ currentPage: 2, pageStatus: 'IN_PROGRESS' }),
     )
   })
 
@@ -152,6 +191,55 @@ describe('ChatPanel', () => {
     expect(strong.tagName).toBe('STRONG')
     expect(screen.getByRole('list')).toBeInTheDocument()
     expect(screen.getByText('*별표*는 그대로 보여야 합니다.')).toBeInTheDocument()
+  })
+
+  it('renders inline and display LaTeX in assistant messages', async () => {
+    const repository = createRepository({
+      listMessages: vi.fn().mockResolvedValue([
+        {
+          content: '인라인 $E = mc^2$와 블록 수식입니다.\n\n$$\nx^2 + y^2 = z^2\n$$',
+          createdAt: '2026-08-04T00:00:00Z',
+          id: 'latex-1',
+          senderType: 'AI',
+        },
+      ]),
+    })
+    const { container } = render(<ChatHarness repository={repository} />)
+
+    await screen.findByText(/인라인/)
+    expect(container.querySelectorAll('.katex')).toHaveLength(2)
+    expect(container.querySelector('.katex-display')).toBeInTheDocument()
+  })
+
+  it('renders parenthesized LaTeX returned without markdown math delimiters', async () => {
+    const repository = createRepository({
+      listMessages: vi.fn().mockResolvedValue([
+        {
+          content: '- (w_{t+1}=w_t-v_t)\n- (v_t=\\gamma v_{t-1}+\\alpha\\nabla L(w_t-\\gamma v_{t-1}))',
+          createdAt: '2026-08-05T00:00:00Z',
+          id: 'latex-2',
+          senderType: 'AI',
+        },
+      ]),
+    })
+    const { container } = render(<ChatHarness repository={repository} />)
+
+    await screen.findByRole('list')
+    expect(container.querySelectorAll('.katex')).toHaveLength(2)
+    expect(container.querySelectorAll('.katex-mathml annotation')).toHaveLength(2)
+  })
+
+  it('grows the question input with multiline content and caps its height', async () => {
+    render(<ChatHarness repository={createRepository()} />)
+    const input = await screen.findByLabelText('질문')
+    Object.defineProperty(input, 'scrollHeight', {
+      configurable: true,
+      value: 72,
+    })
+
+    fireEvent.change(input, { target: { value: '첫 줄\n둘째 줄\n셋째 줄' } })
+
+    expect(input).toHaveStyle({ height: '72px', overflowY: 'hidden' })
   })
 
   it('renders GFM tables and preserves markdown when an answer is saved as a note', async () => {

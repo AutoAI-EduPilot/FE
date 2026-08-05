@@ -18,6 +18,7 @@ import {
   UiActionsRenderer,
   type LearningSession,
   type SessionQuizSummary,
+  type SessionTurnResult,
   type UiActionEvent,
 } from '../../features/sessions'
 import {
@@ -30,11 +31,11 @@ import {
   classroomDetailPath,
   diagnosisPath,
   materialViewerPath,
-  quizDetailPath,
   routes,
   sessionDetailPath,
 } from '../routes'
 import { usePageTitle } from '../../shared/lib/usePageTitle'
+import { QuizWorkspace } from './QuizPage'
 
 const SessionPageViewer = lazy(async () => {
   const module = await import('../../features/sessions/SessionPageViewer')
@@ -76,11 +77,15 @@ export function SessionDetailPage() {
   const [isSelectingQuizType, setIsSelectingQuizType] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
   const [quizHistory, setQuizHistory] = useState<SessionQuizSummary[]>([])
+  const [embeddedQuizId, setEmbeddedQuizId] = useState<string | null>(null)
   const [materials, setMaterials] = useState<StudyMaterial[]>([])
   const [materialFile, setMaterialFile] = useState<Blob | null | undefined>()
   const [materialFileError, setMaterialFileError] = useState<string | null>(null)
-  const [chatPanelWidth, setChatPanelWidth] = useState(DEFAULT_CHAT_PANEL_WIDTH)
+  const [chatPanelWidth, setChatPanelWidth] = useState<number | null>(null)
   const [chatPanelMaxWidth, setChatPanelMaxWidth] = useState(DEFAULT_CHAT_PANEL_WIDTH)
+  const [isResourcePanelOpen, setIsResourcePanelOpen] = useState(
+    () => window.innerWidth >= 1536,
+  )
   const [sessionsPastInitialChat, setSessionsPastInitialChat] = useState<ReadonlySet<string>>(
     () => new Set(),
   )
@@ -202,7 +207,9 @@ export function SessionDetailPage() {
         workspace.clientWidth - MIN_PDF_PANEL_WIDTH - PANEL_RESIZER_WIDTH,
       )
       setChatPanelMaxWidth(nextMaximum)
-      setChatPanelWidth((width) => Math.min(nextMaximum, Math.max(MIN_CHAT_PANEL_WIDTH, width)))
+      setChatPanelWidth((width) => width === null
+        ? null
+        : Math.min(nextMaximum, Math.max(MIN_CHAT_PANEL_WIDTH, width)))
     }
 
     updatePanelBounds()
@@ -262,6 +269,27 @@ export function SessionDetailPage() {
     })
   }
 
+  function applyTurnResult(result: SessionTurnResult) {
+    const nextPage = result.currentPage === undefined
+      ? undefined
+      : movePage(result.currentPage, totalPages)
+    if (nextPage !== undefined) setCurrentPage(nextPage)
+    setSession((current) => current
+      ? {
+          ...current,
+          activeQuizId: result.activeQuizId === undefined
+            ? current.activeQuizId
+            : result.activeQuizId ?? undefined,
+          currentPage: nextPage ?? current.currentPage,
+          pageStatus: result.pageStatus ?? current.pageStatus,
+          pendingDiagnosis: result.pendingDiagnosis === undefined
+            ? current.pendingDiagnosis
+            : result.pendingDiagnosis ?? undefined,
+          uiActions: result.uiActions,
+        }
+      : current)
+  }
+
   async function handlePageMove(nextPage: number) {
     if (isActionPending) return
     leaveInitialChatState()
@@ -299,16 +327,7 @@ export function SessionDetailPage() {
         payload,
         requestId: createTurnRequestId(),
       })
-      setSession((current) =>
-        current
-          ? {
-              ...current,
-              activeQuizId: result.activeQuizId,
-              pendingDiagnosis: result.pendingDiagnosis,
-              uiActions: result.uiActions,
-            }
-          : current,
-      )
+      applyTurnResult(result)
       return result
     } catch (requestError) {
       if (
@@ -366,7 +385,7 @@ export function SessionDetailPage() {
     if (!result) return
     setIsSelectingQuizType(false)
     if (result.activeQuizId) {
-      navigate(quizDetailPath(result.activeQuizId))
+      setEmbeddedQuizId(result.activeQuizId)
     }
   }
 
@@ -408,7 +427,16 @@ export function SessionDetailPage() {
     if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return
     event.preventDefault()
     const delta = event.key === 'ArrowLeft' ? 24 : -24
-    setChatPanelWidth((width) => Math.min(chatPanelMaxWidth, Math.max(MIN_CHAT_PANEL_WIDTH, width + delta)))
+    setChatPanelWidth((width) => {
+      const currentWidth = width ?? Math.max(
+        MIN_CHAT_PANEL_WIDTH,
+        ((workspaceRef.current?.clientWidth || DEFAULT_CHAT_PANEL_WIDTH * 2) - PANEL_RESIZER_WIDTH) / 2,
+      )
+      return Math.min(
+        chatPanelMaxWidth,
+        Math.max(MIN_CHAT_PANEL_WIDTH, currentWidth + delta),
+      )
+    })
   }
 
   return (
@@ -419,25 +447,30 @@ export function SessionDetailPage() {
       </p>
 
       <section className="flex h-full min-h-0">
-        <SessionResourcePanel
-          activeMaterialId={activeSession.materialId}
-          backLabel="주차 페이지로"
-          backTo={weekPagePath}
-          materials={materials}
-          progressLabel={`${currentPage}/${totalPages}`}
-          quizDetailPath={quizDetailPath}
-          quizHistory={quizHistory}
-          resourcePath={(material) =>
-            material.activeSessionId
-              ? sessionDetailPath(material.activeSessionId)
-              : materialViewerPath(material.id)
-          }
-        />
+        {isResourcePanelOpen ? (
+          <SessionResourcePanel
+            activeMaterialId={activeSession.materialId}
+            backLabel="주차 페이지로"
+            backTo={weekPagePath}
+            materials={materials}
+            onClose={() => setIsResourcePanelOpen(false)}
+            progressLabel={`${currentPage}/${totalPages}`}
+            quizHistory={quizHistory}
+            onOpenQuiz={setEmbeddedQuizId}
+            resourcePath={(material) =>
+              material.activeSessionId
+                ? sessionDetailPath(material.activeSessionId)
+                : materialViewerPath(material.id)
+            }
+          />
+        ) : null}
 
         <div
           className="study-session-content h-full min-h-0 min-w-0 flex-1"
           ref={workspaceRef}
-          style={{ '--chat-panel-width': `${chatPanelWidth}px` } as CSSProperties}
+          style={chatPanelWidth === null
+            ? undefined
+            : { '--chat-panel-width': `${chatPanelWidth}px` } as CSSProperties}
         >
           <Suspense
             fallback={
@@ -449,15 +482,26 @@ export function SessionDetailPage() {
               </div>
             }
           >
-            <SessionPageViewer
-              currentPage={currentPage}
-              file={materialFile}
-              fileError={materialFileError}
-              isPending={isActionPending}
-              materialTitle={activeSession.materialTitle}
-              onMovePage={handlePageMove}
-              totalPages={totalPages}
-            />
+            {embeddedQuizId ? (
+              <QuizWorkspace
+                embedded
+                onBackToPdf={() => setEmbeddedQuizId(null)}
+                quizId={embeddedQuizId}
+              />
+            ) : (
+              <SessionPageViewer
+                currentPage={currentPage}
+                file={materialFile}
+                fileError={materialFileError}
+                isPending={isActionPending}
+                materialTitle={activeSession.materialTitle}
+                onMovePage={handlePageMove}
+                onOpenResources={isResourcePanelOpen
+                  ? undefined
+                  : () => setIsResourcePanelOpen(true)}
+                totalPages={totalPages}
+              />
+            )}
           </Suspense>
 
           <div
@@ -465,16 +509,16 @@ export function SessionDetailPage() {
             aria-orientation="vertical"
             aria-valuemax={Math.round(chatPanelMaxWidth)}
             aria-valuemin={MIN_CHAT_PANEL_WIDTH}
-            aria-valuenow={Math.round(chatPanelWidth)}
+            aria-valuenow={chatPanelWidth === null ? undefined : Math.round(chatPanelWidth)}
             className="group hidden h-full cursor-col-resize touch-none items-center justify-center bg-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-inset focus-visible:outline-brand-600 lg:flex"
-            onDoubleClick={() => setChatPanelWidth(Math.min(DEFAULT_CHAT_PANEL_WIDTH, chatPanelMaxWidth))}
+            onDoubleClick={() => setChatPanelWidth(null)}
             onKeyDown={handleResizerKeyDown}
             onPointerDown={handleResizerPointerDown}
             onPointerMove={handleResizerPointerMove}
             onPointerUp={(event) => event.currentTarget.releasePointerCapture(event.pointerId)}
             role="separator"
             tabIndex={0}
-            title="드래그하여 PDF와 채팅 너비 조절"
+            title="드래그하여 PDF와 채팅 너비 조절, 두 번 클릭하여 동일 너비로 복원"
           >
             <span className="h-full w-px bg-stone-200 transition-colors group-hover:bg-brand-400" />
           </div>
@@ -494,7 +538,7 @@ export function SessionDetailPage() {
                     <div className="mt-2 grid grid-cols-2 gap-2">
                       {QUIZ_TYPE_OPTIONS.map((option) => (
                         <Button
-                          disabled={isActionPending}
+                          disabled={isActionPending || chat.isTurnPending}
                           key={option.kind}
                           onClick={() => void handleQuizTypeSelected(option.kind)}
                           size="sm"
@@ -509,7 +553,7 @@ export function SessionDetailPage() {
                 ) : (
                   <UiActionsRenderer
                     actions={visibleUiActions}
-                    disabled={isActionPending}
+                    disabled={isActionPending || chat.isTurnPending}
                     onEvent={(event) => void handleEvent(event)}
                     onOpenDiagnosis={(diagnosisId) =>
                       navigate(diagnosisPath(activeSession.id, diagnosisId))
@@ -517,14 +561,15 @@ export function SessionDetailPage() {
                   />
                 )}
 
-                {activeSession.activeQuizId && !isSelectingQuizType ? (
-                  <ButtonLink
+                {activeSession.activeQuizId && !isSelectingQuizType && !embeddedQuizId ? (
+                  <Button
+                    onClick={() => setEmbeddedQuizId(activeSession.activeQuizId ?? null)}
                     size="sm"
-                    to={quizDetailPath(activeSession.activeQuizId)}
+                    type="button"
                     variant="secondary"
                   >
                     진행 중인 퀴즈 풀기
-                  </ButtonLink>
+                  </Button>
                 ) : null}
 
                 {error ? (
@@ -536,7 +581,7 @@ export function SessionDetailPage() {
             }
             headerAction={activeSession.status === 'ACTIVE' ? (
               <Button
-                disabled={isActionPending}
+                disabled={isActionPending || chat.isTurnPending}
                 onClick={() => {
                   if (window.confirm('학습을 완료 처리할까요?')) {
                     void handleEvent('COMPLETE_SESSION')
@@ -552,6 +597,7 @@ export function SessionDetailPage() {
             ) : undefined}
             onConversationStarted={leaveInitialChatState}
             onRequestQuiz={() => setIsSelectingQuizType(true)}
+            onTurnCompleted={applyTurnResult}
             sessionId={activeSession.id}
           />
         </div>

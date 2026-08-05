@@ -4,6 +4,7 @@ import type { AuthenticatedRequest } from '../auth'
 export type ClassroomColor = 'BLUE' | 'GREEN' | 'PURPLE' | 'ORANGE' | 'RED' | 'GRAY'
 export type ClassroomStatus = 'ACTIVE' | 'COMPLETED'
 export type JoinRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
+export type ClassroomWeekStatus = 'PRIVATE' | 'SCHEDULED' | 'PUBLISHED' | 'BREAK'
 
 export const JOIN_REQUESTS_CHANGED_EVENT = 'edupilot:join-requests-changed'
 
@@ -33,6 +34,10 @@ export interface CreateClassroomInput {
   startDate: string
 }
 
+export interface UpdateClassroomInput extends Partial<CreateClassroomInput> {
+  shiftWeekReleaseDates?: boolean
+}
+
 export interface ClassroomMaterial {
   id: string
   pageCount?: number
@@ -44,11 +49,44 @@ export interface ClassroomMaterial {
 }
 
 export interface ClassroomWeek {
+  averageProgressRate?: number
+  displayOrder: number
+  id: string
   materials: ClassroomMaterial[]
   releaseAt?: string
-  status: 'SCHEDULED' | 'PUBLISHED'
+  status: ClassroomWeekStatus
   title: string
   weekNumber: number
+}
+
+export interface ClassroomStudent {
+  affiliation?: string
+  email: string
+  id: string
+  joinedAt: string
+  lastActiveAt?: string
+  name: string
+  status: string
+}
+
+export interface ClassroomAnalytics {
+  aiQuestionCountLast7Days: number
+  averageProgressRate: number
+  inactiveLearnerCountLast7Days: number
+  lastUpdatedAt: string
+  learnerCount: number
+  materials: Array<{
+    averageProgressRate: number
+    id: string
+    title: string
+    viewerCount: number
+    viewRate: number
+  }>
+  questionsByPage: Array<{
+    materialId: string
+    pageNumber: number
+    questionCount: number
+  }>
 }
 
 export interface ClassroomNotice {
@@ -89,11 +127,34 @@ interface ClassroomDto {
 }
 
 interface WeekDto {
+  averageProgressRate?: number
+  displayOrder?: number
   materials: Array<{ materialId: number; pageCount?: number; processingStatus: ClassroomMaterial['status']; title: string; uploadedAt: string; viewerCount?: number; viewRate?: number }>
   releaseAt?: string
-  status: ClassroomWeek['status']
+  status: ClassroomWeekStatus
   title: string
+  weekId?: number
   weekNumber: number
+}
+
+interface ClassroomStudentDto {
+  affiliation?: string
+  email: string
+  joinedAt: string
+  lastActiveAt?: string
+  name: string
+  status: string
+  studentId: number
+}
+
+interface ClassroomAnalyticsDto {
+  aiQuestionCountLast7Days: number
+  averageProgressRate: number
+  inactiveLearnerCountLast7Days: number
+  lastUpdatedAt: string
+  learnerCount: number
+  materials: Array<{ averageProgressRate: number; materialId: number; title: string; viewerCount: number; viewRate: number }>
+  questionsByPage: Array<{ materialId: number; pageNumber: number; questionCount: number }>
 }
 
 interface NoticeDto {
@@ -141,10 +202,12 @@ export function createClassroomsRepository(request: AuthenticatedRequest) {
       })
       return mapClassroom(data)
     },
-    async update(id: string, input: Partial<Omit<CreateClassroomInput, 'startDate'>>) {
+    async update(id: string, input: UpdateClassroomInput) {
       const body: Record<string, unknown> = {}
       if (input.name !== undefined) { body.namePresent = true; body.name = input.name }
+      if (input.startDate !== undefined) { body.startDatePresent = true; body.startDate = input.startDate }
       if (input.endDate !== undefined) { body.endDatePresent = true; body.endDate = input.endDate }
+      if (input.shiftWeekReleaseDates !== undefined) { body.shiftWeekReleaseDatesPresent = true; body.shiftWeekReleaseDates = input.shiftWeekReleaseDates }
       if (input.color !== undefined) { body.colorPresent = true; body.color = input.color }
       if (input.description !== undefined) { body.descriptionPresent = true; body.description = input.description }
       const { data } = await request<ClassroomDto>(`/api/classrooms/${encodeURIComponent(id)}`, { body, method: 'PATCH' })
@@ -164,6 +227,40 @@ export function createClassroomsRepository(request: AuthenticatedRequest) {
     async listWeeks(id: string, signal?: AbortSignal) {
       const { data } = await request<{ items: WeekDto[] }>(`/api/classrooms/${encodeURIComponent(id)}/weeks`, { signal })
       return data.items.map(mapWeek)
+    },
+    async changeWeekStatus(id: string, weekId: string, status: ClassroomWeekStatus) {
+      const { data } = await request<WeekDto>(
+        `/api/classrooms/${encodeURIComponent(id)}/weeks/${encodeURIComponent(weekId)}/status`,
+        { body: { status }, method: 'PATCH' },
+      )
+      return mapWeek(data)
+    },
+    async reorderWeeks(id: string, orderedWeekIds: string[]) {
+      const { data } = await request<{ items: WeekDto[] }>(
+        `/api/classrooms/${encodeURIComponent(id)}/weeks/reorder`,
+        { body: { orderedWeekIds: orderedWeekIds.map(Number) }, method: 'PATCH' },
+      )
+      return data.items.map(mapWeek)
+    },
+    async getAnalytics(id: string, signal?: AbortSignal) {
+      const { data } = await request<ClassroomAnalyticsDto>(
+        `/api/classrooms/${encodeURIComponent(id)}/analytics`,
+        { signal },
+      )
+      return mapAnalytics(data)
+    },
+    async listStudents(id: string, signal?: AbortSignal) {
+      const { data } = await request<PagedResponse<ClassroomStudentDto>>(
+        `/api/classrooms/${encodeURIComponent(id)}/students?page=0&size=100`,
+        { signal },
+      )
+      return data.items.map(mapStudent)
+    },
+    async removeStudent(id: string, studentId: string) {
+      await request(
+        `/api/classrooms/${encodeURIComponent(id)}/students/${encodeURIComponent(studentId)}`,
+        { method: 'DELETE' },
+      )
     },
     async createWeek(id: string, input: { releaseAt?: string; title: string; weekNumber?: number }) {
       const { data } = await request<WeekDto>(`/api/classrooms/${encodeURIComponent(id)}/weeks`, { body: input, method: 'POST' })
@@ -218,7 +315,24 @@ function mapClassroom(value: ClassroomDto): Classroom {
 }
 
 function mapWeek(value: WeekDto): ClassroomWeek {
-  return { ...value, materials: value.materials.map((item) => ({ id: String(item.materialId), pageCount: item.pageCount, status: item.processingStatus, title: item.title, uploadedAt: item.uploadedAt, viewerCount: item.viewerCount, viewRate: item.viewRate })) }
+  return {
+    ...value,
+    displayOrder: value.displayOrder ?? value.weekNumber,
+    id: String(value.weekId ?? value.weekNumber),
+    materials: value.materials.map((item) => ({ id: String(item.materialId), pageCount: item.pageCount, status: item.processingStatus, title: item.title, uploadedAt: item.uploadedAt, viewerCount: item.viewerCount, viewRate: item.viewRate })),
+  }
+}
+
+function mapStudent(value: ClassroomStudentDto): ClassroomStudent {
+  return { ...value, id: String(value.studentId) }
+}
+
+function mapAnalytics(value: ClassroomAnalyticsDto): ClassroomAnalytics {
+  return {
+    ...value,
+    materials: value.materials.map((item) => ({ ...item, id: String(item.materialId) })),
+    questionsByPage: value.questionsByPage.map((item) => ({ ...item, materialId: String(item.materialId) })),
+  }
 }
 
 function mapNotice(value: NoticeDto): ClassroomNotice {

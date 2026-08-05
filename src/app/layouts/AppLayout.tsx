@@ -117,6 +117,16 @@ export function AppLayout() {
     : learnerNavigation, [classroomContextId, isInstructor])
 
   useEffect(() => {
+    document.documentElement.classList.toggle(
+      'study-workspace-active',
+      isStudyWorkspace,
+    )
+    return () => {
+      document.documentElement.classList.remove('study-workspace-active')
+    }
+  }, [isStudyWorkspace])
+
+  useEffect(() => {
     if (!isInstructor) {
       return
     }
