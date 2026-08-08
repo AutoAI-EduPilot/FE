@@ -1,10 +1,10 @@
-import { CheckCircle2, ChevronLeft, ChevronRight, Send, Trash2 } from 'lucide-react'
+import { CheckCircle2, ChevronLeft, ChevronRight, LoaderCircle, Send, Sparkles, Trash2, X } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { isInstructorRole, useAuth } from '../../features/auth'
 import { rememberClassroomId } from '../../features/classrooms'
-import { createExamsRepository, type CreateExamInput, type Exam, type ExamQuestion, type ExamSubmission, type InstructorSubmissionSummary } from '../../features/exams'
+import { createExamsRepository, type CreateExamInput, type Exam, type ExamQuestion, type ExamQuestionType, type ExamSubmission, type GenerateExamDraftInput, type InstructorSubmissionSummary } from '../../features/exams'
 import { ExamEditor } from '../../features/exams/ExamEditor'
 import { isExamDraftValid } from '../../features/exams/examEditorModel'
 import { getRequestErrorMessage } from '../../shared/api'
@@ -49,14 +49,64 @@ export function ExamDetailPage() {
 
 function InstructorExamView({ exam, isWorking, onAction, onUpdated, repository }: { exam: Exam; isWorking: boolean; onAction: (action: 'publish' | 'close' | 'delete') => void; onUpdated: (exam: Exam) => void; repository: ReturnType<typeof createExamsRepository> }) {
   const { show } = useToast(); const [isEditing, setIsEditing] = useState(false); const [isSaving, setIsSaving] = useState(false)
+  const [isAiDraftOpen, setIsAiDraftOpen] = useState(false)
+  const [draftWasTruncated, setDraftWasTruncated] = useState(false)
   const [submissions, setSubmissions] = useState<InstructorSubmissionSummary[]>([]); const [submissionsError, setSubmissionsError] = useState<string | null>(null)
   const [draft, setDraft] = useState<CreateExamInput>(() => toExamInput(exam))
   useEffect(() => { if (exam.status === 'DRAFT') return; const controller = new AbortController(); repository.listSubmissions(exam.id, controller.signal).then(setSubmissions).catch((error) => { if (!controller.signal.aborted) setSubmissionsError(getRequestErrorMessage(error)) }); return () => controller.abort() }, [exam.id, exam.status, repository])
   async function save(event: FormEvent) { event.preventDefault(); if (!isExamDraftValid(draft) || isSaving) return; setIsSaving(true); try { onUpdated(await repository.update(exam.id, draft)); setIsEditing(false); show('시험 초안을 저장했습니다.', 'success') } catch (error) { show(getRequestErrorMessage(error), 'danger') } finally { setIsSaving(false) } }
+  async function generateAiDraft(input: GenerateExamDraftInput) {
+    try {
+      const generated = await repository.generateDraftQuestions(exam.classroomId, exam.id, input)
+      setDraft({
+        ...toExamInput(exam),
+        questions: generated.questions,
+        weekNumber: input.weekNumber ?? exam.weekNumber,
+      })
+      setDraftWasTruncated(generated.truncated)
+      setIsAiDraftOpen(false)
+      setIsEditing(true)
+      show(`${generated.questions.length}개 문항 초안을 생성했습니다.`, 'success')
+    } catch (error) {
+      show(getRequestErrorMessage(error), 'danger')
+      throw error
+    }
+  }
   return <>
-    {exam.status === 'DRAFT' && isEditing ? <form className="rounded-xl border border-stone-200 bg-white p-5" onSubmit={save}><ExamEditor onChange={setDraft} value={draft} /><div className="mt-6 flex justify-end gap-2"><Button onClick={() => { setDraft(toExamInput(exam)); setIsEditing(false) }} variant="ghost">취소</Button><Button disabled={!isExamDraftValid(draft) || isSaving} type="submit">{isSaving ? '저장 중' : '변경 저장'}</Button></div></form> : <section className="rounded-xl border border-stone-200 bg-white"><div className="flex flex-wrap items-center gap-3 border-b border-stone-200 px-5 py-4"><div><p className="type-body text-stone-600">{exam.description || '설명 없음'}</p><p className="mt-1 type-caption text-stone-400">{exam.weekNumber ? `${exam.weekNumber}주차 · ` : ''}{exam.questionCount}문항 · 총 {exam.totalScore}점 · 재응시 {exam.allowRetake ? '허용' : '불가'}</p></div><div className="ml-auto flex gap-2">{exam.status === 'DRAFT' ? <><Button onClick={() => { setDraft(toExamInput(exam)); setIsEditing(true) }} variant="secondary">수정</Button><Button disabled={isWorking || exam.questionCount === 0} onClick={() => onAction('publish')}>공개</Button><Button disabled={isWorking} onClick={() => onAction('delete')} variant="ghost"><Trash2 size={14} />삭제</Button></> : null}{exam.status === 'PUBLISHED' ? <Button disabled={isWorking} onClick={() => onAction('close')} variant="secondary">시험 종료</Button> : null}</div></div><div className="divide-y divide-stone-100">{exam.questions.map((question, index) => <article className="px-5 py-4" key={question.id}><div className="flex gap-3"><Badge>{index + 1}번</Badge><div className="min-w-0"><h2 className="type-body font-semibold text-stone-900">{question.questionText}</h2><p className="mt-1 type-caption text-stone-500">{question.questionType} · {question.maxScore}점</p><PrivateAnswer question={question} /></div></div></article>)}</div></section>}
+    {exam.status === 'DRAFT' && isEditing ? <form className="rounded-xl border border-stone-200 bg-white p-5" onSubmit={save}>{draftWasTruncated ? <p className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 type-control font-semibold text-amber-800" role="status">자료가 많아 앞 30페이지만 사용되었습니다.</p> : null}<ExamEditor onChange={setDraft} value={draft} /><div className="mt-6 flex justify-end gap-2"><Button onClick={() => { setDraft(toExamInput(exam)); setDraftWasTruncated(false); setIsEditing(false) }} variant="ghost">취소</Button><Button disabled={!isExamDraftValid(draft) || isSaving} type="submit">{isSaving ? '저장 중' : '변경 저장'}</Button></div></form> : <section className="rounded-xl border border-stone-200 bg-white"><div className="flex flex-wrap items-center gap-3 border-b border-stone-200 px-5 py-4"><div><p className="type-body text-stone-600">{exam.description || '설명 없음'}</p><p className="mt-1 type-caption text-stone-400">{exam.weekNumber ? `${exam.weekNumber}주차 · ` : ''}{exam.questionCount}문항 · 총 {exam.totalScore}점 · 재응시 {exam.allowRetake ? '허용' : '불가'}</p></div><div className="ml-auto flex flex-wrap gap-2">{exam.status === 'DRAFT' ? <><Button onClick={() => setIsAiDraftOpen(true)} variant="secondary"><Sparkles aria-hidden="true" size={14} />AI 초안으로 시작</Button><Button onClick={() => { setDraft(toExamInput(exam)); setDraftWasTruncated(false); setIsEditing(true) }} variant="secondary">직접 수정</Button><Button disabled={isWorking || exam.questionCount === 0} onClick={() => onAction('publish')}>공개</Button><Button disabled={isWorking} onClick={() => onAction('delete')} variant="ghost"><Trash2 size={14} />삭제</Button></> : null}{exam.status === 'PUBLISHED' ? <Button disabled={isWorking} onClick={() => onAction('close')} variant="secondary">시험 종료</Button> : null}</div></div><div className="divide-y divide-stone-100">{exam.questions.map((question, index) => <article className="px-5 py-4" key={question.id}><div className="flex gap-3"><Badge>{index + 1}번</Badge><div className="min-w-0"><h2 className="type-body font-semibold text-stone-900">{question.questionText}</h2><p className="mt-1 type-caption text-stone-500">{question.questionType} · {question.maxScore}점</p><PrivateAnswer question={question} /></div></div></article>)}</div></section>}
     {exam.status !== 'DRAFT' ? <section className="overflow-hidden rounded-xl border border-stone-200 bg-white"><div className="border-b border-stone-200 px-5 py-4"><h2 className="type-section-title font-bold">제출 현황</h2></div>{submissionsError ? <p className="px-5 py-6 type-body text-rose-700">{submissionsError}</p> : submissions.length === 0 ? <EmptyState title="제출 내역이 없습니다" description="학습자가 시험을 제출하면 여기에 표시됩니다." /> : <div className="overflow-x-auto"><table className="w-full min-w-[700px] text-left type-control"><thead className="bg-stone-50 type-caption text-stone-500"><tr><th className="px-5 py-3">학습자</th><th>상태</th><th>시도</th><th>점수</th><th className="px-5">제출 시각</th></tr></thead><tbody>{submissions.map((submission) => <tr className="border-t border-stone-100" key={submission.id}><td className="px-5 py-3 font-semibold">{submission.userName}</td><td>{getSubmissionLabel(submission.status)}</td><td>{submission.attemptNo}/{submission.attemptCount}</td><td>{submission.status === 'GRADED' ? `${submission.score ?? 0}/${submission.maxScore ?? 0}` : '-'}</td><td className="px-5 text-stone-500">{formatDateTime(submission.submittedAt)}</td></tr>)}</tbody></table></div>}</section> : null}
+    {isAiDraftOpen ? <AiExamDraftDialog initialWeekNumber={exam.weekNumber} onClose={() => setIsAiDraftOpen(false)} onGenerate={generateAiDraft} /> : null}
   </>
+}
+
+const draftQuestionTypes: Array<{ label: string; type: ExamQuestionType }> = [
+  { label: '객관식', type: 'MCQ' },
+  { label: 'OX', type: 'OX' },
+  { label: '단답형', type: 'SHORT' },
+  { label: '서술형', type: 'ESSAY' },
+]
+
+function AiExamDraftDialog({ initialWeekNumber, onClose, onGenerate }: { initialWeekNumber?: number; onClose: () => void; onGenerate: (input: GenerateExamDraftInput) => Promise<void> }) {
+  const [weekNumber, setWeekNumber] = useState(initialWeekNumber ? String(initialWeekNumber) : '')
+  const [counts, setCounts] = useState<Record<ExamQuestionType, number>>({ ESSAY: 0, MCQ: 3, OX: 0, SHORT: 2 })
+  const [isGenerating, setIsGenerating] = useState(false)
+  const totalCount = Object.values(counts).reduce((sum, count) => sum + count, 0)
+
+  async function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (isGenerating || totalCount < 1 || totalCount > 20) return
+    setIsGenerating(true)
+    try {
+      await onGenerate({
+        questionPlan: draftQuestionTypes.flatMap(({ type }) => counts[type] > 0 ? [{ count: counts[type], questionType: type }] : []),
+        weekNumber: weekNumber ? Number(weekNumber) : undefined,
+      })
+    } finally {
+      setIsGenerating(false)
+    }
+  }
+
+  return <div aria-labelledby="ai-exam-draft-title" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/45 px-4" role="dialog"><form className="w-full max-w-lg rounded-xl border border-stone-200 bg-white p-6 shadow-2xl" onSubmit={submit}><div className="flex items-start justify-between gap-4"><div><h2 className="type-dialog-title font-bold text-stone-950" id="ai-exam-draft-title">AI 문항 초안</h2><p className="mt-1 type-caption text-stone-500">생성된 문항은 검토 후 저장해야 반영됩니다.</p></div><button aria-label="AI 문항 초안 닫기" className="flex size-8 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100" disabled={isGenerating} onClick={onClose} type="button"><X aria-hidden="true" size={16} /></button></div><label className="mt-5 block type-control font-semibold text-stone-700">분석 범위<select className="mt-1 h-10 w-full rounded-lg border border-stone-300 bg-white px-3 type-body" disabled={isGenerating} onChange={(event) => setWeekNumber(event.target.value)} value={weekNumber}><option value="">전체 READY 자료</option>{Array.from({ length: 52 }, (_, index) => index + 1).map((week) => <option key={week} value={week}>{week}주차</option>)}</select></label><fieldset className="mt-5"><legend className="type-control font-semibold text-stone-700">문항 구성</legend><div className="mt-2 grid grid-cols-2 gap-3">{draftQuestionTypes.map((item) => <label className="rounded-lg border border-stone-200 p-3 type-control font-semibold text-stone-700" key={item.type}>{item.label}<input aria-label={`${item.label} 문항 수`} className="mt-2 h-9 w-full rounded-lg border border-stone-300 px-3 type-body" disabled={isGenerating} max={20} min={0} onChange={(event) => setCounts((current) => ({ ...current, [item.type]: Math.max(0, Number(event.target.value)) }))} type="number" value={counts[item.type]} /></label>)}</div></fieldset><p className={`mt-3 type-caption font-semibold ${totalCount > 20 ? 'text-rose-700' : 'text-stone-500'}`}>총 {totalCount}문항 / 최대 20문항</p><div className="mt-6 flex justify-end gap-2"><Button disabled={isGenerating} onClick={onClose} variant="secondary">취소</Button><Button disabled={isGenerating || totalCount < 1 || totalCount > 20} type="submit">{isGenerating ? <><LoaderCircle aria-hidden="true" className="animate-spin" size={14} />AI가 문항을 생성하는 중</> : <><Sparkles aria-hidden="true" size={14} />초안 생성</>}</Button></div></form></div>
 }
 
 function LearnerExamView({ exam, repository }: { exam: Exam; repository: ReturnType<typeof createExamsRepository> }) {

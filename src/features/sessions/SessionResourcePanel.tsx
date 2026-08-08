@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronLeft, PanelLeftClose } from 'lucide-react'
+import { ChevronLeft, PanelLeftClose } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { cx } from '../../shared/lib/cx'
@@ -25,7 +25,6 @@ interface SessionResourcePanelProps {
   backTo: string
   onClose: () => void
   onOpenQuiz: (quizId: string) => void
-  progressLabel?: string
   resourcePath: (material: SessionResourceMaterial) => string
   weeks: SessionResourceWeek[]
 }
@@ -36,15 +35,9 @@ export function SessionResourcePanel({
   backTo,
   onClose,
   onOpenQuiz,
-  progressLabel,
   resourcePath,
   weeks,
 }: SessionResourcePanelProps) {
-  const materialCount = weeks.reduce(
-    (count, week) => count + week.materials.length,
-    0,
-  )
-
   return (
     <aside className="hidden h-full min-h-0 w-[240px] shrink-0 flex-col overflow-x-hidden overflow-y-auto border-r border-stone-200 bg-stone-50/60 p-3 xl:flex">
       <div className="flex items-center gap-1">
@@ -66,10 +59,7 @@ export function SessionResourcePanel({
         </button>
       </div>
 
-      <p className="px-2 pt-3.5 pb-1.5 type-caption font-semibold tracking-[0.04em] text-stone-400">
-        강의실 자료
-      </p>
-      <div className="grid gap-3">
+      <div className="mt-3.5 grid gap-3">
         {weeks.map((week) => (
           <section key={week.id}>
             <div className="flex items-baseline gap-1.5 px-2 py-1">
@@ -86,9 +76,6 @@ export function SessionResourcePanel({
                   <ResourceRow
                     isActive={material.id === activeMaterialId}
                     isMuted={material.status !== 'READY'}
-                    progressLabel={
-                      material.id === activeMaterialId ? progressLabel : undefined
-                    }
                     to={resourcePath(material)}
                     title={material.title}
                   />
@@ -118,10 +105,6 @@ export function SessionResourcePanel({
         ) : null}
       </div>
 
-      <p className="mt-auto flex items-center gap-1 px-2 pt-4 type-caption text-stone-400">
-        자료 {materialCount}개
-        <ChevronDown aria-hidden="true" size={13} />
-      </p>
     </aside>
   )
 }
@@ -143,11 +126,6 @@ function QuizRow({
       <span className="shrink-0 type-micro text-stone-400">
         {getQuizKindLabel(quiz.quizType)}
       </span>
-      {quiz.score !== undefined ? (
-        <span className="shrink-0 font-semibold text-brand-700">
-          {quiz.score}점
-        </span>
-      ) : null}
     </button>
   )
 }
@@ -155,13 +133,11 @@ function QuizRow({
 function ResourceRow({
   isActive = false,
   isMuted = false,
-  progressLabel,
   title,
   to,
 }: {
   isActive?: boolean
   isMuted?: boolean
-  progressLabel?: string
   title: string
   to: string
 }) {
@@ -189,11 +165,6 @@ function ResourceRow({
         {getMaterialKind(title)}
       </span>
       <span className="min-w-0 flex-1 break-words leading-5">{title}</span>
-      {progressLabel ? (
-        <span className="shrink-0 type-micro font-semibold text-brand-600">
-          {progressLabel}
-        </span>
-      ) : null}
     </Link>
   )
 }

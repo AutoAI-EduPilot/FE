@@ -131,6 +131,7 @@ html.dark {
 html {
   min-width: 320px;
   background: #fff;
+  scrollbar-gutter: stable;
 }
 
 html.study-workspace-active,

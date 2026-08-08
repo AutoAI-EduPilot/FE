@@ -80,13 +80,15 @@ DELETE /api/classrooms/{classroomId}/students/{studentId}
 ```
 
 강의실 수정의 `startDate`, `endDate`, `shiftWeekReleaseDates`도 공개 PATCH 계약에
-연결했다. 영구 삭제만 여전히 공개 API가 없다.
+연결했다. 영구 삭제 API도 2026-08-06 배포 Swagger에 추가되어 FE 재확인
+다이얼로그와 연결했다.
 
 ```http
 DELETE /api/classrooms/{classroomId}/permanent
 ```
 
-영구 삭제는 확인용 강의실명과 재인증 또는 별도 확인 토큰을 요구해야 한다.
+영구 삭제는 확인용 강의실명을 body의 `confirmName`으로 전송하며, trim 후 현재
+강의실명과 정확히 일치할 때만 요청한다.
 
 ## 연결 완료: 주차 순서와 운영 상태
 
@@ -104,12 +106,12 @@ PATCH /api/classrooms/{classroomId}/weeks/{weekNumber}/status
   현재 페이지 첨부·해제 상태를 FE 요청 payload에 연결했다.
 - `대화 새로 시작`: `POST /api/sessions/{sessionId}/conversations`에 연결했다.
 
-## P0. 통합학습 후속 단계 계약 보완
+## 연결 완료: 통합학습 후속 단계 계약
 
 노션 `통합학습 에이전트 명세서` 4번 시나리오는 페이지 설명 뒤 오케스트레이터가
-현재 페이지 중요도를 판단해 퀴즈 여부를 결정하도록 정의한다. 현재 공개 계약은
-설명 완료 시 항상 퀴즈를 제안하는 W3 규칙이어서 명세와 다르다. 기존 turns API의
-응답 계약을 다음처럼 보완해야 하며 새 endpoint는 필요하지 않다.
+현재 페이지 중요도를 판단해 퀴즈 여부를 결정하도록 정의한다. 2026-08-06 배포분은
+표지·목차성 페이지에 다음 페이지 액션을 반환하며, 중요 페이지의 퀴즈 준비 상태는
+기존 turns API 응답과 세션 상세 state로 복원한다.
 
 ```http
 POST /api/sessions/{sessionId}/turns

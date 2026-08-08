@@ -309,6 +309,10 @@ export async function handleApiFixtureRequest(
     return apiSuccess({ quizzes: quizHistoryFixture })
   }
 
+  if (request.method === 'GET' && path === '/api/sessions/103/quizzes') {
+    return apiSuccess({ quizzes: [] })
+  }
+
   if (request.method === 'GET' && path === '/api/users/me/memory?materialId=10') {
     return apiSuccess(memoryFixture(10))
   }
@@ -325,10 +329,18 @@ export async function handleApiFixtureRequest(
     return apiSuccess(sessionFixtures[100])
   }
 
+  if (request.method === 'GET' && path === '/api/sessions/103') {
+    return apiSuccess(sessionFixtures[103])
+  }
+
   if (
     request.method === 'GET' &&
     path === '/api/sessions/100/messages?size=50'
   ) {
+    return apiSuccess({ hasMore: false, items: [], nextCursor: null })
+  }
+
+  if (request.method === 'GET' && path === '/api/sessions/103/messages?size=50') {
     return apiSuccess({ hasMore: false, items: [], nextCursor: null })
   }
 
@@ -716,6 +728,17 @@ const sessionFixtures: Record<number, Record<string, unknown> | undefined> = {
       },
     ],
     updatedAt: '2026-07-28T00:00:00Z',
+  },
+  103: {
+    activeQuizId: 50,
+    currentPage: 2,
+    materialId: 10,
+    materialTitle: '시험 대비 요약.pdf',
+    pageStatus: 'QUIZ_READY',
+    sessionId: 103,
+    status: 'ACTIVE',
+    uiActions: [],
+    updatedAt: '2026-08-06T00:00:00Z',
   },
 }
 

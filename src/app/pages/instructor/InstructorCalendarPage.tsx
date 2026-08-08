@@ -115,7 +115,7 @@ export function InstructorCalendarPage() {
   }
 
   return (
-    <PageContainer className="lg:flex lg:h-[calc(100dvh-4.5rem)] lg:min-h-0 lg:flex-col lg:gap-5 lg:overflow-hidden lg:space-y-0">
+    <PageContainer className="lg:flex lg:h-[calc(100dvh-2.5rem)] lg:min-h-0 lg:flex-col lg:gap-5 lg:overflow-hidden lg:space-y-0">
       <PageHeader
         actions={
           <>
@@ -511,7 +511,7 @@ function ListView({
                 {event.title}
               </strong>
               <span className="mt-0.5 block type-caption text-stone-400">
-                {formatScheduleDateTime(event.startsAt)} ·{' '}
+                {formatScheduleDate(event.startsAt)} ·{' '}
                 {getCalendarEventKindLabel(event.kind)}
               </span>
             </span>
@@ -554,7 +554,7 @@ function CalendarEventButton({
       title={event.title}
       type="button"
     >
-      {event.hasTime === false ? '종일' : formatEventTime(event.startsAt)} {event.title}
+      {event.title}
     </button>
   )
 }
@@ -835,6 +835,12 @@ function formatScheduleDateTime(iso: string): string {
   }).format(new Date(iso))
 }
 
+function formatScheduleDate(iso: string): string {
+  return new Intl.DateTimeFormat('ko-KR', {
+    dateStyle: 'medium',
+  }).format(new Date(iso))
+}
+
 function formatEventRange(event: CalendarEvent): string {
   const start = new Date(event.startsAt)
   const dateFormatter = new Intl.DateTimeFormat('ko-KR', { dateStyle: 'medium' })
@@ -848,13 +854,6 @@ function formatEventRange(event: CalendarEvent): string {
   return event.endsAt
     ? `${startLabel} - ${formatScheduleDateTime(event.endsAt)}`
     : startLabel
-}
-
-function formatEventTime(iso: string): string {
-  return new Intl.DateTimeFormat('ko-KR', {
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(iso))
 }
 
 function getMonthCells(cursor: Date): Date[] {

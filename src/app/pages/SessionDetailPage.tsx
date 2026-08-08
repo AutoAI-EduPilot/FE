@@ -93,6 +93,7 @@ export function SessionDetailPage() {
     () => window.innerWidth >= 1536,
   )
   const workspaceRef = useRef<HTMLDivElement | null>(null)
+  const autoOpenedQuizIdRef = useRef<string | null>(null)
   const chat = useSessionChat(sessionsRepository, sessionId ?? '')
   const [resolvedClassroomId, setResolvedClassroomId] = useState<string | null>(
     () => getRememberedClassroomId(),
@@ -178,6 +179,21 @@ export function SessionDetailPage() {
     void loadMaterialFile()
     return () => controller.abort()
   }, [materialsRepository, session?.materialId])
+
+  useEffect(() => {
+    const activeQuizId = session?.activeQuizId
+    if (!activeQuizId) {
+      autoOpenedQuizIdRef.current = null
+      return
+    }
+    if (
+      session.pageStatus === 'QUIZ_READY'
+      && autoOpenedQuizIdRef.current !== activeQuizId
+    ) {
+      autoOpenedQuizIdRef.current = activeQuizId
+      setEmbeddedQuizId(activeQuizId)
+    }
+  }, [session?.activeQuizId, session?.pageStatus])
 
   useEffect(() => {
     const activeSessionId = session?.id
@@ -426,6 +442,7 @@ export function SessionDetailPage() {
     if (!result) return
     setIsSelectingQuizType(false)
     if (result.activeQuizId) {
+      autoOpenedQuizIdRef.current = result.activeQuizId
       setEmbeddedQuizId(result.activeQuizId)
     }
   }
@@ -510,7 +527,6 @@ export function SessionDetailPage() {
             backLabel="주차 페이지로"
             backTo={weekPagePath}
             onClose={() => setIsResourcePanelOpen(false)}
-            progressLabel={`${currentPage}/${totalPages}`}
             onOpenQuiz={setEmbeddedQuizId}
             resourcePath={(material) =>
               material.sessionId

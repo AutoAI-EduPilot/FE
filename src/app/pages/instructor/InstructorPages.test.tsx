@@ -8,7 +8,7 @@ import {
 } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
 import { AuthProvider } from '../../../features/auth'
 import { ToastProvider } from '../../../shared/ui'
@@ -47,17 +47,27 @@ function renderInstructorPage(page: ReactNode, initialEntries = ['/']) {
   )
 }
 
+function renderInstructorRoute(page: ReactNode, path: string, routePath: string) {
+  return render(
+    <MemoryRouter initialEntries={[path]}>
+      <AuthProvider initialUser={{ email: 'instructor@example.com', id: 7, name: '강의자', role: 'INSTRUCTOR' }}>
+        <ToastProvider><Routes><Route element={page} path={routePath} /></Routes></ToastProvider>
+      </AuthProvider>
+    </MemoryRouter>,
+  )
+}
+
 
 function stubNoticesApi() {
   return vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
-    const url = String(input instanceof Request ? input.url : input)
+    const url = new URL(String(input instanceof Request ? input.url : input), 'http://localhost')
     const envelope = (data: unknown) =>
       new Response(JSON.stringify({ data, message: 'ok', success: true }), {
         headers: { 'Content-Type': 'application/json' },
         status: 200,
       })
 
-    if (url.includes('/notices')) {
+    if (url.pathname.includes('/notices')) {
       return envelope({
         items: [
           {
@@ -76,24 +86,19 @@ function stubNoticesApi() {
         totalPages: 1,
       })
     }
-    if (url.includes('/api/classrooms')) {
+    if (url.pathname === '/api/classrooms/1') {
       return envelope({
-        items: [
-          {
-            classroomId: 1,
-            color: 'INDIGO',
-            endDate: '2026-11-15',
-            instructorName: '박교수',
-            name: '자료구조',
-            startDate: '2026-08-03',
-            status: 'ACTIVE',
-            weekCount: 15,
-          },
-        ],
-        page: 0,
-        size: 100,
-        totalElements: 1,
-        totalPages: 1,
+        classroomId: 1,
+        color: 'BLUE',
+        endDate: '2026-11-15',
+        instructorName: '박교수',
+        learnerCount: 38,
+        name: '자료구조',
+        pendingRequestCount: 0,
+        progressRate: 0,
+        startDate: '2026-08-03',
+        status: 'ACTIVE',
+        weekCount: 15,
       })
     }
     return envelope(null)
@@ -267,28 +272,22 @@ describe('instructor pages', () => {
 
   it('offers edit and takedown controls for each notice', async () => {
     const fetchMock = stubNoticesApi()
-    renderInstructorPage(<InstructorNoticesPage />)
+    renderInstructorRoute(<InstructorNoticesPage />, '/classrooms/1/announcements', '/classrooms/:classroomId/announcements')
 
-    const editButtons = await screen.findAllByRole('button', { name: /수정$/ })
-    expect(editButtons.length).toBeGreaterThan(0)
-    expect(
-      screen.getAllByRole('button', { name: /내리기$/ }).length,
-    ).toBeGreaterThan(0)
-
-    fireEvent.click(editButtons[0])
-    const dialog = await screen.findByRole('dialog')
-    expect(within(dialog).getByText('공지 수정')).toBeInTheDocument()
-    expect(within(dialog).getByRole('button', { name: '저장' })).toBeInTheDocument()
+    fireEvent.click(await screen.findByRole('button', { name: /중간고사 범위 안내/ }))
+    expect(screen.getByRole('heading', { name: '공지 편집' })).toBeInTheDocument()
+    expect(screen.getByDisplayValue('중간고사 범위 안내')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '변경사항 저장' })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
     fetchMock.mockRestore()
   })
 
   it('asks for confirmation before taking a notice down', async () => {
     const fetchMock = stubNoticesApi()
     const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
-    renderInstructorPage(<InstructorNoticesPage />)
+    renderInstructorRoute(<InstructorNoticesPage />, '/classrooms/1/announcements', '/classrooms/:classroomId/announcements')
 
-    const [takeDown] = await screen.findAllByRole('button', { name: /내리기$/ })
-    fireEvent.click(takeDown)
+    fireEvent.click(await screen.findByRole('button', { name: '공지 삭제' }))
 
     expect(confirmSpy).toHaveBeenCalled()
     confirmSpy.mockRestore()
@@ -359,7 +358,7 @@ describe('instructor pages', () => {
     const page = screen.getByRole('heading', { name: '캘린더' }).closest('.w-full')
 
     expect(viewControls.nextElementSibling).toBe(addButton)
-    expect(page).toHaveClass('lg:h-[calc(100dvh-4.5rem)]', 'lg:overflow-hidden')
+    expect(page).toHaveClass('lg:h-[calc(100dvh-2.5rem)]', 'lg:overflow-hidden')
     expect(screen.getByRole('region', { name: '월간 캘린더' })).toHaveClass('lg:min-h-0')
   })
 
@@ -372,10 +371,10 @@ describe('instructor pages', () => {
     })
     fireEvent.click(screen.getByRole('button', { name: '8월' }))
 
-    const saturday = screen.getByLabelText('2026년 8월 8일 토요일 일정 0개')
-    const sunday = screen.getByLabelText('2026년 8월 9일 일요일 일정 0개')
-    expect(within(saturday).getByText('8')).toHaveClass('text-sky-700')
-    expect(within(sunday).getByText('9')).toHaveClass('text-rose-600')
+    const saturday = screen.getByLabelText('2026년 8월 15일 토요일 일정 0개')
+    const sunday = screen.getByLabelText('2026년 8월 16일 일요일 일정 0개')
+    expect(within(saturday).getByText('15')).toHaveClass('text-sky-700')
+    expect(within(sunday).getByText('16')).toHaveClass('text-rose-600')
   })
 
   it('adds and removes a calendar schedule through the personal schedule API', async () => {
@@ -397,9 +396,9 @@ describe('instructor pages', () => {
 
     await waitFor(() => expect(screen.queryByRole('dialog', { name: '일정 추가' })).not.toBeInTheDocument())
     fireEvent.click(screen.getByRole('button', { name: '목록' }))
-    fireEvent.click(
-      screen.getByRole('button', { name: /중간고사 범위 공지/ }),
-    )
+    const scheduleItem = screen.getByRole('button', { name: /중간고사 범위 공지/ })
+    expect(scheduleItem).not.toHaveTextContent(/오전|오후|\d{1,2}:\d{2}/)
+    fireEvent.click(scheduleItem)
     expect(
       screen.getByRole('dialog', { name: '중간고사 범위 공지' }),
     ).toBeInTheDocument()
@@ -430,7 +429,7 @@ describe('instructor pages', () => {
       ['/classrooms/12/analytics'],
     )
 
-    expect(await screen.findByLabelText('강의실 선택')).toHaveValue('12')
+    expect(await screen.findByRole('link', { name: '학습 현황' })).toHaveAttribute('aria-current', 'page')
     expect(await screen.findByText('17')).toBeInTheDocument()
     expect(screen.getByText(/마지막 갱신/)).toBeInTheDocument()
     expect(screen.getByText('페이지별 AI 질문 수')).toBeInTheDocument()
@@ -440,10 +439,14 @@ describe('instructor pages', () => {
     fetchMock.mockRestore()
   })
 
-  it('opens the notice composer from the design action', () => {
-    renderInstructorPage(<InstructorNoticesPage />)
+  it('starts a new notice from the notice list', async () => {
+    const fetchMock = stubNoticesApi()
+    renderInstructorRoute(<InstructorNoticesPage />, '/classrooms/1/announcements', '/classrooms/:classroomId/announcements')
 
-    expect(screen.getByLabelText('강의실 선택')).toHaveValue('')
-    expect(screen.getByRole('button', { name: '새 공지' })).toBeDisabled()
+    fireEvent.click(await screen.findByRole('button', { name: '새 공지' }))
+    expect(screen.getByRole('heading', { name: '공지 작성' })).toBeInTheDocument()
+    expect(screen.getByPlaceholderText('공지 제목을 입력하세요')).toHaveValue('')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    fetchMock.mockRestore()
   })
 })

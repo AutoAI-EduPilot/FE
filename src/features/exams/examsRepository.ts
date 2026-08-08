@@ -21,6 +21,7 @@ export interface ExamQuestionInput {
   questionType: ExamQuestionType
   referenceAnswer?: string
   rubric?: Array<{ criterion: string; weight: number }>
+  sourceContextNumber?: number
 }
 
 export interface ExamQuestion extends ExamQuestionInput {
@@ -54,6 +55,18 @@ export interface CreateExamInput {
   questions: ExamQuestionInput[]
   title: string
   weekNumber?: number
+}
+
+export interface GenerateExamDraftInput {
+  materialIds?: string[]
+  questionPlan: Array<{ count: number; questionType: ExamQuestionType }>
+  weekNumber?: number
+}
+
+export interface ExamDraftResult {
+  questions: ExamQuestionInput[]
+  schemaVersion?: string
+  truncated: boolean
 }
 
 export interface ExamSubmission {
@@ -96,6 +109,7 @@ export interface ExamsRepository {
   get: (examId: string, signal?: AbortSignal) => Promise<Exam>
   getMySubmission: (examId: string, attemptNo?: number, signal?: AbortSignal) => Promise<ExamSubmission>
   getSubmission: (examId: string, submissionId: string, signal?: AbortSignal) => Promise<ExamSubmission>
+  generateDraftQuestions: (classroomId: string, examId: string, input: GenerateExamDraftInput, signal?: AbortSignal) => Promise<ExamDraftResult>
   list: (classroomId: string, status?: ExamStatus, signal?: AbortSignal) => Promise<Exam[]>
   listSubmissions: (examId: string, signal?: AbortSignal) => Promise<InstructorSubmissionSummary[]>
   publish: (examId: string, signal?: AbortSignal) => Promise<Exam>
@@ -116,6 +130,26 @@ interface ExamQuestionDto {
   questionType: ExamQuestionType
   referenceAnswer?: string
   rubric?: Array<{ criterion: string; weight: number }>
+}
+interface ExamDraftQuestionDto {
+  answerChoiceId?: string
+  answerValue?: boolean
+  choices?: Array<{ choiceId: string; text: string }>
+  explanation?: string
+  gradingCriteria?: string[]
+  modelAnswer?: string
+  points: number
+  questionId: string
+  questionText: string
+  questionType: ExamQuestionType
+  referenceAnswer?: string
+  rubric?: Array<{ criterion: string; weight: number }>
+  sourcePageNumber?: number
+}
+interface ExamDraftResponseDto {
+  questions?: ExamDraftQuestionDto[]
+  schemaVersion?: string
+  truncated?: boolean
 }
 interface ExamDto {
   allowRetake?: boolean
@@ -180,6 +214,22 @@ export function createExamsRepository(request: AuthenticatedRequest): ExamsRepos
       const { data } = await request<ExamDto>(`/api/exams/${encodeURIComponent(examId)}`, { signal })
       return mapExam(data)
     },
+    async generateDraftQuestions(classroomId, examId, input, signal) {
+      const { data } = await request<ExamDraftResponseDto>(`/api/classrooms/${encodeURIComponent(classroomId)}/exams/${encodeURIComponent(examId)}/draft-questions`, {
+        body: {
+          materialIds: input.materialIds?.map(toApiId),
+          questionPlan: input.questionPlan,
+          weekNumber: input.weekNumber,
+        },
+        method: 'POST',
+        signal,
+      })
+      return {
+        questions: (data.questions ?? []).map(mapDraftQuestion),
+        schemaVersion: data.schemaVersion,
+        truncated: data.truncated ?? false,
+      }
+    },
     async getMySubmission(examId, attemptNo, signal) {
       const params = attemptNo ? `?attemptNo=${attemptNo}` : ''
       const { data } = await request<ExamSubmissionDto>(`/api/exams/${encodeURIComponent(examId)}/submissions/me${params}`, { signal })
@@ -229,7 +279,42 @@ function mapExamInput(input: CreateExamInput) {
 }
 
 function mapQuestionInput(question: ExamQuestionInput) {
-  return { ...question, options: question.options?.map((option) => ({ optionId: option.id, text: option.text })) }
+  return {
+    answerChoiceId: question.answerChoiceId,
+    answerValue: question.answerValue,
+    explanation: question.explanation,
+    modelAnswer: question.modelAnswer,
+    options: question.options?.map((option) => ({ optionId: option.id, text: option.text })),
+    points: question.points,
+    questionText: question.questionText,
+    questionType: question.questionType,
+    referenceAnswer: question.referenceAnswer,
+    rubric: question.rubric,
+  }
+}
+
+function mapDraftQuestion(question: ExamDraftQuestionDto): ExamQuestionInput {
+  const gradingCriteria = question.gradingCriteria?.filter(Boolean) ?? []
+  const gradingExplanation = gradingCriteria.length > 0
+    ? `채점 기준: ${gradingCriteria.join(' · ')}`
+    : undefined
+  return {
+    answerChoiceId: question.answerChoiceId,
+    answerValue: question.answerValue,
+    explanation: question.explanation ?? gradingExplanation,
+    modelAnswer: question.modelAnswer,
+    options: question.choices?.map((choice) => ({ id: choice.choiceId, text: choice.text })),
+    points: question.points,
+    questionText: question.questionText,
+    questionType: question.questionType,
+    referenceAnswer: question.referenceAnswer,
+    rubric: question.rubric,
+    sourceContextNumber: question.sourcePageNumber,
+  }
+}
+
+function toApiId(value: string): string | number {
+  return /^\d+$/.test(value) ? Number(value) : value
 }
 
 function mapExam(value: ExamDto): Exam {

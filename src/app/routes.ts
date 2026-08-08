@@ -7,6 +7,7 @@ export const routes = {
   signup: '/signup',
   classrooms: '/classrooms',
   classroomDetail: '/classrooms/:classroomId',
+  classroomStudents: '/classrooms/:classroomId/students',
   classroomSettings: '/classrooms/:classroomId/settings',
   classroomCalendar: '/classrooms/:classroomId/calendar',
   classroomAnalytics: '/classrooms/:classroomId/analytics',
@@ -43,6 +44,10 @@ export function classroomDetailPath(classroomId: string | number): string {
 
 export function classroomEditPath(classroomId: string | number): string {
   return `/classrooms/${encodeURIComponent(String(classroomId))}/settings`
+}
+
+export function classroomStudentsPath(classroomId: string | number): string {
+  return `/classrooms/${encodeURIComponent(String(classroomId))}/students`
 }
 
 export function learningStatusPath(classroomId: string | number): string {

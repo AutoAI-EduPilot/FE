@@ -102,7 +102,7 @@ describe('LoginPage', () => {
     renderLogin('/login?reason=idle')
 
     expect(screen.getByRole('alert')).toHaveTextContent(
-      '10분 동안 활동이 없어 로그아웃되었습니다.',
+      '30분 동안 활동이 없어 로그아웃되었습니다.',
     )
   })
 

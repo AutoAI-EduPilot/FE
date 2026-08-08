@@ -2,6 +2,7 @@ export { createExamsRepository } from './examsRepository'
 export type {
   CreateExamInput,
   Exam,
+  ExamDraftResult,
   ExamOption,
   ExamQuestion,
   ExamQuestionInput,
@@ -10,5 +11,6 @@ export type {
   ExamStatus,
   ExamSubmission,
   ExamSubmissionStatus,
+  GenerateExamDraftInput,
   InstructorSubmissionSummary,
 } from './examsRepository'

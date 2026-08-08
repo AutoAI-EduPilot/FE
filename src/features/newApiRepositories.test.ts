@@ -118,11 +118,8 @@ describe('2026-08-04 API additions', () => {
     expect(request).toHaveBeenCalledWith('/api/classrooms/12', {
       body: {
         endDate: '2026-11-22',
-        endDatePresent: true,
         shiftWeekReleaseDates: true,
-        shiftWeekReleaseDatesPresent: true,
         startDate: '2026-08-10',
-        startDatePresent: true,
       },
       method: 'PATCH',
     })

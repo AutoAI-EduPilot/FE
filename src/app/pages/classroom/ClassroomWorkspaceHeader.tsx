@@ -1,0 +1,97 @@
+import { useContext, useEffect, type ReactNode, type Ref } from 'react'
+import { createPortal } from 'react-dom'
+import { Link } from 'react-router-dom'
+
+import type { Classroom } from '../../../features/classrooms'
+import {
+  classroomAnalyticsPath,
+  classroomAnnouncementsPath,
+  classroomDetailPath,
+  classroomEditPath,
+  classroomExamsPath,
+  classroomStudentsPath,
+} from '../../routes'
+import { ClassroomWorkspaceShellContext } from './ClassroomWorkspaceShellContext'
+
+export type ClassroomWorkspaceTab = 'analytics' | 'exams' | 'materials' | 'notices' | 'settings' | 'students'
+
+export function ClassroomWorkspaceHeader({
+  actionSlotRef,
+  actions,
+  activeTab,
+  classroom,
+  materialCount,
+  root = false,
+  titleAccessory,
+  titleAccessorySlotRef,
+}: {
+  actionSlotRef?: Ref<HTMLDivElement>
+  actions?: ReactNode
+  activeTab: ClassroomWorkspaceTab
+  classroom: Classroom
+  materialCount?: number
+  root?: boolean
+  titleAccessory?: ReactNode
+  titleAccessorySlotRef?: Ref<HTMLDivElement>
+}) {
+  const workspaceShell = useContext(ClassroomWorkspaceShellContext)
+  const tabs = [
+    { id: 'materials' as const, label: '자료', to: classroomDetailPath(classroom.id) },
+    { id: 'notices' as const, label: '공지', to: classroomAnnouncementsPath(classroom.id) },
+    { id: 'exams' as const, label: '시험', to: classroomExamsPath(classroom.id) },
+    { id: 'analytics' as const, label: '학습 현황', to: classroomAnalyticsPath(classroom.id) },
+    { id: 'students' as const, label: '수강생·리포트', to: classroomStudentsPath(classroom.id) },
+    { id: 'settings' as const, label: '관리', to: classroomEditPath(classroom.id) },
+  ]
+
+  useEffect(() => {
+    if (!root) workspaceShell?.syncClassroom(classroom)
+  }, [classroom, root, workspaceShell])
+
+  if (!root && workspaceShell) {
+    return (
+      <>
+        {titleAccessory && workspaceShell.titleAccessoryTarget
+          ? createPortal(titleAccessory, workspaceShell.titleAccessoryTarget)
+          : null}
+        {actions && workspaceShell.actionTarget
+          ? createPortal(actions, workspaceShell.actionTarget)
+          : null}
+      </>
+    )
+  }
+
+  return (
+    <header>
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex min-w-0 flex-wrap items-center gap-3">
+            <h1 className="min-w-0 break-words type-page-title font-bold text-stone-950">{classroom.name}</h1>
+            {titleAccessory || titleAccessorySlotRef ? <div ref={titleAccessorySlotRef}>{titleAccessory}</div> : null}
+          </div>
+          <p className="mt-2 type-control text-stone-500">
+            {formatClassroomPeriod(classroom.startDate, classroom.endDate)} · {classroom.weekCount}주차 · 수강생 {classroom.learnerCount}명
+            {materialCount !== undefined ? ` · 자료 ${materialCount}개` : ''}
+          </p>
+          {classroom.description ? <p className="mt-2 max-w-4xl type-body leading-6 text-stone-600">{classroom.description}</p> : null}
+        </div>
+        {actions || actionSlotRef ? <div className="flex shrink-0 flex-wrap items-center gap-2" ref={actionSlotRef}>{actions}</div> : null}
+      </div>
+      <nav aria-label="강의실 메뉴" className="mt-4 flex h-11 items-stretch gap-7 overflow-x-auto border-b border-stone-200">
+        {tabs.map((tab) => <Link aria-current={activeTab === tab.id ? 'page' : undefined} className={activeTab === tab.id ? 'relative flex shrink-0 items-center type-body font-bold text-stone-950 after:absolute after:right-0 after:bottom-0 after:left-0 after:h-0.5 after:bg-brand-600' : 'relative flex shrink-0 items-center type-body font-medium text-stone-500 hover:text-stone-900'} key={tab.id} preventScrollReset to={tab.to}>{tab.label}</Link>)}
+      </nav>
+    </header>
+  )
+}
+
+function formatClassroomPeriod(startDate: string, endDate: string): string {
+  const start = formatLocalDate(startDate)
+  const end = formatLocalDate(endDate)
+  return start && end ? `${start} - ${end}` : '수업 기간 미정'
+}
+
+function formatLocalDate(value: string): string {
+  const [year, month, day] = value.slice(0, 10).split('-').map(Number)
+  if (!year || !month || !day) return ''
+  return `${year}. ${month}. ${day}.`
+}

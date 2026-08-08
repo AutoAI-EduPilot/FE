@@ -12,8 +12,8 @@ afterEach(() => {
 })
 
 describe('ClassroomDetailPage instructor materials', () => {
-  it('uploads a dropped PDF into the target week without management buttons', async () => {
-    let createdNotice: { content: string; title: string } | null = null
+  it('renders the classroom resource table in week order and uploads a dropped PDF', async () => {
+    let weekListCalls = 0
     let uploadedValues: {
       classroomId: FormDataEntryValue | null
       file: FormDataEntryValue | null
@@ -29,21 +29,26 @@ describe('ClassroomDetailPage instructor materials', () => {
         return success(classroomFixture)
       }
       if (url.pathname === '/api/classrooms/12/weeks') {
-        return success({ items: [weekFixture] })
+        weekListCalls += 1
+        return success({
+          items: [
+            { ...weekFixture, releaseAt: '2026-08-10T09:07:42', title: '심화', weekNumber: 2 },
+            {
+              ...weekFixture,
+              materials: weekListCalls > 1 ? [{
+                materialId: 91,
+                pageCount: 12,
+                processingStatus: 'READY',
+                title: 'lecture.pdf',
+                uploadedAt: '2026-08-02T00:00:00Z',
+                viewerCount: 9,
+                viewRate: 38,
+              }] : [],
+            },
+          ],
+        })
       }
       if (url.pathname === '/api/classrooms/12/notices') {
-        if (init?.method === 'POST') {
-          createdNotice = JSON.parse(String(init.body)) as { content: string; title: string }
-          return success({
-            classroomId: 12,
-            content: createdNotice.content,
-            createdAt: '2026-08-03T11:00:00Z',
-            noticeId: 3,
-            publishedAt: '2026-08-03T11:00:00Z',
-            title: createdNotice.title,
-            updatedAt: '2026-08-03T11:00:00Z',
-          })
-        }
         return success({
           items: [],
           page: 0,
@@ -91,30 +96,28 @@ describe('ClassroomDetailPage instructor materials', () => {
 
     const dropZone = await screen.findByLabelText('1주차 PDF 드롭 영역')
     expect(screen.getByRole('heading', { level: 1, name: '자료구조' })).toBeInTheDocument()
-    expect(screen.getByText('2026. 8. 3. 오전 9:07')).toBeInTheDocument()
+    expect(screen.getByText('자료구조 강의실')).toBeInTheDocument()
+    expect(screen.getAllByText(/^\d주차$/).map((label) => label.textContent)).toEqual(['1주차', '2주차'])
+    expect(screen.getByText('2026. 8. 3. - 2026. 11. 15. · 15주차 · 수강생 42명 · 자료 0개')).toBeInTheDocument()
+    expect(screen.getByText('8월 3일')).toBeInTheDocument()
     expect(screen.queryByText(/9:07:42/)).not.toBeInTheDocument()
-    expect(screen.queryByText(/자료 관리 ·/)).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: '설정' })).toHaveAttribute('href', '/classrooms/12/settings')
-    fireEvent.click(screen.getByRole('button', { name: '새 항목 추가' }))
-    expect(screen.getByRole('dialog', { name: '새 항목 추가' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: /강의자료/ }))
+    expect(screen.getByRole('link', { name: '자료' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByRole('link', { name: '수강생·리포트' })).toHaveAttribute('href', '/classrooms/12/students')
+    expect(screen.getByRole('link', { name: '공지' })).toHaveAttribute('href', '/classrooms/12/announcements')
+    expect(screen.getByRole('link', { name: '시험' })).toHaveAttribute('href', '/classrooms/12/exams')
+    expect(screen.getByRole('link', { name: '학습 현황' })).toHaveAttribute('href', '/classrooms/12/analytics')
+    expect(screen.getByRole('link', { name: '관리' })).toHaveAttribute('href', '/classrooms/12/settings')
+    fireEvent.click(screen.getByRole('button', { name: '자료 업로드' }))
     expect(screen.getByRole('dialog', { name: '강의자료 업로드' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '강의자료 업로드 닫기' }))
-    fireEvent.click(screen.getByRole('button', { name: '새 항목 추가' }))
-    fireEvent.click(screen.getByRole('button', { name: /공지사항/ }))
-    fireEvent.change(screen.getByLabelText('제목'), { target: { value: '중간고사 안내' } })
-    fireEvent.change(screen.getByLabelText('내용'), { target: { value: '시험 범위를 확인해 주세요.' } })
-    fireEvent.click(screen.getByRole('button', { name: '전체 공지 게시' }))
-    await waitFor(() => expect(createdNotice).toEqual({ content: '시험 범위를 확인해 주세요.', title: '중간고사 안내' }))
-    expect(screen.getByRole('heading', { name: '전체 공지' })).toBeInTheDocument()
-    expect(screen.getByText('중간고사 안내')).toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '주차 추가' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '수정' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'PDF 업로드' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '주차 추가' }))
+    expect(screen.getByRole('dialog', { name: '주차 추가' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '주차 추가 닫기' }))
+    expect(screen.queryByRole('switch', { name: '1주차 공개 상태' })).not.toBeInTheDocument()
 
     const file = new File(['pdf'], 'lecture.pdf', { type: 'application/pdf' })
     fireEvent.dragEnter(dropZone, { dataTransfer: { files: [file] } })
-    expect(dropZone).toHaveTextContent('PDF를 놓아 이 주차에 추가')
+    expect(dropZone).toHaveTextContent('자료를 끌어다 놓거나 클릭해 업로드')
     fireEvent.drop(dropZone, { dataTransfer: { files: [file] } })
 
     await waitFor(() => expect(uploadedValues).not.toBeNull())
@@ -123,6 +126,9 @@ describe('ClassroomDetailPage instructor materials', () => {
       file,
       weekNumber: '1',
     })
+    expect(await screen.findByRole('button', { name: 'lecture' })).toHaveClass('font-extrabold', 'text-stone-950')
+    expect(screen.getByText('조회 9명 · 38%')).toBeInTheDocument()
+    expect(weekListCalls).toBeGreaterThanOrEqual(2)
   })
 
   it('keeps completed classroom materials read-only and available for viewing', async () => {
@@ -178,15 +184,15 @@ describe('ClassroomDetailPage instructor materials', () => {
     )
 
     expect(await screen.findByText(/기존 자료는 확인할 수 있지만/)).toHaveTextContent(
-      '새 자료 업로드, 삭제, 공개 상태 변경은 할 수 없습니다.',
+      '새 자료 업로드, 교체, 삭제는 할 수 없습니다.',
     )
     expect(screen.queryByText('연결 리스트.pdf')).not.toBeInTheDocument()
-    expect(screen.getByText('24쪽 · 8월 2일 업로드')).toBeInTheDocument()
-    expect(screen.getByText('자료 1 · 평균 진도 38%')).toBeInTheDocument()
-    expect(screen.getByText('열람 -/42명')).toBeInTheDocument()
+    expect(screen.queryByText(/24쪽/)).not.toBeInTheDocument()
+    expect(screen.queryByText(/8월 2일 업로드/)).not.toBeInTheDocument()
+    expect(screen.getByText('열람 정보 없음')).toBeInTheDocument()
     expect(screen.queryByLabelText('1주차 PDF 드롭 영역')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '연결 리스트.pdf 주차에서 제거' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: '지금 공개' })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '자료 업로드' })).toBeDisabled()
+    expect(screen.queryByRole('switch', { name: '1주차 공개 상태' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '연결 리스트' }))
     expect(await screen.findByText('PDF 뷰어')).toBeInTheDocument()
   })
