@@ -1,5 +1,4 @@
 import {
-  BarChart3,
   Bell,
   BookOpenCheck,
   CalendarDays,
@@ -12,7 +11,6 @@ import {
   LayoutGrid,
   LogOut,
   Monitor,
-  Megaphone,
   Moon,
   NotebookPen,
   Settings,
@@ -36,6 +34,7 @@ import {
   createClassroomsRepository,
   getRememberedClassroomId,
   JOIN_REQUESTS_CHANGED_EVENT,
+  type Classroom,
 } from '../../features/classrooms'
 import {
   getCalendarEventKindLabel,
@@ -48,8 +47,7 @@ import { formatDateTime } from '../../shared/lib/format'
 import { useTheme, type ThemeMode } from '../../shared/theme'
 import { useToast } from '../../shared/ui'
 import {
-  classroomAnalyticsPath,
-  classroomAnnouncementsPath,
+  classroomDetailPath,
   classroomEntranceRequestsPath,
   classroomExamsPath,
   classroomReportsPath,
@@ -61,7 +59,7 @@ const learnerNavigation: Array<{
   label: string
   to: string
 }> = [
-  { icon: LayoutGrid, label: '내 강의실', to: routes.classrooms },
+  { icon: LayoutGrid, label: '강의실', to: routes.classrooms },
   { icon: CalendarDays, label: '캘린더', to: routes.calendar },
   { icon: NotebookPen, label: '내 노트', to: routes.notes },
   { icon: ClipboardCheck, label: '복습 퀴즈', to: routes.reviewQuizzes },
@@ -90,6 +88,7 @@ export function AppLayout() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false)
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false)
   const [pendingJoinRequestCount, setPendingJoinRequestCount] = useState(0)
+  const [instructorClassrooms, setInstructorClassrooms] = useState<Classroom[]>([])
   const [notificationReferenceTime, setNotificationReferenceTime] = useState(
     () => Date.now(),
   )
@@ -137,6 +136,7 @@ export function AppLayout() {
         .list()
         .then((items) => {
           if (!cancelled) {
+            setInstructorClassrooms(items.filter((item) => item.status === 'ACTIVE'))
             setPendingJoinRequestCount(
               items.reduce((sum, item) => sum + item.pendingRequestCount, 0),
             )
@@ -395,26 +395,45 @@ export function AppLayout() {
             className="order-2 mt-3 flex w-full gap-1 overflow-x-auto lg:mt-6 lg:ml-0 lg:w-auto lg:flex-col lg:gap-0.5"
           >
             {primaryNavigation.map((item) => (
-              <NavLink
-                key={item.label}
-                to={item.to}
-                className={({ isActive }) => navLinkClassName(isActive, isCollapsed)}
-                title={item.label}
-              >
-                <item.icon aria-hidden="true" className="shrink-0" size={16} />
-                <span className={cx(isCollapsed && 'lg:sr-only')}>{item.label}</span>
-                {item.label === '입장 요청' && pendingJoinRequestCount > 0 ? (
-                  <span
-                    aria-label={`${pendingJoinRequestCount}개의 대기 요청`}
-                    className={cx(
-                      'ml-auto min-w-5 rounded-full bg-brand-600 px-1.5 text-center type-micro font-bold leading-5 text-white',
-                      isCollapsed && 'lg:absolute lg:top-0 lg:right-0 lg:min-w-4 lg:px-1 lg:leading-4',
-                    )}
-                  >
-                    {pendingJoinRequestCount > 99 ? '99+' : pendingJoinRequestCount}
-                  </span>
+              <div className="contents" key={item.label}>
+                <NavLink
+                  to={item.to}
+                  className={({ isActive }) => navLinkClassName(isActive, isCollapsed)}
+                  title={item.label}
+                >
+                  <item.icon aria-hidden="true" className="shrink-0" size={16} />
+                  <span className={cx(isCollapsed && 'lg:sr-only')}>{item.label}</span>
+                  {item.label === '입장 요청' && pendingJoinRequestCount > 0 ? (
+                    <span
+                      aria-label={`${pendingJoinRequestCount}개의 대기 요청`}
+                      className={cx(
+                        'ml-auto min-w-5 rounded-full bg-brand-600 px-1.5 text-center type-micro font-bold leading-5 text-white',
+                        isCollapsed && 'lg:absolute lg:top-0 lg:right-0 lg:min-w-4 lg:px-1 lg:leading-4',
+                      )}
+                    >
+                      {pendingJoinRequestCount > 99 ? '99+' : pendingJoinRequestCount}
+                    </span>
+                  ) : null}
+                </NavLink>
+                {isInstructor && item.label === '강의실' && instructorClassrooms.length > 0 ? (
+                  <div className={cx('ml-5 hidden border-l border-stone-200 py-1 pl-2 lg:flex lg:flex-col lg:gap-0.5', isCollapsed && 'lg:hidden')}>
+                    {instructorClassrooms.map((classroom) => (
+                      <NavLink
+                        className={({ isActive }) => cx(
+                          'flex min-h-8 items-center gap-2 rounded-md px-2 type-caption font-medium text-stone-500 hover:bg-white/60 hover:text-stone-800',
+                          isActive && 'bg-brand-50 text-brand-700',
+                        )}
+                        key={classroom.id}
+                        title={classroom.name}
+                        to={classroomDetailPath(classroom.id)}
+                      >
+                        <span aria-hidden="true" className={cx('size-2 shrink-0 rounded-full', classroomDotClassName(classroom.color))} />
+                        <span className="truncate">{classroom.name}</span>
+                      </NavLink>
+                    ))}
+                  </div>
                 ) : null}
-              </NavLink>
+              </div>
             ))}
           </nav>
         </div>
@@ -518,7 +537,7 @@ export function AppLayout() {
           'min-w-0 flex-1',
           isStudyWorkspace
             ? 'h-[calc(100dvh-61px)] overflow-hidden p-0 lg:h-dvh'
-            : 'px-4 py-5 sm:px-6 lg:px-12 lg:py-9',
+            : 'px-4 py-4 sm:px-6 lg:px-12 lg:py-5',
         )}
       >
         <div
@@ -620,14 +639,23 @@ function navLinkClassName(isActive: boolean, isCollapsed: boolean): string {
 
 function getInstructorNavigation(classroomId: string | null): Array<{ icon: LucideIcon; label: string; to: string }> {
   return [
-    { icon: LayoutGrid, label: '내 강의실', to: routes.classrooms },
+    { icon: LayoutGrid, label: '강의실', to: routes.classrooms },
     { icon: CalendarDays, label: '캘린더', to: routes.calendar },
-    { icon: BarChart3, label: '학습 현황', to: classroomId ? classroomAnalyticsPath(classroomId) : routes.learningStatus },
     { icon: FileSearch, label: '리포트', to: classroomId ? classroomReportsPath(classroomId) : routes.classrooms },
-    { icon: Megaphone, label: '공지 관리', to: classroomId ? classroomAnnouncementsPath(classroomId) : routes.announcements },
     { icon: FileCheck2, label: '시험 관리', to: classroomId ? classroomExamsPath(classroomId) : routes.exams },
     { icon: UserPlus, label: '입장 요청', to: classroomId ? classroomEntranceRequestsPath(classroomId) : routes.entranceRequests },
   ]
+}
+
+function classroomDotClassName(color: Classroom['color']): string {
+  return {
+    BLUE: 'bg-blue-500',
+    GRAY: 'bg-stone-400',
+    GREEN: 'bg-emerald-500',
+    ORANGE: 'bg-orange-500',
+    PURPLE: 'bg-violet-500',
+    RED: 'bg-rose-500',
+  }[color]
 }
 
 function getClassroomIdFromPath(pathname: string): string | null {

@@ -12,7 +12,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } fro
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { useAuth } from '../../../features/auth'
-import { createClassroomsRepository, rememberClassroomId, type ClassroomWeek } from '../../../features/classrooms'
+import {
+  createClassroomsRepository,
+  rememberClassroomId,
+  type Classroom,
+  type ClassroomWeek,
+} from '../../../features/classrooms'
 import {
   createReportsRepository,
   type ReportCriterion,
@@ -41,11 +46,26 @@ const reportsEnabled = isApiCapabilityEnabled('reports')
 export function InstructorReportsPage() {
   usePageTitle('학습 리포트')
   const { classroomId = '' } = useParams()
+  const navigate = useNavigate()
   const { apiRequest } = useAuth()
   const repository = useMemo(() => createReportsRepository(apiRequest), [apiRequest])
+  const classroomsRepository = useMemo(
+    () => createClassroomsRepository(apiRequest),
+    [apiRequest],
+  )
+  const [classrooms, setClassrooms] = useState<Classroom[]>([])
   const [students, setStudents] = useState<ReportStudent[]>([])
   const [isLoading, setIsLoading] = useState(reportsEnabled)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    classroomsRepository
+      .list('', controller.signal)
+      .then(setClassrooms)
+      .catch(() => undefined)
+    return () => controller.abort()
+  }, [classroomsRepository])
 
   useEffect(() => {
     if (!classroomId || !reportsEnabled) return
@@ -64,8 +84,9 @@ export function InstructorReportsPage() {
 
   return <PageContainer>
     <PageHeader
-      actions={<ButtonLink to={classroomReportCriteriaPath(classroomId)} variant="secondary"><Settings2 size={14} />평가 기준</ButtonLink>}
+      actions={classroomId ? <ButtonLink to={classroomReportCriteriaPath(classroomId)} variant="secondary"><Settings2 size={14} />평가 기준</ButtonLink> : undefined}
       title="학습 리포트"
+      titleAccessory={<label><span className="sr-only">강의실 선택</span><select className="h-9 min-w-40 rounded-lg border border-stone-200 bg-white px-3 type-caption font-semibold text-stone-600" onChange={(event) => { setIsLoading(true); setError(null); navigate(classroomReportsPath(event.target.value), { replace: true }) }} value={classroomId}>{classrooms.length === 0 ? <option value="">강의실 없음</option> : classrooms.map((classroom) => <option key={classroom.id} value={classroom.id}>{classroom.name}</option>)}</select></label>}
     />
     {!reportsEnabled ? <ReportsUnavailableState /> : null}
     {reportsEnabled && isLoading ? <LoadingState message="학습자 목록을 불러오는 중입니다." /> : null}

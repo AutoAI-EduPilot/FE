@@ -42,6 +42,7 @@ export function ExamEditor({ onChange, value }: ExamEditorProps) {
     {value.questions.map((question, index) => <section className="rounded-lg border border-stone-200 bg-stone-50 p-4" key={index}>
       <div className="flex items-center gap-3">
         <strong className="type-body text-stone-900">{index + 1}번</strong>
+        {question.sourceContextNumber ? <span className="rounded-full bg-brand-50 px-2 py-1 type-micro font-semibold text-brand-700">참고 자료 {question.sourceContextNumber}번</span> : null}
         <select className="h-9 rounded-lg border border-stone-300 bg-white px-2.5 type-control" onChange={(event) => updateQuestion(index, createQuestion(event.target.value as ExamQuestionType, question.questionText, question.points))} value={question.questionType}>
           {Object.entries(typeLabels).map(([type, label]) => <option key={type} value={type}>{label}</option>)}
         </select>
@@ -54,6 +55,9 @@ export function ExamEditor({ onChange, value }: ExamEditorProps) {
         <textarea className="mt-1 min-h-20 w-full resize-none rounded-lg border border-stone-300 bg-white px-3 py-2.5 type-body" onChange={(event) => updateQuestion(index, { ...question, questionText: event.target.value })} value={question.questionText} />
       </label>
       <AnswerEditor onChange={(next) => updateQuestion(index, next)} question={question} />
+      <label className="mt-3 block type-control font-semibold text-stone-700">해설 (선택)
+        <textarea className="mt-1 min-h-16 w-full resize-none rounded-lg border border-stone-300 bg-white px-3 py-2 type-body" onChange={(event) => updateQuestion(index, { ...question, explanation: event.target.value })} value={question.explanation ?? ''} />
+      </label>
     </section>)}
   </div>
 }
@@ -61,8 +65,10 @@ export function ExamEditor({ onChange, value }: ExamEditorProps) {
 function AnswerEditor({ onChange, question }: { onChange: (value: ExamQuestionInput) => void; question: ExamQuestionInput }) {
   if (question.questionType === 'MCQ') return <div className="mt-3 grid gap-2 sm:grid-cols-2">{(question.options ?? []).map((option, index) => <label className="flex items-center gap-2 type-control" key={option.id}><input checked={question.answerChoiceId === option.id} name={`answer-${question.questionText}`} onChange={() => onChange({ ...question, answerChoiceId: option.id })} type="radio" /><span className="w-5 font-bold text-stone-500">{option.id.toUpperCase()}</span><input className="h-9 min-w-0 flex-1 rounded-lg border border-stone-300 bg-white px-2.5" onChange={(event) => onChange({ ...question, options: question.options?.map((item, itemIndex) => itemIndex === index ? { ...item, text: event.target.value } : item) })} value={option.text} /></label>)}</div>
   if (question.questionType === 'OX') return <div className="mt-3 flex gap-4">{[['true', 'O'], ['false', 'X']].map(([value, label]) => <label className="flex items-center gap-2 type-control font-semibold" key={value}><input checked={question.answerValue === (value === 'true')} onChange={() => onChange({ ...question, answerValue: value === 'true' })} type="radio" />{label}</label>)}</div>
-  const key = question.questionType === 'SHORT' ? 'referenceAnswer' : 'modelAnswer'
-  return <label className="mt-3 block type-control font-semibold text-stone-700">{question.questionType === 'SHORT' ? '참고 정답' : '모범 답안'}
-    <textarea className="mt-1 min-h-16 w-full resize-none rounded-lg border border-stone-300 bg-white px-3 py-2 type-body" onChange={(event) => onChange({ ...question, [key]: event.target.value })} value={question[key] ?? ''} />
+  if (question.questionType === 'SHORT') return <label className="mt-3 block type-control font-semibold text-stone-700">참고 정답
+    <textarea className="mt-1 min-h-16 w-full resize-none rounded-lg border border-stone-300 bg-white px-3 py-2 type-body" onChange={(event) => onChange({ ...question, referenceAnswer: event.target.value })} value={question.referenceAnswer ?? ''} />
   </label>
+  return <div className="mt-3 space-y-3"><label className="block type-control font-semibold text-stone-700">모범 답안
+    <textarea className="mt-1 min-h-16 w-full resize-none rounded-lg border border-stone-300 bg-white px-3 py-2 type-body" onChange={(event) => onChange({ ...question, modelAnswer: event.target.value })} value={question.modelAnswer ?? ''} />
+  </label>{question.rubric && question.rubric.length > 0 ? <fieldset><legend className="type-control font-semibold text-stone-700">평가 기준</legend><div className="mt-1 space-y-2">{question.rubric.map((item, index) => <div className="grid grid-cols-[minmax(0,1fr)_96px] gap-2" key={index}><input aria-label={`평가 기준 ${index + 1}`} className="h-9 rounded-lg border border-stone-300 bg-white px-2.5 type-control" onChange={(event) => onChange({ ...question, rubric: question.rubric?.map((rubric, rubricIndex) => rubricIndex === index ? { ...rubric, criterion: event.target.value } : rubric) })} value={item.criterion} /><input aria-label={`평가 기준 ${index + 1} 가중치`} className="h-9 rounded-lg border border-stone-300 bg-white px-2.5 type-control" min={0} onChange={(event) => onChange({ ...question, rubric: question.rubric?.map((rubric, rubricIndex) => rubricIndex === index ? { ...rubric, weight: Number(event.target.value) } : rubric) })} step="0.01" type="number" value={item.weight} /></div>)}</div></fieldset> : null}</div>
 }

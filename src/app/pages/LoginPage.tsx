@@ -78,7 +78,7 @@ export function LoginPage() {
           role="alert"
         >
           {isIdleExpired
-            ? '10분 동안 활동이 없어 로그아웃되었습니다.'
+            ? '30분 동안 활동이 없어 로그아웃되었습니다.'
             : '세션이 만료되었습니다. 다시 로그인하세요.'}
         </p>
       ) : null}

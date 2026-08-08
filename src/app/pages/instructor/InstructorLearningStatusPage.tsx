@@ -1,19 +1,20 @@
 import { BarChart3, FileQuestion, FileSearch, Users } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 
 import { useAuth } from '../../../features/auth'
 import { createClassroomsRepository, rememberClassroomId, type Classroom, type ClassroomAnalytics } from '../../../features/classrooms'
 import { getRequestErrorMessage } from '../../../shared/api'
 import { usePageTitle } from '../../../shared/lib/usePageTitle'
-import { ButtonLink, PageContainer, PageHeader } from '../../../shared/ui'
-import { classroomAnalyticsPath, classroomReportsPath } from '../../routes'
+import { ButtonLink } from '../../../shared/ui'
+import { classroomReportsPath } from '../../routes'
+import { ClassroomWorkspaceContainer } from '../classroom/ClassroomWorkspaceContainer'
+import { ClassroomWorkspaceHeader } from '../classroom/ClassroomWorkspaceHeader'
 
 export function InstructorLearningStatusPage() {
   usePageTitle('학습 현황')
   const { apiRequest } = useAuth()
   const { classroomId = '' } = useParams()
-  const navigate = useNavigate()
   const repository = useMemo(() => createClassroomsRepository(apiRequest), [apiRequest])
   const [classrooms, setClassrooms] = useState<Classroom[]>([])
   const [analytics, setAnalytics] = useState<ClassroomAnalytics | null>(null)
@@ -62,28 +63,13 @@ export function InstructorLearningStatusPage() {
   }, [repository, selectedClassroom])
 
   return (
-    <PageContainer>
-      <PageHeader
-        actions={<><p className="type-caption font-medium text-stone-400">{analytics ? `마지막 갱신 ${formatUpdatedAt(analytics.lastUpdatedAt)}` : '마지막 갱신 정보 없음'}</p>{selectedClassroom ? <ButtonLink to={classroomReportsPath(selectedClassroom.id)} variant="secondary"><FileSearch size={14} />학생 리포트</ButtonLink> : null}</>}
-        title="학습 현황"
-        titleAccessory={
-          <label>
-            <span className="sr-only">강의실 선택</span>
-            <select
-              className="h-9 min-w-40 rounded-lg border border-stone-200 bg-white px-3 type-caption font-semibold text-stone-500"
-              disabled={classrooms.length === 0}
-              onChange={(event) => navigate(classroomAnalyticsPath(event.target.value), { replace: true })}
-              value={selectedClassroom?.id ?? ''}
-            >
-              {classrooms.length === 0 ? (
-                <option value="">{isLoading ? '불러오는 중' : '강의실 없음'}</option>
-              ) : classrooms.map((classroom) => (
-                <option key={classroom.id} value={classroom.id}>{classroom.name}</option>
-              ))}
-            </select>
-          </label>
-        }
-      />
+    <ClassroomWorkspaceContainer>
+      {selectedClassroom ? <ClassroomWorkspaceHeader
+        actions={<><p className="type-caption font-medium text-stone-400">{analytics ? `마지막 갱신 ${formatUpdatedAt(analytics.lastUpdatedAt)}` : '마지막 갱신 정보 없음'}</p><ButtonLink to={classroomReportsPath(selectedClassroom.id)} variant="secondary"><FileSearch size={14} />학생 리포트</ButtonLink></>}
+        activeTab="analytics"
+        classroom={selectedClassroom}
+        materialCount={selectedClassroom.materialCount}
+      /> : <h1 className="type-page-title font-bold text-stone-950">학습 현황</h1>}
 
       {error ? <p className="type-body text-rose-700" role="alert">{error}</p> : null}
 
@@ -106,7 +92,7 @@ export function InstructorLearningStatusPage() {
         <MaterialAnalyticsPanel analytics={analytics} isLoading={isLoading} />
         <QuestionAnalyticsPanel analytics={analytics} isLoading={isLoading} />
       </section>
-    </PageContainer>
+    </ClassroomWorkspaceContainer>
   )
 }
 

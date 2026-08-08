@@ -93,10 +93,12 @@ EduPilot FE는 운영형 SaaS 학습 도구 방향을 기본으로 합니다. �
 - 모든 브라우저 요청은 `VITE_API_BASE_URL`에 설정한 Spring Main Service로 보냅니다.
 - `apiRequest`는 `/api/...` 형태의 상대 경로만 허용합니다. 절대 URL이나 FastAPI URL을 직접 전달할 수 없습니다.
 - 요청에는 기본적으로 `credentials: include`를 적용합니다.
-- 인증된 repository 요청에는 저장된 access token을 Bearer 헤더로 자동 주입합니다.
+- 인증된 repository 요청에는 메모리에 보관한 access token을 Bearer 헤더로 자동 주입합니다.
 - PDF와 SSE처럼 공통 JSON envelope를 사용하지 않는 응답은 `rawApiRequest`가
   같은 인증 갱신·401 만료 정책을 적용합니다.
-- access token, 사용자 정보, 마지막 활동 시각은 `edupilot.auth.session.v1` localStorage 항목에 저장합니다. 10분 동안 사용자 활동이 없거나 401 응답을 받으면 폐기합니다.
+- refresh token은 BE의 HttpOnly 쿠키로 관리하며, 앱 시작 시 refresh API와 `/api/users/me`로 세션을 복원합니다.
+- 인증 요청이 401을 반환하면 access token을 한 번 갱신하고 원요청을 재시도합니다. 갱신 실패 또는 재시도 실패 시 세션을 종료합니다.
+- 30분 동안 사용자 활동이 없으면 refresh 쿠키를 폐기하고 `?reason=idle`로 로그인 화면에 이동합니다.
 - 성공 응답은 `ApiSuccess<T>`로 반환하고 실패 응답은 `ApiClientError`로 정규화합니다.
 
 ## 검증 명령

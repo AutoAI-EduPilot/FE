@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
@@ -37,7 +37,41 @@ describe('ExamsPage creation entry', () => {
     )
 
     expect(await screen.findByRole('heading', { name: '시험 만들기' })).toBeInTheDocument()
+    expect(screen.getByLabelText('강의실 선택')).toHaveValue('12')
     expect(screen.getByLabelText('주차 (선택)')).toHaveValue(3)
+  })
+
+  it('reloads exams when the instructor selects another classroom', async () => {
+    const requestedPaths: string[] = []
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = new URL(input instanceof Request ? input.url : String(input), 'http://localhost')
+      requestedPaths.push(url.pathname)
+      if (url.pathname === '/api/classrooms') {
+        return success({ items: [classroomFixture, secondClassroomFixture], page: 0, size: 100, totalElements: 2, totalPages: 1 })
+      }
+      if (url.pathname === '/api/classrooms/12/exams' || url.pathname === '/api/classrooms/13/exams') {
+        return success({ items: [], page: 0, size: 100, totalElements: 0, totalPages: 0 })
+      }
+      return new Response(null, { status: 404 })
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/classrooms/12/exams']}>
+        <AuthProvider initialUser={{ email: 'instructor@example.com', id: 7, name: '강의자', role: 'INSTRUCTOR' }}>
+          <ToastProvider>
+            <Routes>
+              <Route element={<ExamsPage />} path="/classrooms/:classroomId/exams" />
+            </Routes>
+          </ToastProvider>
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+
+    const classroomSelect = await screen.findByLabelText('강의실 선택')
+    fireEvent.change(classroomSelect, { target: { value: '13' } })
+
+    await waitFor(() => expect(requestedPaths).toContain('/api/classrooms/13/exams'))
+    expect(screen.getByLabelText('강의실 선택')).toHaveValue('13')
   })
 })
 
@@ -55,6 +89,12 @@ const classroomFixture = {
   startDate: '2026-08-03',
   status: 'ACTIVE',
   weekCount: 15,
+}
+
+const secondClassroomFixture = {
+  ...classroomFixture,
+  classroomId: 13,
+  name: '알고리즘',
 }
 
 function success(data: unknown): Response {

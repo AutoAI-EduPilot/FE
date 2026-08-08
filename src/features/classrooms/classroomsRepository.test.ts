@@ -22,13 +22,25 @@ describe('classrooms repository', () => {
     }))
   })
 
-  it('uses explicit partial-update presence flags', async () => {
+  it('sends only public partial-update fields', async () => {
     const request = vi.fn().mockResolvedValue({ data: classroomDto })
     const repository = createClassroomsRepository(request as AuthenticatedRequest)
     await repository.update('12', { description: '', name: '새 이름' })
     expect(request).toHaveBeenCalledWith('/api/classrooms/12', {
-      body: { description: '', descriptionPresent: true, name: '새 이름', namePresent: true },
+      body: { description: '', name: '새 이름' },
       method: 'PATCH',
+    })
+  })
+
+  it('sends the classroom name when permanently deleting a classroom', async () => {
+    const request = vi.fn().mockResolvedValue({ data: null })
+    const repository = createClassroomsRepository(request as AuthenticatedRequest)
+
+    await repository.deletePermanently('12', ' 자료구조 ')
+
+    expect(request).toHaveBeenCalledWith('/api/classrooms/12/permanent', {
+      body: { confirmName: '자료구조' },
+      method: 'DELETE',
     })
   })
 })

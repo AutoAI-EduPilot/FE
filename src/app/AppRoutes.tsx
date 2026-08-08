@@ -7,6 +7,8 @@ import { AuthLayout } from './layouts/AuthLayout'
 import { AuthCallbackPage, ResetPasswordPage } from './pages/AuthCapabilityPages'
 import { ClassroomsPage } from './pages/ClassroomsPage'
 import { ClassroomDetailPage } from './pages/ClassroomDetailPage'
+import { ClassroomStudentsPage } from './pages/classroom/ClassroomStudentsPage'
+import { ClassroomWorkspaceLayout } from './pages/classroom/ClassroomWorkspaceLayout'
 import { DiagnosisPage } from './pages/DiagnosisPage'
 import { ForgotPasswordPage } from './pages/ForgotPasswordPage'
 import { EntranceRequestsPage } from './pages/EntranceRequestsPage'
@@ -65,28 +67,27 @@ export function AppRoutes() {
           <Route path={routes.reviewQuizzes} element={<LearnerReviewQuizzesPage />} />
           <Route path={routes.exams} element={<LegacyClassroomRouteRedirect destination="exams" />} />
           <Route path={routes.examDetail} element={<LegacyExamDetailRedirect />} />
-          <Route path={routes.classroomExams} element={<ExamsPage />} />
           <Route path={routes.classroomExamDetail} element={<ExamDetailPage />} />
-          <Route
-            path={routes.classroomDetail}
-            element={<ClassroomDetailPage />}
-          />
+          <Route path={routes.classroomDetail} element={<ClassroomWorkspaceLayout />}>
+            <Route index element={<ClassroomDetailPage />} />
+            <Route path="exams" element={<ExamsPage />} />
+            <Route element={<RequireInstructor />}>
+              <Route path="students" element={<ClassroomStudentsPage />} />
+              <Route path="settings" element={<InstructorClassroomEditPage />} />
+              <Route path="analytics" element={<InstructorLearningStatusPage />} />
+              <Route path="announcements" element={<InstructorNoticesPage />} />
+            </Route>
+          </Route>
           <Route element={<RequireInstructor />}>
-            <Route
-              path={routes.classroomSettings}
-              element={<InstructorClassroomEditPage />}
-            />
             <Route path={routes.legacyClassroomEdit} element={<LegacyClassroomSettingsRedirect />} />
             <Route
               path={routes.learningStatus}
               element={<LegacyClassroomRouteRedirect destination="analytics" />}
             />
-            <Route path={routes.classroomAnalytics} element={<InstructorLearningStatusPage />} />
             <Route
               path={routes.announcements}
               element={<LegacyClassroomRouteRedirect destination="announcements" />}
             />
-            <Route path={routes.classroomAnnouncements} element={<InstructorNoticesPage />} />
             <Route
               path={routes.entranceRequests}
               element={<LegacyClassroomRouteRedirect destination="entrance-requests" />}

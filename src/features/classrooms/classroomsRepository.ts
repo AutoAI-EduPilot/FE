@@ -34,7 +34,8 @@ export interface CreateClassroomInput {
   startDate: string
 }
 
-export interface UpdateClassroomInput extends Partial<CreateClassroomInput> {
+export interface UpdateClassroomInput extends Omit<Partial<CreateClassroomInput>, 'description'> {
+  description?: string | null
   shiftWeekReleaseDates?: boolean
 }
 
@@ -204,16 +205,22 @@ export function createClassroomsRepository(request: AuthenticatedRequest) {
     },
     async update(id: string, input: UpdateClassroomInput) {
       const body: Record<string, unknown> = {}
-      if (input.name !== undefined) { body.namePresent = true; body.name = input.name }
-      if (input.startDate !== undefined) { body.startDatePresent = true; body.startDate = input.startDate }
-      if (input.endDate !== undefined) { body.endDatePresent = true; body.endDate = input.endDate }
-      if (input.shiftWeekReleaseDates !== undefined) { body.shiftWeekReleaseDatesPresent = true; body.shiftWeekReleaseDates = input.shiftWeekReleaseDates }
-      if (input.color !== undefined) { body.colorPresent = true; body.color = input.color }
-      if (input.description !== undefined) { body.descriptionPresent = true; body.description = input.description }
+      if (input.name !== undefined) body.name = input.name
+      if (input.startDate !== undefined) body.startDate = input.startDate
+      if (input.endDate !== undefined) body.endDate = input.endDate
+      if (input.shiftWeekReleaseDates !== undefined) body.shiftWeekReleaseDates = input.shiftWeekReleaseDates
+      if (input.color !== undefined) body.color = input.color
+      if (input.description !== undefined) body.description = input.description
       const { data } = await request<ClassroomDto>(`/api/classrooms/${encodeURIComponent(id)}`, { body, method: 'PATCH' })
       return mapClassroom(data)
     },
     async complete(id: string) { await request(`/api/classrooms/${encodeURIComponent(id)}`, { method: 'DELETE' }) },
+    async deletePermanently(id: string, confirmName: string) {
+      await request(`/api/classrooms/${encodeURIComponent(id)}/permanent`, {
+        body: { confirmName: confirmName.trim() },
+        method: 'DELETE',
+      })
+    },
     async join(inviteCode: string) {
       const { data } = await request<JoinRequestDto>('/api/classroom-join-requests', {
         body: { inviteCode: inviteCode.trim() }, method: 'POST',
@@ -276,8 +283,8 @@ export function createClassroomsRepository(request: AuthenticatedRequest) {
     },
     async updateWeek(id: string, weekNumber: number, input: { releaseAt?: string; title?: string }) {
       const body: Record<string, unknown> = {}
-      if (input.title !== undefined) { body.titlePresent = true; body.title = input.title }
-      if (input.releaseAt !== undefined) { body.releaseAtPresent = true; body.releaseAt = input.releaseAt }
+      if (input.title !== undefined) body.title = input.title
+      if (input.releaseAt !== undefined) body.releaseAt = input.releaseAt
       const { data } = await request<WeekDto>(`/api/classrooms/${encodeURIComponent(id)}/weeks/${weekNumber}`, { body, method: 'PATCH' })
       return mapWeek(data)
     },
@@ -294,8 +301,8 @@ export function createClassroomsRepository(request: AuthenticatedRequest) {
     },
     async updateNotice(id: string, noticeId: string, input: { content?: string; title?: string }) {
       const body: Record<string, unknown> = {}
-      if (input.title !== undefined) { body.titlePresent = true; body.title = input.title }
-      if (input.content !== undefined) { body.contentPresent = true; body.content = input.content }
+      if (input.title !== undefined) body.title = input.title
+      if (input.content !== undefined) body.content = input.content
       const { data } = await request<NoticeDto>(`/api/classrooms/${encodeURIComponent(id)}/notices/${encodeURIComponent(noticeId)}`, { body, method: 'PATCH' })
       return mapNotice(data)
     },

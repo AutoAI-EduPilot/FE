@@ -1,11 +1,9 @@
 import {
   Archive,
   GripVertical,
-  MoreHorizontal,
   Plus,
-  Search,
   Trash2,
-  UserRoundX,
+  X,
 } from 'lucide-react'
 import { useEffect, useMemo, useState, type DragEvent, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
@@ -15,7 +13,6 @@ import {
   createClassroomsRepository,
   rememberClassroomId,
   type Classroom,
-  type ClassroomStudent,
   type ClassroomWeek,
   type ClassroomWeekStatus,
 } from '../../../features/classrooms'
@@ -24,16 +21,16 @@ import { usePageTitle } from '../../../shared/lib/usePageTitle'
 import {
   Button,
   EmptyState,
-  PageContainer,
-  PageHeader,
   useToast,
 } from '../../../shared/ui'
-import { routes } from '../../routes'
+import { classroomDetailPath, routes } from '../../routes'
+import { ClassroomWorkspaceContainer } from '../classroom/ClassroomWorkspaceContainer'
+import { ClassroomWorkspaceHeader } from '../classroom/ClassroomWorkspaceHeader'
 
 type WeekDisplayStatus = ClassroomWeekStatus
 
 export function InstructorClassroomEditPage() {
-  usePageTitle('강의실 삭제')
+  usePageTitle('강의실 설정')
   const { classroomId = '' } = useParams()
   const { apiRequest } = useAuth()
   const { show: showToast } = useToast()
@@ -49,7 +46,6 @@ export function InstructorClassroomEditPage() {
   const [classroom, setClassroom] = useState<Classroom | null>(null)
   const [weeks, setWeeks] = useState<ClassroomWeek[]>([])
   const [weekTitles, setWeekTitles] = useState<Record<number, string>>({})
-  const [learners, setLearners] = useState<ClassroomStudent[]>([])
   const [inviteCode, setInviteCode] = useState('')
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
@@ -58,21 +54,21 @@ export function InstructorClassroomEditPage() {
   const [weekOrder, setWeekOrder] = useState<number[]>([])
   const [weekStatuses, setWeekStatuses] = useState<Record<number, WeekDisplayStatus>>({})
   const [draggedWeek, setDraggedWeek] = useState<number | null>(null)
-  const [openWeekMenu, setOpenWeekMenu] = useState<number | null>(null)
-  const [learnerQuery, setLearnerQuery] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [deleteConfirmation, setDeleteConfirmation] = useState('')
+  const [isDeleting, setIsDeleting] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     Promise.all([
       repository.get(classroomId),
       repository.listWeeks(classroomId),
-      repository.listStudents(classroomId),
       repository.getInviteCode(classroomId),
     ])
-      .then(([nextClassroom, nextWeeks, nextLearners, nextInviteCode]) => {
+      .then(([nextClassroom, nextWeeks, nextInviteCode]) => {
         if (cancelled) return
         setClassroom(nextClassroom)
         setWeeks(nextWeeks)
@@ -92,7 +88,6 @@ export function InstructorClassroomEditPage() {
           week.weekNumber,
           week.status,
         ])))
-        setLearners(nextLearners)
         setInviteCode(nextInviteCode)
         setName(nextClassroom.name)
         setDescription(nextClassroom.description ?? '')
@@ -109,16 +104,6 @@ export function InstructorClassroomEditPage() {
       cancelled = true
     }
   }, [classroomId, repository])
-
-  const filteredLearners = useMemo(() => {
-    const query = learnerQuery.trim().toLocaleLowerCase('ko-KR')
-    if (!query) return learners
-    return learners.filter((request) => {
-      return [request.name, request.email, request.affiliation]
-        .filter(Boolean)
-        .some((value) => value?.toLocaleLowerCase('ko-KR').includes(query))
-    })
-  }, [learnerQuery, learners])
 
   const weekByNumber = useMemo(
     () => new Map(weeks.map((week) => [week.weekNumber, week])),
@@ -175,7 +160,6 @@ export function InstructorClassroomEditPage() {
   }
 
   async function changeWeekStatus(weekNumber: number, status: WeekDisplayStatus) {
-    setOpenWeekMenu(null)
     const week = weekByNumber.get(weekNumber)
     if (!week) {
       setWeekStatuses((current) => ({ ...current, [weekNumber]: status }))
@@ -193,7 +177,6 @@ export function InstructorClassroomEditPage() {
   }
 
   async function deleteWeek(weekNumber: number) {
-    setOpenWeekMenu(null)
     const week = weekByNumber.get(weekNumber)
     if (week?.materials.length) {
       showToast('자료가 등록된 주차는 삭제할 수 없습니다.', 'danger')
@@ -247,7 +230,7 @@ export function InstructorClassroomEditPage() {
 
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!classroom || !name.trim() || isSaving) return
+    if (!classroom || !name.trim() || !startDate || isSaving) return
 
     const removedWeeks = weeks.filter((week) => week.weekNumber > weekCount)
     if (removedWeeks.some((week) => week.materials.length > 0)) {
@@ -257,6 +240,26 @@ export function InstructorClassroomEditPage() {
 
     setIsSaving(true)
     try {
+      const periodChanged = startDate !== classroom.startDate || weekCount !== classroom.weekCount
+      const nextEndDate = periodChanged
+        ? getEndDate(startDate, weekCount)
+        : classroom.endDate
+      const classroomChanges = {
+        ...(name.trim() !== classroom.name ? { name: name.trim() } : {}),
+        ...(description.trim() !== (classroom.description ?? '')
+          ? { description: description.trim() || null }
+          : {}),
+        ...(startDate !== classroom.startDate ? { startDate } : {}),
+        ...(nextEndDate !== classroom.endDate ? { endDate: nextEndDate } : {}),
+        ...(startDate !== classroom.startDate ? { shiftWeekReleaseDates: true } : {}),
+      }
+      const isRangeExpanding = new Date(`${nextEndDate}T00:00:00Z`) > new Date(`${classroom.endDate}T00:00:00Z`)
+
+      // The server validates new weeks against the current classroom date range.
+      if (isRangeExpanding && Object.keys(classroomChanges).length > 0) {
+        await repository.update(classroomId, classroomChanges)
+      }
+
       for (let weekNumber = 1; weekNumber <= weekCount; weekNumber += 1) {
         const existingWeek = weekByNumber.get(weekNumber)
         const nextTitle = weekTitles[weekNumber]?.trim() || `${weekNumber}주차`
@@ -275,25 +278,24 @@ export function InstructorClassroomEditPage() {
         await repository.deleteWeek(classroomId, week.weekNumber)
       }
 
+      if (!isRangeExpanding && Object.keys(classroomChanges).length > 0) {
+        await repository.update(classroomId, classroomChanges)
+      }
+
       const savedWeeks = await repository.listWeeks(classroomId)
       const savedWeekByNumber = new Map(savedWeeks.map((week) => [week.weekNumber, week]))
       const orderedWeekIds = weekOrder
         .map((weekNumber) => savedWeekByNumber.get(weekNumber)?.id)
         .filter((weekId): weekId is string => Boolean(weekId))
-      if (orderedWeekIds.length === savedWeeks.length && orderedWeekIds.length > 0) {
+      const currentWeekIds = [...savedWeeks]
+        .sort((left, right) => left.displayOrder - right.displayOrder)
+        .map((week) => week.id)
+      const orderChanged = orderedWeekIds.some((weekId, index) => weekId !== currentWeekIds[index])
+      if (orderedWeekIds.length === savedWeeks.length && orderedWeekIds.length > 0 && orderChanged) {
         await repository.reorderWeeks(classroomId, orderedWeekIds)
       }
-
-      await repository.update(classroomId, {
-        color: classroom.color,
-        description: description.trim(),
-        endDate: getEndDate(startDate, weekCount),
-        name: name.trim(),
-        shiftWeekReleaseDates: startDate !== classroom.startDate,
-        startDate,
-      })
       showToast('강의실 정보를 저장했습니다.', 'success')
-      navigate(routes.classrooms)
+      navigate(classroomDetailPath(classroom.id))
     } catch (requestError) {
       showToast(getRequestErrorMessage(requestError), 'danger')
     } finally {
@@ -302,7 +304,7 @@ export function InstructorClassroomEditPage() {
   }
 
   async function completeClassroom() {
-    if (!classroom || !window.confirm('강의실 운영을 종료할까요? 종료 후에는 새 자료 업로드와 학습자 추가가 불가능하며, 기존 자료와 학습 기록만 확인할 수 있습니다.')) return
+    if (!classroom || classroom.status === 'COMPLETED' || !window.confirm('강의실 운영을 종료할까요? 종료 후에는 새 자료 업로드와 학습자 추가가 불가능하며, 기존 자료와 학습 기록만 확인할 수 있습니다.')) return
     try {
       await repository.complete(classroom.id)
       showToast('강의실 운영을 종료했습니다.', 'success')
@@ -312,54 +314,55 @@ export function InstructorClassroomEditPage() {
     }
   }
 
-  async function removeLearner(learner: ClassroomStudent) {
-    if (!window.confirm(`${learner.name} 학습자를 강의실에서 제외할까요?`)) return
+  async function deleteClassroomPermanently(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!classroom || deleteConfirmation.trim() !== classroom.name || isDeleting) return
+    setIsDeleting(true)
     try {
-      await repository.removeStudent(classroomId, learner.id)
-      setLearners((current) => current.filter((item) => item.id !== learner.id))
-      setClassroom((current) => current ? { ...current, learnerCount: Math.max(0, current.learnerCount - 1) } : current)
-      showToast('학습자를 강의실에서 제외했습니다.', 'success')
+      await repository.deletePermanently(classroom.id, deleteConfirmation)
+      showToast('강의실을 영구 삭제했습니다.', 'success')
+      navigate(routes.classrooms, { replace: true })
     } catch (requestError) {
       showToast(getRequestErrorMessage(requestError), 'danger')
+      setIsDeleting(false)
     }
+  }
+
+  function closeDeleteDialog() {
+    if (isDeleting) return
+    setIsDeleteDialogOpen(false)
+    setDeleteConfirmation('')
   }
 
   if (isLoading) {
     return (
-      <PageContainer>
-        <PageHeader title="강의실 삭제" />
+      <ClassroomWorkspaceContainer>
         <p className="py-16 text-center type-body text-stone-500" role="status">
           강의실 정보를 불러오는 중입니다.
         </p>
-      </PageContainer>
+      </ClassroomWorkspaceContainer>
     )
   }
 
   if (error || !classroom) {
     return (
-      <PageContainer>
-        <PageHeader title="강의실 삭제" />
+      <ClassroomWorkspaceContainer>
         <EmptyState
           action={<Button onClick={() => navigate(routes.classrooms)} variant="secondary">내 강의실로 이동</Button>}
           description={error ?? '강의실 정보를 확인할 수 없습니다.'}
           title="강의실을 불러오지 못했습니다"
         />
-      </PageContainer>
+      </ClassroomWorkspaceContainer>
     )
   }
 
   return (
-    <PageContainer className="xl:flex xl:h-[calc(100dvh-4.5rem)] xl:min-h-0 xl:flex-col xl:gap-5 xl:overflow-hidden xl:space-y-0">
-      <PageHeader
-        actions={
-          <>
-            <Button onClick={() => navigate(routes.classrooms)} variant="secondary">취소</Button>
-            <Button disabled={!name.trim() || isSaving} form="classroom-edit-form" type="submit">
-              {isSaving ? '저장 중' : '저장'}
-            </Button>
-          </>
-        }
-        title="강의실 삭제"
+    <ClassroomWorkspaceContainer className="xl:h-[calc(100dvh-2.5rem)] xl:min-h-0 xl:overflow-hidden">
+      <ClassroomWorkspaceHeader
+        actions={<><Button onClick={() => navigate(classroomDetailPath(classroom.id))} variant="secondary">되돌리기</Button><Button disabled={!name.trim() || !startDate || isSaving} form="classroom-edit-form" type="submit">{isSaving ? '저장 중' : '변경사항 저장'}</Button></>}
+        activeTab="settings"
+        classroom={classroom}
+        materialCount={weeks.reduce((sum, week) => sum + week.materials.length, 0)}
       />
 
       <form
@@ -367,19 +370,40 @@ export function InstructorClassroomEditPage() {
         id="classroom-edit-form"
         onSubmit={save}
       >
-        <div className="grid items-stretch gap-3 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(300px,0.95fr)_minmax(280px,0.78fr)_minmax(380px,1.2fr)]">
-          <BasicInformationSection
-            description={description}
-            inviteCode={inviteCode}
-            name={name}
-            onCopyInviteCode={() => void copyInviteCode()}
-            onDescriptionChange={setDescription}
-            onNameChange={setName}
-            onRegenerateInviteCode={() => void regenerateInviteCode()}
-            onStartDateChange={setStartDate}
-            startDate={startDate}
-            weekCount={weekCount}
-          />
+        <div className="grid items-stretch gap-3 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(360px,1.08fr)_minmax(340px,0.92fr)]">
+          <div className="flex min-h-0 flex-col gap-3">
+            <BasicInformationSection
+              description={description}
+              inviteCode={inviteCode}
+              name={name}
+              onCopyInviteCode={() => void copyInviteCode()}
+              onDescriptionChange={setDescription}
+              onNameChange={setName}
+              onRegenerateInviteCode={() => void regenerateInviteCode()}
+              onStartDateChange={setStartDate}
+              startDate={startDate}
+              weekCount={weekCount}
+            />
+
+            <section className="flex min-h-14 shrink-0 flex-wrap items-center gap-3 rounded-lg border border-rose-200 bg-rose-50/30 px-4 py-2.5">
+              <h2 className="type-caption font-bold text-rose-700">위험 구역</h2>
+              <p className="min-w-0 flex-1 type-micro leading-5 text-stone-500">
+                운영 종료는 기록을 보존합니다. 영구 삭제는 강의실 운영 데이터와 리포트·시험을 복구할 수 없게 제거합니다.
+              </p>
+              <Button
+                disabled={classroom.status === 'COMPLETED'}
+                onClick={() => void completeClassroom()}
+                size="sm"
+                title={classroom.status === 'COMPLETED' ? '종료된 강의실은 다시 활성화할 수 없습니다.' : undefined}
+                variant="secondary"
+              >
+                <Archive aria-hidden="true" size={13} />강의실 종료
+              </Button>
+              <Button className="text-rose-700 hover:border-rose-200 hover:bg-rose-50" onClick={() => setIsDeleteDialogOpen(true)} size="sm" variant="secondary">
+                <Trash2 aria-hidden="true" size={13} />강의실 삭제
+              </Button>
+            </section>
+          </div>
 
           <section className="flex min-h-0 flex-col overflow-hidden rounded-lg border border-stone-200 bg-white">
             <div className="flex min-h-12 items-center border-b border-stone-200 bg-stone-50 px-4">
@@ -422,11 +446,9 @@ export function InstructorClassroomEditPage() {
                       placeholder="주차 이름 (선택)"
                       value={weekTitles[weekNumber] ?? week?.title ?? ''}
                     />
-                    <WeekStatusMenu
+                    <WeekStatusButtons
                       displayWeekNumber={displayWeekNumber}
-                      isOpen={openWeekMenu === weekNumber}
                       onDelete={() => void deleteWeek(weekNumber)}
-                      onOpenChange={() => setOpenWeekMenu((current) => current === weekNumber ? null : weekNumber)}
                       onStatusChange={(status) => void changeWeekStatus(weekNumber, status)}
                       status={weekStatuses[weekNumber] ?? getWeekDisplayStatus(week)}
                     />
@@ -446,30 +468,30 @@ export function InstructorClassroomEditPage() {
             </div>
           </section>
 
-          <LearnerSection
-            classroom={classroom}
-            learners={learners}
-            onRemoveLearner={(learner) => void removeLearner(learner)}
-            onQueryChange={setLearnerQuery}
-            query={learnerQuery}
-            visibleLearners={filteredLearners}
-          />
         </div>
-
-        <section className="mt-auto flex min-h-14 flex-wrap items-center gap-3 rounded-lg border border-rose-200 bg-rose-50/30 px-4 py-2.5 xl:shrink-0">
-          <h2 className="type-caption font-bold text-rose-700">위험 구역</h2>
-          <p className="min-w-0 flex-1 type-micro leading-5 text-stone-500">
-            운영을 종료하면 자료 업로드와 학습자 추가가 중단되며 기존 자료와 학습 기록만 확인할 수 있습니다. 영구 삭제는 백엔드 API 제공 전까지 사용할 수 없습니다.
-          </p>
-          <Button onClick={() => void completeClassroom()} size="sm" variant="secondary">
-            <Archive aria-hidden="true" size={13} />강의실 종료
-          </Button>
-          <Button className="border-rose-700 bg-rose-700 text-white hover:bg-rose-800" disabled size="sm" variant="secondary">
-            <Trash2 aria-hidden="true" size={13} />강의실 삭제
-          </Button>
-        </section>
       </form>
-    </PageContainer>
+      {isDeleteDialogOpen ? (
+        <div aria-labelledby="delete-classroom-title" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/45 px-4" role="dialog">
+          <form className="w-full max-w-md rounded-xl border border-stone-200 bg-white p-6 shadow-2xl" onSubmit={deleteClassroomPermanently}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="type-dialog-title font-bold text-stone-950" id="delete-classroom-title">강의실 영구 삭제</h2>
+                <p className="mt-2 type-caption leading-5 text-stone-500">강의실과 시험·리포트 등 소속 데이터가 영구 삭제됩니다. 학생 개인 학습 기록 (자료·세션·진도)은 유지됩니다.</p>
+              </div>
+              <button aria-label="강의실 삭제 닫기" className="flex size-8 shrink-0 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100 hover:text-stone-700" disabled={isDeleting} onClick={closeDeleteDialog} type="button"><X aria-hidden="true" size={16} /></button>
+            </div>
+            <label className="mt-5 block type-control font-semibold text-stone-800" htmlFor="classroom-delete-confirmation">
+              확인을 위해 <strong>{classroom.name}</strong> 입력
+            </label>
+            <input autoComplete="off" autoFocus className="mt-1 h-11 w-full rounded-lg border border-stone-300 px-3.5 type-body outline-none focus:border-rose-600 focus:ring-2 focus:ring-rose-100" id="classroom-delete-confirmation" onChange={(event) => setDeleteConfirmation(event.target.value)} value={deleteConfirmation} />
+            <div className="mt-5 flex justify-end gap-2">
+              <Button disabled={isDeleting} onClick={closeDeleteDialog} variant="secondary">취소</Button>
+              <Button className="bg-rose-700 text-white hover:bg-rose-800 disabled:bg-stone-300" disabled={deleteConfirmation.trim() !== classroom.name || isDeleting} type="submit">{isDeleting ? '삭제 중' : '영구 삭제'}</Button>
+            </div>
+          </form>
+        </div>
+      ) : null}
+    </ClassroomWorkspaceContainer>
   )
 }
 
@@ -497,11 +519,11 @@ function BasicInformationSection({
   weekCount: number
 }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-stone-200 bg-white xl:h-full xl:min-h-0">
+    <section className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-stone-200 bg-white">
       <div className="flex min-h-12 items-center border-b border-stone-200 bg-stone-50 px-4">
         <h2 className="type-body font-bold text-stone-950">기본 정보</h2>
       </div>
-      <div className="space-y-4 p-4">
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
         <label className="block type-caption font-semibold text-stone-700">
           강의실 이름
           <input
@@ -550,110 +572,56 @@ function BasicInformationSection({
   )
 }
 
-function WeekStatusMenu({
+function WeekStatusButtons({
   displayWeekNumber,
-  isOpen,
   onDelete,
-  onOpenChange,
   onStatusChange,
   status,
 }: {
   displayWeekNumber: number
-  isOpen: boolean
   onDelete: () => void
-  onOpenChange: () => void
   onStatusChange: (status: WeekDisplayStatus) => void
   status: WeekDisplayStatus
 }) {
-  const statusLabel = status === 'PUBLISHED' ? '공개 중' : status === 'SCHEDULED' ? '예약' : status === 'BREAK' ? '휴강' : '비공개'
-  const statusClassName = status === 'PUBLISHED'
-    ? 'bg-brand-50 text-brand-700'
-    : status === 'SCHEDULED'
-      ? 'bg-amber-50 text-amber-700'
-      : status === 'BREAK'
-      ? 'bg-rose-50 text-rose-700'
-      : 'bg-stone-100 text-stone-500'
+  const options: Array<{ label: string; value: WeekDisplayStatus }> = [
+    { label: '공개', value: 'PUBLISHED' },
+    { label: '예약', value: 'SCHEDULED' },
+    { label: '비공개', value: 'PRIVATE' },
+    { label: '휴강', value: 'BREAK' },
+  ]
 
   return (
-    <div className="relative flex items-center gap-1">
-      <span className={`rounded-full px-2 py-1 type-micro font-semibold ${statusClassName}`}>{statusLabel}</span>
+    <div aria-label={`${displayWeekNumber}주차 상태`} className="flex items-center gap-1">
+      {options.map((option) => (
+        <button
+          aria-label={`${displayWeekNumber}주차 ${option.label}`}
+          aria-pressed={status === option.value}
+          className={status === option.value
+            ? option.value === 'PUBLISHED'
+              ? 'h-7 rounded-md bg-brand-600 px-2 type-micro font-bold text-white'
+              : option.value === 'SCHEDULED'
+                ? 'h-7 rounded-md bg-amber-100 px-2 type-micro font-bold text-amber-800'
+                : option.value === 'BREAK'
+                  ? 'h-7 rounded-md bg-rose-100 px-2 type-micro font-bold text-rose-700'
+                  : 'h-7 rounded-md bg-stone-700 px-2 type-micro font-bold text-white'
+            : 'h-7 rounded-md border border-stone-200 bg-white px-2 type-micro font-semibold text-stone-500 hover:bg-stone-50 hover:text-stone-800'}
+          key={option.value}
+          onClick={() => onStatusChange(option.value)}
+          type="button"
+        >
+          {option.label}
+        </button>
+      ))}
       <button
-        aria-expanded={isOpen}
-        aria-label={`${displayWeekNumber}주차 상태 메뉴`}
-        className="flex size-7 items-center justify-center rounded-md text-stone-400 hover:bg-stone-100 hover:text-stone-700"
-        onClick={onOpenChange}
+        aria-label={`${displayWeekNumber}주차 삭제`}
+        className="flex size-7 items-center justify-center rounded-md text-stone-400 hover:bg-rose-50 hover:text-rose-700"
+        onClick={onDelete}
+        title="주차 삭제"
         type="button"
       >
-        <MoreHorizontal aria-hidden="true" size={15} />
+        <Trash2 aria-hidden="true" size={13} />
       </button>
-      {isOpen ? (
-        <div className="absolute top-8 right-0 z-20 w-36 rounded-lg border border-stone-200 bg-white p-1 shadow-lg">
-          <button className="block h-8 w-full rounded px-2 text-left type-caption text-stone-700 hover:bg-stone-50" onClick={() => onStatusChange('PUBLISHED')} type="button">공개</button>
-          <button className="block h-8 w-full rounded px-2 text-left type-caption text-stone-700 hover:bg-stone-50" onClick={() => onStatusChange('SCHEDULED')} type="button">예약</button>
-          <button className="block h-8 w-full rounded px-2 text-left type-caption text-stone-700 hover:bg-stone-50" onClick={() => onStatusChange('PRIVATE')} type="button">비공개</button>
-          <button className="block h-8 w-full rounded px-2 text-left type-caption text-stone-700 hover:bg-stone-50" onClick={() => onStatusChange('BREAK')} type="button">휴강</button>
-          <div className="my-1 border-t border-stone-100" />
-          <button className="block h-8 w-full rounded px-2 text-left type-caption font-semibold text-rose-700 hover:bg-rose-50" onClick={onDelete} type="button">삭제</button>
-        </div>
-      ) : null}
     </div>
-  )
-}
-
-function LearnerSection({
-  classroom,
-  learners,
-  onQueryChange,
-  onRemoveLearner,
-  query,
-  visibleLearners,
-}: {
-  classroom: Classroom
-  learners: ClassroomStudent[]
-  onQueryChange: (value: string) => void
-  onRemoveLearner: (learner: ClassroomStudent) => void
-  query: string
-  visibleLearners: ClassroomStudent[]
-}) {
-  return (
-    <section className="flex flex-col overflow-hidden rounded-lg border border-stone-200 bg-white xl:h-full xl:min-h-0">
-      <div className="flex min-h-12 flex-wrap items-center gap-3 border-b border-stone-200 bg-stone-50 px-4">
-        <h2 className="type-body font-bold text-stone-950">학습자 <span className="ml-1 font-normal text-stone-400">{classroom.learnerCount}명</span></h2>
-        <label className="relative ml-auto min-w-48 flex-1 sm:max-w-64">
-          <span className="sr-only">학습자 검색</span>
-          <Search aria-hidden="true" className="absolute top-1/2 left-3 -translate-y-1/2 text-stone-400" size={13} />
-          <input
-            className="h-8 w-full rounded-lg border border-stone-200 pl-8 pr-3 type-micro focus:border-brand-600 focus:outline-none focus:ring-2 focus:ring-brand-100"
-            onChange={(event) => onQueryChange(event.target.value)}
-            placeholder="이름, 이메일, 소속 검색"
-            value={query}
-          />
-        </label>
-      </div>
-      <div className="hidden grid-cols-[1fr_1.25fr_1fr_1fr_54px] border-b border-stone-100 bg-stone-50 px-4 py-2.5 type-micro font-semibold text-stone-400 lg:grid">
-        <span>이름</span><span>이메일</span><span>소속</span><span>입장 시각</span><span className="text-right">관리</span>
-      </div>
-      <div className="overflow-y-auto xl:min-h-0 xl:flex-1">
-        {visibleLearners.length === 0 ? (
-          <div className="flex min-h-72 flex-col items-center justify-center px-6 text-center">
-            <UserRoundX aria-hidden="true" className="text-stone-300" size={22} />
-            <h3 className="mt-4 type-body font-bold text-stone-900">{query.trim() ? '일치하는 학습자가 없습니다' : '승인된 학습자가 없습니다'}</h3>
-          </div>
-        ) : visibleLearners.map((learner) => (
-          <div className="grid gap-2 border-b border-stone-100 px-4 py-2.5 type-caption last:border-0 lg:grid-cols-[1fr_1.25fr_1fr_1fr_54px] lg:items-center" key={learner.id}>
-            <div className="flex min-w-0 items-center gap-2">
-              <span aria-hidden="true" className="flex size-7 shrink-0 items-center justify-center rounded-full bg-stone-100 type-micro font-bold text-stone-600">{getInitial(learner.name)}</span>
-              <strong className="truncate text-stone-900">{learner.name}</strong>
-            </div>
-            <span className="truncate text-stone-500">{learner.email}</span>
-            <span className="truncate text-stone-500">{learner.affiliation ?? '-'}</span>
-            <span className="type-micro text-stone-400">{formatEntryTime(learner.joinedAt)}</span>
-            <button className="justify-self-end type-micro font-semibold text-rose-600 hover:text-rose-800" onClick={() => onRemoveLearner(learner)} type="button">제외</button>
-          </div>
-        ))}
-      </div>
-      <div className="border-t border-stone-100 px-4 py-3 text-center type-micro text-stone-400">현재 수강 중인 학습자 {learners.length}명을 표시합니다.</div>
-    </section>
   )
 }
 
@@ -672,19 +640,4 @@ function toReleaseAt(startDate: string, weekIndex: number): string {
 
 function getWeekDisplayStatus(week?: ClassroomWeek): WeekDisplayStatus {
   return week?.status ?? 'PRIVATE'
-}
-
-function getInitial(name?: string): string {
-  return name?.trim().slice(0, 1) || '?'
-}
-
-function formatEntryTime(value: string): string {
-  return new Intl.DateTimeFormat('ko-KR', {
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-    month: 'numeric',
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-  }).format(new Date(value))
 }

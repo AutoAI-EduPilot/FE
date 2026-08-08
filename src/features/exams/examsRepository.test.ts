@@ -73,6 +73,48 @@ describe('exams repository', () => {
     expect(request).toHaveBeenNthCalledWith(3, '/api/exams/10/submissions/300', { signal: undefined })
     expect(request).toHaveBeenNthCalledWith(4, '/api/exams/10/submissions?page=0&size=100', { signal: undefined })
   })
+
+  it('generates editable AI question drafts without persisting internal source context fields', async () => {
+    const request = vi.fn()
+      .mockResolvedValueOnce(success({
+        questions: [{
+          answerChoiceId: 'a',
+          choices: [{ choiceId: 'a', text: '정답' }, { choiceId: 'b', text: '오답' }],
+          explanation: '해설',
+          points: 10,
+          questionId: 'draft-1',
+          questionText: '정답을 고르세요.',
+          questionType: 'MCQ',
+          sourcePageNumber: 3,
+        }],
+        schemaVersion: '1.0',
+        truncated: true,
+      }))
+      .mockResolvedValueOnce(success(examDto))
+    const repository = createExamsRepository(request as AuthenticatedRequest)
+
+    const draft = await repository.generateDraftQuestions('30', '10', {
+      materialIds: ['12'],
+      questionPlan: [{ count: 1, questionType: 'MCQ' }],
+      weekNumber: 3,
+    })
+    await repository.update('10', { questions: draft.questions })
+
+    expect(draft).toMatchObject({
+      questions: [{ options: [{ id: 'a', text: '정답' }, { id: 'b', text: '오답' }], sourceContextNumber: 3 }],
+      truncated: true,
+    })
+    expect(request).toHaveBeenNthCalledWith(1, '/api/classrooms/30/exams/10/draft-questions', expect.objectContaining({
+      body: {
+        materialIds: [12],
+        questionPlan: [{ count: 1, questionType: 'MCQ' }],
+        weekNumber: 3,
+      },
+      method: 'POST',
+    }))
+    const updateBody = request.mock.calls[1]?.[1]?.body as { questions: Array<Record<string, unknown>> }
+    expect(updateBody.questions[0]).not.toHaveProperty('sourceContextNumber')
+  })
 })
 
 function success<T>(data: T): ApiSuccess<T> { return { data, message: '성공', success: true } }

@@ -1,18 +1,18 @@
-import { Archive, BellRing, BookOpen, ChevronDown, ChevronUp, ClipboardList, Copy, Megaphone, Plus, Send, Settings, Upload, X } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } from 'react'
+import { Archive, Copy, FileText, KeyRound, MoreHorizontal, Plus, Upload, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type FormEvent } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 
 import { isInstructorRole, useAuth } from '../../features/auth'
-import { createClassroomsRepository, rememberClassroomId, type Classroom, type ClassroomNotice, type ClassroomWeek } from '../../features/classrooms'
+import { createClassroomsRepository, rememberClassroomId, type Classroom, type ClassroomWeek } from '../../features/classrooms'
 import { createMaterialsRepository, validateMaterialUpload } from '../../features/materials'
 import { createSessionsRepository } from '../../features/sessions'
 import { getRequestErrorMessage } from '../../shared/api'
-import { formatDateTime } from '../../shared/lib/format'
 import { usePageTitle } from '../../shared/lib/usePageTitle'
-import { Button, ButtonLink, EmptyState, PageContainer, PageHeader, useToast } from '../../shared/ui'
-import { classroomAnnouncementsPath, classroomEditPath, classroomExamsPath, sessionDetailPath } from '../routes'
-
-type NewClassroomItemType = 'MATERIAL' | 'NOTICE' | 'EXAM'
+import { usePolling } from '../../shared/state'
+import { Button, EmptyState, useToast } from '../../shared/ui'
+import { sessionDetailPath } from '../routes'
+import { ClassroomWorkspaceContainer } from './classroom/ClassroomWorkspaceContainer'
+import { ClassroomWorkspaceHeader } from './classroom/ClassroomWorkspaceHeader'
 
 export function ClassroomDetailPage() {
   usePageTitle('강의실 자료 관리')
@@ -22,17 +22,18 @@ export function ClassroomDetailPage() {
   const { show: showToast } = useToast()
   const [classroom, setClassroom] = useState<Classroom | null>(null)
   const [weeks, setWeeks] = useState<ClassroomWeek[]>([])
-  const [notices, setNotices] = useState<ClassroomNotice[]>([])
-  const [expandedWeek, setExpandedWeek] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [draggingWeek, setDraggingWeek] = useState<number | null>(null)
   const [isUploading, setIsUploading] = useState(false)
   const [uploadWeek, setUploadWeek] = useState<number | null>(null)
-  const [isItemTypeDialogOpen, setIsItemTypeDialogOpen] = useState(false)
+  const [isWeekDialogOpen, setIsWeekDialogOpen] = useState(false)
   const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false)
-  const [isNoticeDialogOpen, setIsNoticeDialogOpen] = useState(false)
+  const [uploadTargetWeek, setUploadTargetWeek] = useState<number | null>(null)
+  const [pendingMaterialId, setPendingMaterialId] = useState<string | null>(null)
+  const [isMaterialPollingStopped, setIsMaterialPollingStopped] = useState(false)
   const [openingMaterialId, setOpeningMaterialId] = useState<string | null>(null)
+  const materialRefreshAttempts = useRef(0)
   const replacementTarget = useRef<{ materialId: string; weekNumber: number } | null>(null)
   const replacementInput = useRef<HTMLInputElement>(null)
   const classroomsRepository = useMemo(() => createClassroomsRepository(apiRequest), [apiRequest])
@@ -50,15 +51,13 @@ export function ClassroomDetailPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const [nextClassroom, nextWeeks, nextNotices] = await Promise.all([
+      const [nextClassroom, nextWeeks] = await Promise.all([
         classroomsRepository.get(classroomId),
         classroomsRepository.listWeeks(classroomId),
-        classroomsRepository.listNotices(classroomId),
       ])
+      const sortedWeeks = sortWeeksByNumber(nextWeeks)
       setClassroom(nextClassroom)
-      setWeeks(nextWeeks)
-      setNotices(nextNotices)
-      setExpandedWeek((current) => current ?? getInitialExpandedWeek(nextWeeks))
+      setWeeks(sortedWeeks)
     } catch (requestError) {
       setError(getRequestErrorMessage(requestError))
     } finally {
@@ -71,12 +70,45 @@ export function ClassroomDetailPage() {
     Promise.all([
       classroomsRepository.get(classroomId),
       classroomsRepository.listWeeks(classroomId),
-      classroomsRepository.listNotices(classroomId),
-    ]).then(([nextClassroom, nextWeeks, nextNotices]) => { if (!cancelled) { setClassroom(nextClassroom); setWeeks(nextWeeks); setNotices(nextNotices); setExpandedWeek(getInitialExpandedWeek(nextWeeks)) } })
+    ]).then(([nextClassroom, nextWeeks]) => {
+      if (!cancelled) {
+        const sortedWeeks = sortWeeksByNumber(nextWeeks)
+        materialRefreshAttempts.current = 0
+        setIsMaterialPollingStopped(false)
+        setClassroom(nextClassroom)
+        setWeeks(sortedWeeks)
+      }
+    })
       .catch((requestError) => { if (!cancelled) setError(getRequestErrorMessage(requestError)) })
       .finally(() => { if (!cancelled) setIsLoading(false) })
     return () => { cancelled = true }
   }, [classroomId, classroomsRepository])
+
+  const refreshWeekMaterials = useCallback(async (expectedMaterialId?: string) => {
+    const materialId = expectedMaterialId ?? pendingMaterialId
+    if (materialId && materialRefreshAttempts.current >= 20) {
+      setPendingMaterialId(null)
+      setIsMaterialPollingStopped(true)
+      return
+    }
+    if (materialId) materialRefreshAttempts.current += 1
+    try {
+      const nextWeeks = sortWeeksByNumber(await classroomsRepository.listWeeks(classroomId))
+      setWeeks(nextWeeks)
+      if (materialId && nextWeeks.some((week) => week.materials.some((material) => material.id === materialId))) {
+        materialRefreshAttempts.current = 0
+        setPendingMaterialId(null)
+      }
+    } catch {
+      // Background refresh failures remain silent; manual retry still exposes errors.
+    }
+  }, [classroomId, classroomsRepository, pendingMaterialId])
+
+  usePolling(
+    !isMaterialPollingStopped && (Boolean(pendingMaterialId) || weeks.some((week) => week.materials.some((material) => material.status === 'PROCESSING'))),
+    () => void refreshWeekMaterials(),
+    3000,
+  )
 
   async function copyInviteCode() {
     if (!classroom) return
@@ -102,14 +134,11 @@ export function ClassroomDetailPage() {
     }
   }
 
-  async function publishWeekNow(week: ClassroomWeek) {
-    if (!canManageMaterials) return
-    if (!window.confirm(`${week.weekNumber}주차를 지금 공개할까요?`)) return
+  async function createWeek(input: { releaseAt?: string; title: string; weekNumber: number }) {
     try {
-      await classroomsRepository.updateWeek(classroomId, week.weekNumber, {
-        releaseAt: new Date().toISOString(),
-      })
-      showToast('주차를 공개했습니다.', 'success')
+      await classroomsRepository.createWeek(classroomId, input)
+      setIsWeekDialogOpen(false)
+      showToast(`${input.weekNumber}주차를 추가했습니다.`, 'success')
       await load()
     } catch (requestError) {
       showToast(getRequestErrorMessage(requestError), 'danger')
@@ -133,7 +162,10 @@ export function ClassroomDetailPage() {
           : 'PDF 업로드를 시작했습니다. 처리 상태는 목록에서 확인할 수 있습니다.',
         material.status === 'FAILED' ? 'danger' : 'success',
       )
-      await load()
+      materialRefreshAttempts.current = 0
+      setIsMaterialPollingStopped(false)
+      if (material.status !== 'FAILED') setPendingMaterialId(material.id)
+      await refreshWeekMaterials(material.id)
       return material.status !== 'FAILED'
     } catch (requestError) {
       showToast(getRequestErrorMessage(requestError), 'danger')
@@ -195,153 +227,100 @@ export function ClassroomDetailPage() {
     if (file) void uploadMaterial(file, weekNumber)
   }
 
-  function selectNewItemType(type: NewClassroomItemType) {
-    setIsItemTypeDialogOpen(false)
-    if (type === 'MATERIAL') {
-      setIsUploadDialogOpen(true)
-      return
-    }
-    if (type === 'NOTICE') {
-      setIsNoticeDialogOpen(true)
-      return
-    }
-    const weekNumber = expandedWeek ?? weeks[0]?.weekNumber
-    const params = new URLSearchParams({ create: '1' })
-    if (weekNumber) params.set('weekNumber', String(weekNumber))
-    navigate(`${classroomExamsPath(classroomId)}?${params}`)
-  }
-
-  async function createNotice(input: { content: string; title: string }) {
-    try {
-      const created = await classroomsRepository.createNotice(classroomId, input)
-      setNotices((items) => [created, ...items])
-      setIsNoticeDialogOpen(false)
-      showToast('전체 공지를 게시했습니다.', 'success')
-    } catch (requestError) {
-      showToast(getRequestErrorMessage(requestError), 'danger')
-    }
-  }
+  const materialCount = weeks.reduce((sum, week) => sum + week.materials.length, 0)
+  const missingWeekNumbers = classroom
+    ? Array.from({ length: classroom.weekCount }, (_, index) => index + 1)
+      .filter((weekNumber) => !weeks.some((week) => week.weekNumber === weekNumber))
+    : []
 
   return (
-    <PageContainer>
-      <PageHeader
-        actions={isInstructor && classroom ? <>
-          <Button disabled={isReadOnly} onClick={() => void copyInviteCode()} title={isReadOnly ? '종료된 강의실의 초대 코드는 사용할 수 없습니다.' : '초대 코드 복사'} variant="secondary">{classroom.inviteCode ?? '초대 코드'}<Copy aria-hidden="true" size={14} /></Button>
-          <ButtonLink to={classroomEditPath(classroom.id)} variant="secondary"><Settings aria-hidden="true" size={14} />설정</ButtonLink>
-          {!isReadOnly ? <Button disabled={isUploading} onClick={() => setIsItemTypeDialogOpen(true)}><Plus aria-hidden="true" size={14} />새 항목 추가</Button> : null}
-        </> : undefined}
-        title={classroom?.name ?? '강의실'}
-        titleAccessory={!isInstructor && classroom ? <span className="type-caption text-stone-400">전체 진도 {classroom.progressRate}% · 자료 {weeks.reduce((sum, week) => sum + week.materials.length, 0)}개</span> : undefined}
-      />
+    <ClassroomWorkspaceContainer>
+      {classroom ? <ClassroomWorkspaceHeader
+        actions={isInstructor ? <><Button disabled={isReadOnly} onClick={() => void copyInviteCode()} title={isReadOnly ? '종료된 강의실의 초대 코드는 사용할 수 없습니다.' : '초대 코드 복사'} variant="secondary"><KeyRound aria-hidden="true" size={14} /><span className="font-bold">{classroom.inviteCode ?? '초대 코드'}</span><Copy aria-hidden="true" size={13} /></Button><Button disabled={isReadOnly || missingWeekNumbers.length === 0} onClick={() => setIsWeekDialogOpen(true)} title={missingWeekNumbers.length === 0 ? '수업 기간의 모든 주차가 생성되어 있습니다.' : '주차 추가'} variant="secondary"><Plus aria-hidden="true" size={14} />주차 추가</Button><Button disabled={isReadOnly || isUploading || weeks.length === 0} onClick={() => { setUploadTargetWeek(null); setIsUploadDialogOpen(true) }}><Upload aria-hidden="true" size={14} />자료 업로드</Button></> : undefined}
+        activeTab="materials"
+        classroom={classroom}
+        materialCount={materialCount}
+      /> : null}
 
-      {isInstructor && isReadOnly ? <p className="flex items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 type-caption leading-5 text-stone-600" role="status"><Archive aria-hidden="true" className="shrink-0 text-stone-500" size={15} />종료된 강의실입니다. 기존 자료는 확인할 수 있지만 새 자료 업로드, 삭제, 공개 상태 변경은 할 수 없습니다.</p> : null}
-
-      {notices.length > 0 ? <section aria-labelledby="classroom-notices-title" className="overflow-hidden rounded-lg border border-stone-200 bg-white">
-        <div className="flex min-h-12 items-center gap-2 border-b border-stone-100 bg-stone-50 px-4">
-          <Megaphone aria-hidden="true" className="text-brand-700" size={15} />
-          <h2 className="type-section-title font-bold text-stone-900" id="classroom-notices-title">전체 공지</h2>
-          <span className="type-caption text-stone-400">{notices.length}개</span>
-          {isInstructor ? <ButtonLink className="ml-auto" size="sm" to={classroomAnnouncementsPath(classroomId)} variant="ghost">공지 관리</ButtonLink> : null}
-        </div>
-        <div className="divide-y divide-stone-100">
-          {notices.map((notice) => <article className="flex items-start gap-3 px-4 py-3" key={notice.id}>
-            <BellRing aria-hidden="true" className="mt-0.5 shrink-0 text-brand-600" size={14} />
-            <div className="min-w-0 flex-1"><strong className="block truncate type-body text-stone-900">{notice.title}</strong><p className="mt-1 line-clamp-2 type-caption leading-5 text-stone-600">{notice.content}</p></div>
-            <time className="shrink-0 type-micro text-stone-400">{new Date(notice.publishedAt).toLocaleDateString('ko-KR')}</time>
-          </article>)}
-        </div>
-      </section> : null}
+      {isInstructor && isReadOnly ? <p className="flex items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-4 py-3 type-caption leading-5 text-stone-600" role="status"><Archive aria-hidden="true" className="shrink-0 text-stone-500" size={15} />종료된 강의실입니다. 기존 자료는 확인할 수 있지만 새 자료 업로드, 교체, 삭제는 할 수 없습니다.</p> : null}
 
       {isLoading ? <p className="py-16 text-center type-body text-stone-500" role="status">강의실 정보를 불러오는 중입니다.</p> : null}
       {error ? <EmptyState action={<Button onClick={() => void load()} variant="secondary">다시 시도</Button>} description={error} title="강의실 정보를 불러오지 못했습니다" /> : null}
       {!isLoading && !error && weeks.length === 0 ? <EmptyState description={isInstructor ? '수업 기간에 따라 생성된 주차가 이곳에 표시됩니다.' : '강의자가 자료를 공개하면 이곳에 표시됩니다.'} title="등록된 주차와 자료가 없습니다" /> : null}
 
-      {weeks.length > 0 ? <section className="space-y-3" aria-label="주차별 자료">
-        {weeks.map((week) => <article
-          className={`overflow-hidden rounded-lg border bg-white transition-colors ${draggingWeek === week.weekNumber ? 'border-brand-500 bg-brand-50/40 ring-2 ring-brand-100' : 'border-stone-200'} ${!isInstructor && week.status !== 'PUBLISHED' ? 'opacity-60' : ''}`}
-          key={week.weekNumber}
-          onDragEnter={canManageMaterials ? (event) => handleDragEnter(event, week.weekNumber) : undefined}
-          onDragLeave={canManageMaterials ? handleDragLeave : undefined}
-          onDragOver={canManageMaterials ? (event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy' } : undefined}
-          onDrop={canManageMaterials ? (event) => handleDrop(event, week.weekNumber) : undefined}
-        >
-          <div className="flex min-h-14 flex-wrap items-center gap-3 bg-stone-50 px-4 py-3">
-            <h2 className="font-bold text-stone-900">{week.weekNumber}주차 - {week.title}</h2>
-            <span className="rounded-full bg-brand-50 px-2 py-1 type-micro font-semibold text-brand-700">{week.status === 'PUBLISHED' ? '공개' : '공개 예정'}</span>
-            {week.releaseAt ? <span className="type-caption text-stone-400">{formatDateTime(week.releaseAt)}</span> : null}
-            {isInstructor ? <div className="ml-auto flex items-center gap-3"><span className="type-micro text-stone-400">자료 {week.materials.length} · 평균 진도 {classroom?.progressRate ?? 0}%</span>{canManageMaterials && week.status !== 'PUBLISHED' ? <Button onClick={() => void publishWeekNow(week)} size="sm" variant="secondary"><Send aria-hidden="true" size={13} />지금 공개</Button> : null}</div> : <button aria-expanded={expandedWeek === week.weekNumber} aria-label={`${week.weekNumber}주차 ${expandedWeek === week.weekNumber ? '접기' : '펼치기'}`} className="ml-auto flex size-8 items-center justify-center rounded-md text-stone-400 hover:bg-white" disabled={week.status !== 'PUBLISHED'} onClick={() => setExpandedWeek((current) => current === week.weekNumber ? null : week.weekNumber)} type="button">{expandedWeek === week.weekNumber ? <ChevronUp size={15} /> : <ChevronDown size={15} />}</button>}
-          </div>
-          {(isInstructor || expandedWeek === week.weekNumber) ? <>
-            {week.materials.length > 0 ? <div className="divide-y divide-stone-100">
-              {week.materials.map((material) => {
-                const displayTitle = getMaterialDisplayTitle(material.title)
-                return <div className="grid min-h-12 grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-2 px-4 py-2 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto]" key={material.id}>
-                  <span className="rounded bg-rose-50 px-2 py-1 type-micro font-bold text-rose-600">PDF</span>
-                  <div className="flex min-w-0 items-baseline gap-2 overflow-hidden">
-                    {material.status === 'READY'
-                      ? <button className="min-w-0 truncate type-body font-semibold text-stone-800 hover:text-brand-700 disabled:text-stone-400" disabled={openingMaterialId !== null} onClick={() => void openMaterial(material.id)} title={material.title} type="button">{openingMaterialId === material.id ? 'PDF 여는 중' : displayTitle}</button>
-                      : <span className="min-w-0 truncate type-body font-semibold text-stone-800" title={material.title}>{displayTitle}</span>}
-                    <span className="shrink-0 type-micro text-stone-400">
-                      {getMaterialPageLabel(material)} · {formatUploadDate(material.uploadedAt)} 업로드
-                    </span>
-                  </div>
-                  <div className="col-span-2 flex min-w-44 items-center justify-end gap-2 sm:col-span-1">
-                    <span className="type-micro text-stone-500">열람 {material.viewerCount ?? '-'}/{classroom?.learnerCount ?? 0}명</span>
-                    <span className="h-1 w-20 overflow-hidden rounded-full bg-stone-200" title={material.viewRate === undefined ? '자료별 열람률 API가 필요합니다.' : `열람률 ${material.viewRate}%`}><span className="block h-full rounded-full bg-brand-600" style={{ width: `${Math.min(100, Math.max(0, material.viewRate ?? 0))}%` }} /></span>
-                  </div>
-                  {canManageMaterials ? <div className="col-span-2 flex justify-end gap-3 sm:col-span-1"><button className="type-caption text-stone-600 hover:text-brand-700" onClick={() => selectReplacement(material.id, week.weekNumber)} type="button">교체</button><button className="type-caption text-rose-600 hover:text-rose-700" onClick={() => void detachMaterial(week.weekNumber, material.id, material.title)} type="button">삭제</button></div> : null}
+      {weeks.length > 0 ? <section aria-label="주차별 자료" className="overflow-visible rounded-lg border border-stone-200 bg-white">
+        <div className="overflow-x-auto rounded-lg">
+          <div className="min-w-[820px]">
+            <div className="grid min-h-9 grid-cols-[88px_minmax(330px,1fr)_130px_220px_56px] items-center gap-2 border-b border-stone-200 bg-stone-50 px-4 type-caption font-semibold text-stone-500" role="row">
+              <span>주차</span><span>자료</span><span>공개일</span><span>열람률</span><span className="text-center">작업</span>
+            </div>
+            {weeks.map((week) => {
+              const viewRate = getWeekViewRate(week)
+              const viewerCount = getWeekViewerCount(week)
+              const rowTone = week.status === 'SCHEDULED' ? 'bg-amber-50/70' : draggingWeek === week.weekNumber ? 'bg-brand-50/70' : 'bg-white'
+              return <article
+                className={`grid min-h-16 grid-cols-[88px_minmax(330px,1fr)_130px_220px_56px] items-center gap-2 border-b border-stone-100 px-4 last:border-b-0 ${rowTone}`}
+                key={week.id}
+                onDragEnter={canManageMaterials ? (event) => handleDragEnter(event, week.weekNumber) : undefined}
+                onDragLeave={canManageMaterials ? handleDragLeave : undefined}
+                onDragOver={canManageMaterials ? (event) => { event.preventDefault(); event.dataTransfer.dropEffect = 'copy' } : undefined}
+                onDrop={canManageMaterials ? (event) => handleDrop(event, week.weekNumber) : undefined}
+              >
+                <span className={`w-fit rounded-lg px-3 py-2 type-control font-bold ${week.status === 'PUBLISHED' ? 'bg-brand-600 text-white' : week.status === 'SCHEDULED' ? 'bg-amber-100 text-amber-700' : 'bg-stone-100 text-stone-500'}`}>{week.weekNumber}주차</span>
+                <div className="min-w-0 py-2">
+                  {week.materials.length > 0 ? <div className="space-y-2">{week.materials.map((material) => <div className="min-w-0" key={material.id}>
+                    {material.status === 'READY' ? <button className="block max-w-full truncate type-body font-extrabold text-stone-950 hover:text-brand-700 disabled:text-stone-400" disabled={openingMaterialId !== null} onClick={() => void openMaterial(material.id)} title={material.title} type="button">{openingMaterialId === material.id ? 'PDF 여는 중' : getMaterialDisplayTitle(material.title)}</button> : <strong className="block truncate type-body font-extrabold text-stone-950">{getMaterialDisplayTitle(material.title)}</strong>}
+                  </div>)}</div> : canManageMaterials ? <button aria-label={`${week.weekNumber}주차 PDF 드롭 영역`} className={`flex min-h-11 w-full items-center gap-2 rounded-lg border border-dashed px-4 text-left type-caption ${draggingWeek === week.weekNumber ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-stone-300 text-stone-400 hover:border-brand-400 hover:bg-brand-50/30'}`} onClick={() => { setUploadTargetWeek(week.weekNumber); setIsUploadDialogOpen(true) }} type="button"><FileText aria-hidden="true" size={14} />{isUploading && uploadWeek === week.weekNumber ? 'PDF 업로드 중' : '자료를 끌어다 놓거나 클릭해 업로드'}</button> : <span className="type-caption text-stone-400">등록된 자료가 없습니다.</span>}
                 </div>
-              })}
-            </div> : null}
-            {canManageMaterials ? <div
-              aria-label={`${week.weekNumber}주차 PDF 드롭 영역`}
-              className={`m-3 flex min-h-14 items-center justify-center rounded-lg border border-dashed px-4 type-caption font-medium transition-colors ${draggingWeek === week.weekNumber ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-stone-300 bg-stone-50 text-stone-400'}`}
-            >
-              {isUploading && uploadWeek === week.weekNumber ? 'PDF 업로드 중' : 'PDF를 놓아 이 주차에 추가'}
-            </div> : week.materials.length === 0 ? <p className="px-4 py-5 text-center type-body text-stone-400">등록된 자료가 없습니다.</p> : null}
-          </> : null}
-        </article>)}
+                <time className={`type-control ${week.status === 'SCHEDULED' ? 'font-semibold text-amber-700' : 'text-stone-600'}`}>{week.releaseAt ? formatReleaseDate(week.releaseAt, week.status === 'SCHEDULED') : '-'}</time>
+                <div>{viewRate === null ? <span className="type-caption text-stone-400">열람 정보 없음</span> : <div className="flex items-center gap-3"><span className="block h-1.5 min-w-20 flex-1 overflow-hidden rounded-full bg-stone-100"><span className={`block h-full rounded-full ${viewRate >= 80 ? 'bg-emerald-600' : 'bg-brand-600'}`} style={{ width: `${viewRate}%` }} /></span><span className={`shrink-0 type-caption font-semibold ${viewRate >= 80 ? 'text-emerald-700' : 'text-brand-700'}`}>조회 {viewerCount ?? 0}명 · {viewRate}%</span></div>}</div>
+                <div className="relative flex justify-center">{canManageMaterials && week.materials.length > 0 ? <details><summary aria-label={`${week.weekNumber}주차 작업 메뉴`} className="flex size-8 cursor-pointer list-none items-center justify-center rounded-md text-stone-400 hover:bg-stone-100 hover:text-stone-700"><MoreHorizontal aria-hidden="true" size={17} /></summary><div className="absolute top-9 right-0 z-20 w-52 rounded-lg border border-stone-200 bg-white p-1.5 shadow-lg">{week.materials.map((material) => <div className="border-b border-stone-100 py-1 last:border-0" key={material.id}><p className="truncate px-2 py-1 type-micro font-semibold text-stone-500">{getMaterialDisplayTitle(material.title)}</p><button className="w-full rounded px-2 py-1.5 text-left type-caption text-stone-700 hover:bg-stone-50" onClick={() => selectReplacement(material.id, week.weekNumber)} type="button">교체</button><button className="w-full rounded px-2 py-1.5 text-left type-caption text-rose-700 hover:bg-rose-50" onClick={() => void detachMaterial(week.weekNumber, material.id, material.title)} type="button">삭제</button></div>)}</div></details> : <MoreHorizontal aria-hidden="true" className="text-stone-300" size={17} />}</div>
+              </article>
+            })}
+          </div>
+        </div>
       </section> : null}
       <input accept="application/pdf,.pdf" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void replaceMaterial(file); event.target.value = '' }} ref={replacementInput} tabIndex={-1} type="file" />
-      {isItemTypeDialogOpen ? <NewItemTypeDialog hasWeeks={weeks.length > 0} onClose={() => setIsItemTypeDialogOpen(false)} onSelect={selectNewItemType} /> : null}
-      {isUploadDialogOpen ? <UploadMaterialDialog isUploading={isUploading} onClose={() => setIsUploadDialogOpen(false)} onUpload={uploadMaterial} weeks={weeks} /> : null}
-      {isNoticeDialogOpen ? <CreateNoticeDialog onClose={() => setIsNoticeDialogOpen(false)} onSubmit={createNotice} /> : null}
-    </PageContainer>
+      {isWeekDialogOpen && classroom ? <CreateWeekDialog availableWeekNumbers={missingWeekNumbers} onClose={() => setIsWeekDialogOpen(false)} onCreate={createWeek} startDate={classroom.startDate} /> : null}
+      {isUploadDialogOpen ? <UploadMaterialDialog initialWeekNumber={uploadTargetWeek ?? undefined} isUploading={isUploading} onClose={() => setIsUploadDialogOpen(false)} onUpload={uploadMaterial} weeks={weeks} /> : null}
+    </ClassroomWorkspaceContainer>
   )
 }
 
-function NewItemTypeDialog({ hasWeeks, onClose, onSelect }: { hasWeeks: boolean; onClose: () => void; onSelect: (type: NewClassroomItemType) => void }) {
-  const choices = [
-    { description: 'PDF를 주차에 추가합니다.', disabled: !hasWeeks, icon: BookOpen, label: '강의자료', type: 'MATERIAL' as const },
-    { description: '강의실 전체 공지를 게시합니다.', disabled: false, icon: Megaphone, label: '공지사항', type: 'NOTICE' as const },
-    { description: '선택한 주차의 시험 초안을 만듭니다.', disabled: !hasWeeks, icon: ClipboardList, label: '시험', type: 'EXAM' as const },
-  ]
-
-  return <div aria-labelledby="new-item-title" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/40 p-4" role="dialog"><div className="w-full max-w-lg rounded-lg bg-white p-5 shadow-xl"><div className="flex items-center justify-between"><h2 className="type-dialog-title font-bold text-stone-950" id="new-item-title">새 항목 추가</h2><button aria-label="새 항목 추가 닫기" className="flex size-8 items-center justify-center rounded-md text-stone-400 hover:bg-stone-100" onClick={onClose} type="button"><X aria-hidden="true" size={17} /></button></div><div className="mt-5 grid gap-2 sm:grid-cols-3">{choices.map((choice) => { const Icon = choice.icon; return <button className="flex min-h-32 flex-col items-start rounded-lg border border-stone-200 p-4 text-left transition-colors hover:border-brand-300 hover:bg-brand-50/30 disabled:cursor-not-allowed disabled:bg-stone-50 disabled:text-stone-400" disabled={choice.disabled} key={choice.type} onClick={() => onSelect(choice.type)} type="button"><span className="flex size-9 items-center justify-center rounded-lg bg-stone-100 text-stone-700"><Icon aria-hidden="true" size={17} /></span><strong className="mt-3 type-body">{choice.label}</strong><span className="mt-1 type-caption leading-5 text-stone-500">{choice.disabled ? '등록된 주차가 필요합니다.' : choice.description}</span></button> })}</div></div></div>
-}
-
-function CreateNoticeDialog({ onClose, onSubmit }: { onClose: () => void; onSubmit: (input: { content: string; title: string }) => Promise<void> }) {
-  const [title, setTitle] = useState('')
-  const [content, setContent] = useState('')
+function CreateWeekDialog({ availableWeekNumbers, onClose, onCreate, startDate }: { availableWeekNumbers: number[]; onClose: () => void; onCreate: (input: { releaseAt?: string; title: string; weekNumber: number }) => Promise<void>; startDate: string }) {
+  const initialWeekNumber = availableWeekNumbers[0] ?? 1
+  const [weekNumber, setWeekNumber] = useState(initialWeekNumber)
+  const [title, setTitle] = useState(`${initialWeekNumber}주차`)
+  const [releaseAt, setReleaseAt] = useState(() => getDefaultWeekReleaseAt(startDate, initialWeekNumber))
   const [isSubmitting, setIsSubmitting] = useState(false)
+
+  function changeWeek(nextWeekNumber: number) {
+    setWeekNumber(nextWeekNumber)
+    setTitle(`${nextWeekNumber}주차`)
+    setReleaseAt(getDefaultWeekReleaseAt(startDate, nextWeekNumber))
+  }
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!title.trim() || !content.trim() || isSubmitting) return
+    if (!title.trim() || isSubmitting) return
     setIsSubmitting(true)
     try {
-      await onSubmit({ content: content.trim(), title: title.trim() })
+      await onCreate({
+        releaseAt: releaseAt ? new Date(releaseAt).toISOString() : undefined,
+        title: title.trim(),
+        weekNumber,
+      })
     } finally {
       setIsSubmitting(false)
     }
   }
 
-  return <div aria-labelledby="create-notice-title" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/40 p-4" role="dialog"><form className="w-full max-w-lg rounded-lg bg-white p-5 shadow-xl" onSubmit={submit}><div className="flex items-center justify-between"><div><h2 className="type-dialog-title font-bold text-stone-950" id="create-notice-title">공지사항 추가</h2><p className="mt-1 type-caption text-stone-500">현재 공지는 강의실 전체에 게시됩니다.</p></div><button aria-label="공지사항 추가 닫기" className="flex size-8 items-center justify-center rounded-md text-stone-400 hover:bg-stone-100" onClick={onClose} type="button"><X aria-hidden="true" size={17} /></button></div><label className="mt-5 block type-control font-semibold text-stone-700">제목<input autoFocus className="mt-1 h-10 w-full rounded-lg border border-stone-300 px-3 type-body" maxLength={200} onChange={(event) => setTitle(event.target.value)} value={title} /></label><label className="mt-4 block type-control font-semibold text-stone-700">내용<textarea className="mt-1 min-h-32 w-full resize-none rounded-lg border border-stone-300 px-3 py-2.5 type-body" maxLength={5000} onChange={(event) => setContent(event.target.value)} value={content} /></label><div className="mt-5 flex justify-end gap-2"><Button onClick={onClose} variant="secondary">취소</Button><Button disabled={!title.trim() || !content.trim() || isSubmitting} type="submit">{isSubmitting ? '게시 중' : '전체 공지 게시'}</Button></div></form></div>
+  return <div aria-labelledby="create-week-title" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/40 p-4" role="dialog"><form className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl" onSubmit={submit}><div className="flex items-center justify-between"><h2 className="type-dialog-title font-bold text-stone-950" id="create-week-title">주차 추가</h2><button aria-label="주차 추가 닫기" className="flex size-8 items-center justify-center rounded-md text-stone-400 hover:bg-stone-100" onClick={onClose} type="button"><X aria-hidden="true" size={17} /></button></div><label className="mt-5 block type-control font-semibold text-stone-700">주차<select className="mt-1 h-10 w-full rounded-lg border border-stone-300 bg-white px-3 type-body" onChange={(event) => changeWeek(Number(event.target.value))} value={weekNumber}>{availableWeekNumbers.map((value) => <option key={value} value={value}>{value}주차</option>)}</select></label><label className="mt-4 block type-control font-semibold text-stone-700">주차 이름<input className="mt-1 h-10 w-full rounded-lg border border-stone-300 px-3 type-body" maxLength={100} onChange={(event) => setTitle(event.target.value)} value={title} /></label><label className="mt-4 block type-control font-semibold text-stone-700">공개 예정일 <span className="font-normal text-stone-400">(선택)</span><input className="mt-1 h-10 w-full rounded-lg border border-stone-300 px-3 type-body" onChange={(event) => setReleaseAt(event.target.value)} type="datetime-local" value={releaseAt} /></label><div className="mt-5 flex justify-end gap-2"><Button onClick={onClose} variant="secondary">취소</Button><Button disabled={!title.trim() || isSubmitting} type="submit">{isSubmitting ? '추가 중' : '추가'}</Button></div></form></div>
 }
 
-function UploadMaterialDialog({ isUploading, onClose, onUpload, weeks }: { isUploading: boolean; onClose: () => void; onUpload: (file: File, weekNumber: number) => Promise<boolean>; weeks: ClassroomWeek[] }) {
+function UploadMaterialDialog({ initialWeekNumber, isUploading, onClose, onUpload, weeks }: { initialWeekNumber?: number; isUploading: boolean; onClose: () => void; onUpload: (file: File, weekNumber: number) => Promise<boolean>; weeks: ClassroomWeek[] }) {
   const [file, setFile] = useState<File | null>(null)
-  const [weekNumber, setWeekNumber] = useState(weeks[0]?.weekNumber ?? 1)
+  const [weekNumber, setWeekNumber] = useState(initialWeekNumber ?? weeks[0]?.weekNumber ?? 1)
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -352,28 +331,37 @@ function UploadMaterialDialog({ isUploading, onClose, onUpload, weeks }: { isUpl
   return <div aria-label="강의자료 업로드" aria-modal="true" className="fixed inset-0 z-50 flex items-center justify-center bg-stone-950/40 p-4" role="dialog"><form className="w-full max-w-md rounded-lg bg-white p-5 shadow-xl" onSubmit={submit}><div className="flex items-center justify-between"><h2 className="type-dialog-title font-bold text-stone-950">강의자료 업로드</h2><button aria-label="강의자료 업로드 닫기" className="flex size-8 items-center justify-center rounded-md text-stone-400 hover:bg-stone-100" onClick={onClose} type="button"><X aria-hidden="true" size={17} /></button></div><label className="mt-5 block type-control font-semibold text-stone-700">주차 선택<select className="mt-1 h-10 w-full rounded-lg border border-stone-300 bg-white px-3 type-body" onChange={(event) => setWeekNumber(Number(event.target.value))} value={weekNumber}>{weeks.map((week) => <option key={week.weekNumber} value={week.weekNumber}>{week.weekNumber}주차 - {week.title}</option>)}</select></label><label className="mt-4 flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-stone-300 bg-stone-50 px-4 text-center hover:border-brand-400 hover:bg-brand-50/30"><Upload aria-hidden="true" className="text-stone-400" size={20} /><span className="mt-2 type-body font-semibold text-stone-700">{file?.name ?? 'PDF 파일 선택'}</span><span className="mt-1 type-caption text-stone-400">PDF · 최대 45MB</span><input accept="application/pdf,.pdf" className="sr-only" onChange={(event) => setFile(event.target.files?.[0] ?? null)} type="file" /></label><div className="mt-5 flex justify-end gap-2"><Button onClick={onClose} variant="secondary">취소</Button><Button disabled={!file || isUploading} type="submit">{isUploading ? '업로드 중' : '업로드'}</Button></div></form></div>
 }
 
-function formatUploadDate(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '날짜 미상'
-  return new Intl.DateTimeFormat('ko-KR', {
-    day: 'numeric',
-    month: 'long',
-  }).format(date)
-}
-
 function getMaterialDisplayTitle(title: string): string {
   return title.replace(/\.pdf$/i, '')
 }
 
-function getMaterialPageLabel(material: ClassroomWeek['materials'][number]): string {
-  if (material.pageCount) return `${material.pageCount}쪽`
-  if (material.status === 'PROCESSING') return '처리 중'
-  if (material.status === 'FAILED') return 'PDF 처리 실패'
-  return '페이지 정보 없음'
+function sortWeeksByNumber(weeks: ClassroomWeek[]): ClassroomWeek[] {
+  return [...weeks].sort((left, right) => left.weekNumber - right.weekNumber)
 }
 
-function getInitialExpandedWeek(weeks: ClassroomWeek[]): number | null {
-  return [...weeks]
-    .filter((week) => week.status === 'PUBLISHED')
-    .sort((left, right) => right.weekNumber - left.weekNumber)[0]?.weekNumber ?? null
+function formatReleaseDate(value: string, includeTime: boolean): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '-'
+  return new Intl.DateTimeFormat('ko-KR', includeTime
+    ? { day: 'numeric', hour: '2-digit', minute: '2-digit', month: 'long' }
+    : { day: 'numeric', month: 'long' }).format(date)
+}
+
+function getWeekViewRate(week: ClassroomWeek): number | null {
+  const rates = week.materials.map((material) => material.viewRate).filter((value): value is number => value !== undefined)
+  if (rates.length === 0) return null
+  return Math.round(Math.max(0, Math.min(100, rates.reduce((sum, value) => sum + value, 0) / rates.length)))
+}
+
+function getWeekViewerCount(week: ClassroomWeek): number | null {
+  const counts = week.materials.map((material) => material.viewerCount).filter((value): value is number => value !== undefined)
+  return counts.length > 0 ? Math.max(...counts) : null
+}
+
+function getDefaultWeekReleaseAt(startDate: string, weekNumber: number): string {
+  const [year, month, day] = startDate.slice(0, 10).split('-').map(Number)
+  if (!year || !month || !day) return ''
+  const date = new Date(year, month - 1, day + ((weekNumber - 1) * 7), 12)
+  const pad = (value: number) => String(value).padStart(2, '0')
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`
 }

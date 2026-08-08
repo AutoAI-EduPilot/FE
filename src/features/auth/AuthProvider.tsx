@@ -25,7 +25,7 @@ interface AuthProviderProps {
   initialUser?: AuthUser | null
 }
 
-export const AUTH_IDLE_TIMEOUT_MS = 10 * 60 * 1000
+export const AUTH_IDLE_TIMEOUT_MS = 30 * 60 * 1000
 const IDLE_CHECK_INTERVAL_MS = 30_000
 
 interface AuthSession {
@@ -117,7 +117,7 @@ export function AuthProvider({
     return () => controller.abort()
   }, [hasExplicitInitialUser, repository])
 
-  // 10분 무활동 시 로그아웃 (refresh 쿠키도 폐기)
+  // 30분 무활동 시 로그아웃 (refresh 쿠키도 폐기)
   useEffect(() => {
     if (!session || hasExplicitInitialUser) {
       return

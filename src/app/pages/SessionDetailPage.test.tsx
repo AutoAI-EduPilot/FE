@@ -165,6 +165,16 @@ describe('SessionDetailPage', () => {
     ).toBeInTheDocument()
   })
 
+  it('automatically restores a quiz when the session state is QUIZ_READY', async () => {
+    renderSessionDetail('/sessions/103')
+
+    expect(await screen.findByRole('button', { name: 'PDF로 돌아가기' })).toBeInTheDocument()
+    expect(await screen.findByText('문항 1 / 2 · 답변 0 / 2')).toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: 'PDF로 돌아가기' }))
+    expect(await screen.findByRole('progressbar', { name: '학습 진행률 2 / 5쪽' })).toBeInTheDocument()
+  })
+
   it('groups current-classroom materials and quizzes by week', async () => {
     renderSessionDetail()
 
@@ -174,7 +184,10 @@ describe('SessionDetailPage', () => {
     expect(screen.getByText('강의 노트 5주차.pdf')).toBeInTheDocument()
     expect(screen.getByText('학습 확인 퀴즈')).toBeInTheDocument()
     expect(screen.getByText('객관식')).toBeInTheDocument()
-    expect(screen.getByText('48점')).toBeInTheDocument()
+    expect(screen.queryByText('48점')).not.toBeInTheDocument()
+    expect(screen.queryByText('강의실 자료')).not.toBeInTheDocument()
+    expect(screen.queryByText('1/5')).not.toBeInTheDocument()
+    expect(screen.queryByText(/^자료 \d+개$/)).not.toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /학습 확인 퀴즈/ }))
     expect(await screen.findByRole('button', { name: 'PDF로 돌아가기' })).toBeInTheDocument()
