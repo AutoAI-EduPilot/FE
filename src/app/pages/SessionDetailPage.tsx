@@ -945,6 +945,7 @@ export function SessionDetailPage() {
             currentPage={currentPage}
             onExplainCurrentPage={() => handleEvent('EXPLAIN_CURRENT_PAGE')}
             onExplainNextPage={handleExplainNextPage}
+            onMoveToPage={(pageNumber) => handlePageNavigation(pageNumber)}
             onOpenQuiz={handleOpenQuizHistory}
             onOverviewPageSelect={(pageNumber) => void handlePageNavigation(pageNumber)}
             onRequestQuiz={() => setIsSelectingQuizType(true)}

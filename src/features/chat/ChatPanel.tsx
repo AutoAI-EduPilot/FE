@@ -55,6 +55,8 @@ interface ChatPanelProps {
   onExplainCurrentPage?: (message?: string) => Promise<void> | void
   /** 다음 페이지로 이동한 뒤 해당 페이지 설명을 학습 진행 이벤트로 요청한다. */
   onExplainNextPage?: (message?: string) => Promise<void> | void
+  /** 명시적으로 입력한 페이지 번호로 이동한다. */
+  onMoveToPage?: (pageNumber: number, message?: string) => Promise<void> | void
   /** 서버가 확정한 턴 상태를 세션 화면과 동기화한다. */
   onTurnCompleted?: (result: SessionTurnResult) => void
   /** 시안 빠른 칩의 "퀴즈 내줘" — 세션 화면의 유형 선택(W4)을 연다. */
@@ -97,6 +99,7 @@ export function ChatPanel({
   currentPage,
   onExplainCurrentPage,
   onExplainNextPage,
+  onMoveToPage,
   onOpenQuiz,
   onOverviewPageSelect,
   onRequestQuiz,
@@ -177,15 +180,23 @@ export function ChatPanel({
     turnSubmissionLockRef.current = true
 
     const requestId = createRequestId()
-    const isProgressCommand = Boolean(
+    const requestedPage = onMoveToPage
+      ? getRequestedPageNumber(trimmedQuestion)
+      : null
+    const requestsQuiz = Boolean(
+      onRequestQuiz && isQuizRequestCommand(trimmedQuestion)
+    )
+    const isLocalActionCommand = Boolean(
       (onExplainNextPage && isExplainNextPageCommand(trimmedQuestion))
-      || (onExplainCurrentPage && isExplainCurrentPageCommand(trimmedQuestion)),
+      || (onExplainCurrentPage && isExplainCurrentPageCommand(trimmedQuestion))
+      || requestedPage !== null
+      || requestsQuiz,
     )
 
     chat.appendLocalMessage({
       content: trimmedQuestion,
       id: `user-${requestId}`,
-      requestId: isProgressCommand ? undefined : requestId,
+      requestId: isLocalActionCommand ? undefined : requestId,
       role: 'user',
       status: 'sent',
     })
@@ -194,12 +205,20 @@ export function ChatPanel({
     setTurnStatus('')
 
     try {
+      if (onMoveToPage && requestedPage !== null) {
+        await onMoveToPage(requestedPage, trimmedQuestion)
+        return
+      }
       if (onExplainNextPage && isExplainNextPageCommand(trimmedQuestion)) {
         await onExplainNextPage(trimmedQuestion)
         return
       }
       if (onExplainCurrentPage && isExplainCurrentPageCommand(trimmedQuestion)) {
         await onExplainCurrentPage(trimmedQuestion)
+        return
+      }
+      if (onRequestQuiz && requestsQuiz) {
+        onRequestQuiz()
         return
       }
       await chat.submitTurn(
@@ -214,7 +233,7 @@ export function ChatPanel({
         onTurnCompleted,
       )
     } catch (requestError) {
-      if (!isProgressCommand) chat.markMessageFailed(requestId)
+      if (!isLocalActionCommand) chat.markMessageFailed(requestId)
       setError(getChatErrorMessage(requestError))
     } finally {
       turnSubmissionLockRef.current = false
@@ -362,7 +381,9 @@ export function ChatPanel({
     }
   }
 
-  const visibleMessages = chat.messages
+  const visibleMessages = chat.messages.filter(
+    (message) => message.content.trim().length > 0,
+  )
   const hasAssistantReply = visibleMessages.some(
     (message) => message.role === 'assistant',
   )
@@ -785,22 +806,51 @@ function localizeQuizTypeSelection(content: string): string {
   )
 }
 
-function isExplainCurrentPageCommand(value: string): boolean {
-  const normalized = value
+function localizeLearningEventMessage(content: string): string {
+  const explanationMatch = content.match(
+    /^현재\s*페이지\s*설명\s*요청\s*:\s*(NORMAL|DETAILED)$/u,
+  )
+  if (explanationMatch?.[1] === 'DETAILED') {
+    return '현재 페이지를 자세히 설명해줘'
+  }
+  if (explanationMatch) return '현재 페이지 설명해줘'
+  if (/^노트\s*작성\s*요청$/u.test(content)) return '노트로 정리해줘'
+  return localizeQuizTypeSelection(content)
+}
+
+function isQuizRequestCommand(value: string): boolean {
+  const normalized = normalizeLearningCommand(value)
+  return /퀴즈(를|좀)?\s*(내|출제|생성|만들)(어|해)?\s*(줘|주세요|주라|달라|달라고|고)(?:\s|$)/u.test(
+    normalized,
+  )
+}
+
+function getRequestedPageNumber(value: string): number | null {
+  const normalized = normalizeLearningCommand(value)
+  const match = normalized.match(
+    /(?:^|\s)(\d+)\s*(페이지|쪽|장)(로|으로)?\s*(이동|넘어가|넘겨|가자)/u,
+  )
+  if (!match) return null
+  const pageNumber = Number(match[1])
+  return Number.isSafeInteger(pageNumber) && pageNumber > 0 ? pageNumber : null
+}
+
+function normalizeLearningCommand(value: string): string {
+  return value
     .toLowerCase()
     .replace(/[?.!,]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+function isExplainCurrentPageCommand(value: string): boolean {
+  const normalized = normalizeLearningCommand(value)
   return /^(현재 |이 )?페이지(를|에 대해)? (쉽게 )?설명(해 ?줘|해 ?주세요|해|)$/u.test(normalized)
     || /^(쉽게 )?설명(해 ?줘|해 ?주세요)$/u.test(normalized)
 }
 
 function isExplainNextPageCommand(value: string): boolean {
-  const normalized = value
-    .toLowerCase()
-    .replace(/[?.!,]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim()
+  const normalized = normalizeLearningCommand(value)
   return /다음\s*(페이지|쪽|장)(로|으로|를|을|의|에|에서)?\s*(넘어가서\s*)?(내용(을|를)?\s*)?(쉽게\s*)?(설명|해설|요약)(해\s*줘|해\s*주세요|해줘|해주세요|해)?/u.test(normalized)
     || /다음\s*(페이지|쪽|장)(로|으로)?\s*(이동|넘어가|넘겨)(해\s*줘|해\s*주세요|줘|주세요|)?/u.test(normalized)
 }
@@ -937,7 +987,7 @@ function MessageBubble({
   const time = message.createdAt ? formatTime(message.createdAt) : ''
 
   if (message.role === 'user') {
-    const displayedContent = localizeQuizTypeSelection(message.content)
+    const displayedContent = localizeLearningEventMessage(message.content)
     return (
       <div className="flex flex-col items-end gap-1">
         <article className="max-w-[85%] rounded-xl rounded-br-[4px] bg-brand-600 px-3.5 py-2.5 text-white">

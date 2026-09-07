@@ -21,7 +21,9 @@ function ChatHarness({
   materialOverview,
   onExplainCurrentPage,
   onExplainNextPage,
+  onMoveToPage,
   onOverviewPageSelect,
+  onRequestQuiz,
   onTurnCompleted,
   request,
   repository,
@@ -33,7 +35,9 @@ function ChatHarness({
   materialOverview?: MaterialOverview | null
   onExplainCurrentPage?: () => void
   onExplainNextPage?: () => void
+  onMoveToPage?: (pageNumber: number, message?: string) => void
   onOverviewPageSelect?: (pageNumber: number) => void
+  onRequestQuiz?: () => void
   onTurnCompleted?: (result: SessionTurnResult) => void
   request?: AuthenticatedRequest
   repository: SessionsRepository
@@ -49,7 +53,9 @@ function ChatHarness({
       materialOverview={materialOverview}
       onExplainCurrentPage={onExplainCurrentPage}
       onExplainNextPage={onExplainNextPage}
+      onMoveToPage={onMoveToPage}
       onOverviewPageSelect={onOverviewPageSelect}
+      onRequestQuiz={onRequestQuiz}
       onTurnCompleted={onTurnCompleted}
       request={request}
       sessionId={sessionId}
@@ -558,6 +564,65 @@ describe('ChatPanel', () => {
     expect(repository.submitTurn).not.toHaveBeenCalled()
   })
 
+  it('opens the structured quiz selector for an explicit typed quiz request', async () => {
+    const onRequestQuiz = vi.fn()
+    const repository = createRepository()
+    render(
+      <ChatHarness
+        onRequestQuiz={onRequestQuiz}
+        repository={repository}
+      />,
+    )
+
+    const input = await screen.findByLabelText('질문')
+    fireEvent.change(input, {
+      target: { value: '퀴즈 내고 다음페이지 가자' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '질문 보내기' }))
+
+    expect(onRequestQuiz).toHaveBeenCalledTimes(1)
+    expect(repository.submitTurn).not.toHaveBeenCalled()
+  })
+
+  it('keeps quiz-related knowledge questions in the normal AI chat flow', async () => {
+    const onRequestQuiz = vi.fn()
+    const submitTurn = vi.fn().mockResolvedValue({ messages: [], uiActions: [] })
+    const repository = createRepository({ submitTurn })
+    render(
+      <ChatHarness
+        onRequestQuiz={onRequestQuiz}
+        repository={repository}
+      />,
+    )
+
+    const input = await screen.findByLabelText('질문')
+    fireEvent.change(input, {
+      target: { value: '퀴즈 생성 방법을 설명해줘' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '질문 보내기' }))
+
+    await waitFor(() => expect(submitTurn).toHaveBeenCalledTimes(1))
+    expect(onRequestQuiz).not.toHaveBeenCalled()
+  })
+
+  it('moves directly to an explicitly requested page without asking the AI', async () => {
+    const onMoveToPage = vi.fn()
+    const repository = createRepository()
+    render(
+      <ChatHarness
+        onMoveToPage={onMoveToPage}
+        repository={repository}
+      />,
+    )
+
+    const input = await screen.findByLabelText('질문')
+    fireEvent.change(input, { target: { value: '3쪽으로 이동해줘' } })
+    fireEvent.click(screen.getByRole('button', { name: '질문 보내기' }))
+
+    expect(onMoveToPage).toHaveBeenCalledWith(3, '3쪽으로 이동해줘')
+    expect(repository.submitTurn).not.toHaveBeenCalled()
+  })
+
   it('restores the chat log to the latest message after visiting my quizzes', async () => {
     vi.spyOn(HTMLElement.prototype, 'scrollHeight', 'get').mockReturnValue(640)
     const repository = createRepository({
@@ -818,6 +883,24 @@ $$`,
     expect(screen.getByText('퀴즈 유형 선택: 단답형')).toBeInTheDocument()
     expect(screen.getByText('퀴즈 유형 선택: 서술형')).toBeInTheDocument()
     expect(screen.queryByText(/퀴즈 유형 선택: (MCQ|SHORT|ESSAY)/)).not.toBeInTheDocument()
+  })
+
+  it('localizes internal learning events and hides empty historical messages', async () => {
+    const repository = createRepository({
+      listMessages: vi.fn().mockResolvedValue([
+        { content: '현재 페이지 설명 요청: NORMAL', id: 'explain-normal', senderType: 'USER' },
+        { content: '현재 페이지 설명 요청: DETAILED', id: 'explain-detailed', senderType: 'USER' },
+        { content: '노트 작성 요청', id: 'note-request', senderType: 'USER' },
+        { content: '   ', id: 'blank-answer', senderType: 'AI' },
+      ]),
+    })
+    render(<ChatHarness repository={repository} />)
+
+    expect(await screen.findByText('현재 페이지 설명해줘')).toBeInTheDocument()
+    expect(screen.getByText('현재 페이지를 자세히 설명해줘')).toBeInTheDocument()
+    expect(screen.getByText('노트로 정리해줘')).toBeInTheDocument()
+    expect(screen.queryByText(/현재 페이지 설명 요청: (NORMAL|DETAILED)/)).not.toBeInTheDocument()
+    expect(screen.queryAllByText('AI 답변')).toHaveLength(0)
   })
 })
 
