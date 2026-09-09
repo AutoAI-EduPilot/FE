@@ -70,14 +70,62 @@ describe('ExamDetailPage AI draft', () => {
       weekNumber: 4,
     }))
   })
+
+  it('links each submitted learner to the answer detail page', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+      const url = new URL(input instanceof Request ? input.url : String(input), 'http://localhost')
+      if (url.pathname === '/api/exams/10') {
+        return success({ ...examFixture, questionCount: 1, questions: [{ maxScore: 10, questionId: 'q1', questionText: '문항', questionType: 'SHORT' }], status: 'PUBLISHED', totalScore: 10 })
+      }
+      if (url.pathname === '/api/exams/10/submissions') {
+        return success({
+          items: [{ attemptCount: 1, attemptNo: 1, gradedAt: '2026-09-09T01:02:00Z', maxScore: 10, normalizedScore: 90, score: 9, status: 'GRADED', submissionId: 300, submittedAt: '2026-09-09T01:01:12Z', userId: 8, userName: '김서연' }],
+          page: 0,
+          size: 100,
+          totalElements: 1,
+          totalPages: 1,
+        })
+      }
+      if (url.pathname === '/api/classrooms/30/students') {
+        return success({
+          items: [
+            { aiQuestionCountLast7Days: 0, email: 'seoyeon@class.kr', joinedAt: '2026-09-01T00:00:00Z', name: '김서연', status: 'ACTIVE', studentId: 8 },
+            { aiQuestionCountLast7Days: 0, email: 'learner@class.kr', joinedAt: '2026-09-01T00:00:00Z', name: '미제출 학습자', status: 'ACTIVE', studentId: 9 },
+          ],
+          page: 0,
+          size: 100,
+          totalElements: 2,
+          totalPages: 1,
+        })
+      }
+      return new Response(null, { status: 404 })
+    })
+
+    render(
+      <MemoryRouter initialEntries={['/classrooms/30/exams/10']}>
+        <AuthProvider initialUser={{ email: 'instructor@example.com', id: 7, name: '강의자', role: 'INSTRUCTOR' }}>
+          <ToastProvider>
+            <Routes><Route element={<ExamDetailPage />} path="/classrooms/:classroomId/exams/:examId" /></Routes>
+          </ToastProvider>
+        </AuthProvider>
+      </MemoryRouter>,
+    )
+
+    const answerLinks = await screen.findAllByRole('link', { name: '답안 보기' })
+    expect(answerLinks[0]).toHaveAttribute('href', '/classrooms/30/exams/10/submissions/300')
+    expect(await screen.findAllByText('미제출 학습자')).not.toHaveLength(0)
+    expect(screen.getAllByText('미제출')).not.toHaveLength(0)
+  })
 })
 
 describe('ExamDetailPage learner submission', () => {
   it('restores a saved answer draft for the current learner and exam', async () => {
     sessionStorage.setItem('exam-draft:10:8', JSON.stringify({ q1: '복원된 답안' }))
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = new URL(input instanceof Request ? input.url : String(input), 'http://localhost')
+      const method = input instanceof Request ? input.method : (init?.method ?? 'GET')
       if (url.pathname === '/api/exams/10') return success(learnerExamFixture)
+      if (method === 'POST' && url.pathname === '/api/exams/10/attempts/start') return success({ startedAt: '2026-09-09T00:58:50Z' })
       return new Response(null, { status: 404 })
     })
 
@@ -96,6 +144,7 @@ describe('ExamDetailPage learner submission', () => {
       const url = new URL(input instanceof Request ? input.url : String(input), 'http://localhost')
       const method = input instanceof Request ? input.method : (init?.method ?? 'GET')
       if (method === 'GET' && url.pathname === '/api/exams/10') return success(learnerExamFixture)
+      if (method === 'POST' && url.pathname === '/api/exams/10/attempts/start') return success({ startedAt: '2026-09-09T00:58:50Z' })
       if (method === 'POST' && url.pathname === '/api/exams/10/submissions') {
         return success({
           attemptNo: 1,
@@ -147,11 +196,14 @@ describe('ExamDetailPage learner submission', () => {
       if (url.pathname === '/api/exams/10/submissions/me') {
         return success({
           attemptNo: 1,
+          durationSeconds: 70,
           gradedAt: '2026-09-09T01:00:10Z',
-          items: [{ answer: '스택', feedback: '핵심 개념을 정확히 작성했습니다.', maxScore: 10, questionId: 'q1', score: 8, verdict: 'CORRECT' }],
+          items: [{ answer: '스택', correctAnswer: '후입선출', explanation: '가장 나중에 들어온 값이 먼저 나옵니다.', feedback: '핵심 개념을 정확히 작성했습니다.', maxScore: 10, questionId: 'q1', score: 8, verdict: 'CORRECT' }],
           maxScore: 10,
           normalizedScore: 80,
+          reviewAvailable: true,
           score: 8,
+          startedAt: '2026-09-09T00:58:50Z',
           status: 'GRADED',
           submissionId: 300,
           submittedAt: '2026-09-09T01:00:00Z',
@@ -163,10 +215,20 @@ describe('ExamDetailPage learner submission', () => {
     renderLearnerExam()
 
     expect(await screen.findByRole('heading', { name: '시험 제출 및 채점이 완료되었습니다' })).toBeInTheDocument()
-    expect(screen.getByText(/8\/10점/)).toBeInTheDocument()
+    expect(screen.getByText('획득 점수').closest('div')).toHaveTextContent('8/10점')
+    expect(screen.getByText('정답 문항').closest('div')).toHaveTextContent('1/1문항')
+    expect(screen.getByText('소요 시간').closest('div')).toHaveTextContent('1분 10초')
+    expect(screen.getByText('내 답안').closest('div')).toHaveTextContent('스택')
+    expect(screen.getByText('정답', { selector: 'p' }).closest('div')).toHaveTextContent('후입선출')
+    expect(screen.getByText('가장 나중에 들어온 값이 먼저 나옵니다.')).toBeInTheDocument()
     expect(screen.getByText('핵심 개념을 정확히 작성했습니다.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '결과 저장' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '오답 노트 만들기' })).toHaveAttribute('href', '/notes/new')
     expect(requestedPaths).toContain('/api/exams/10/submissions/me')
     expect(screen.queryByPlaceholderText('답안을 입력하세요')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('button', { name: '오답만' }))
+    expect(screen.getByRole('heading', { name: '오답이 없습니다' })).toBeInTheDocument()
   })
 })
 

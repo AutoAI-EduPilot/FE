@@ -18,6 +18,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { cx } from '../lib/cx'
 import { useTheme } from '../theme'
+import { filterNoteSlashMenuItems } from './noteSlashMenu'
 import './NotionBlockEditor.css'
 
 interface NotionBlockEditorProps {
@@ -143,7 +144,7 @@ export default NotionBlockEditor
 function getNotionSlashMenuItems(
   editor: ReturnType<typeof useCreateBlockNote>,
 ) {
-  return getDefaultReactSlashMenuItems(editor)
+  return filterNoteSlashMenuItems(getDefaultReactSlashMenuItems(editor))
 }
 
 function parseSavedBlocks(documentValue?: string): Block[] | null {

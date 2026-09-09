@@ -118,7 +118,7 @@ export function ClassroomContentPanel({
 
     <div aria-label="리소스 목록" className="min-h-0 flex-1 space-y-2 lg:overflow-y-auto tablet-portrait:overflow-y-auto tablet-landscape:overflow-y-auto" role="region">
       {globalItems.length > 0
-        ? filter === 'all' || filter === 'notice'
+        ? filter === 'all' || filter === 'notice' || filter === 'exam'
           ? <div className="space-y-2">{globalItems.map((item) => <ContentRow canManage={canManage} isMenuOpen={openMenuItemId === item.id} item={item} key={item.id} onItem={onItem} onMenuToggle={() => setOpenMenuItemId((current) => current === item.id ? null : item.id)} onRemoveMaterial={onRemoveMaterial} onRenameMaterial={onRenameMaterial} openingMaterialId={openingMaterialId} />)}</div>
           : <details className="border-y border-stone-200 py-2" open><summary className="flex min-h-10 cursor-pointer list-none items-center px-1"><span className="type-body font-bold text-stone-900">전체 항목</span></summary><div className="space-y-2 pt-2">{globalItems.map((item) => <ContentRow canManage={canManage} isMenuOpen={openMenuItemId === item.id} item={item} key={item.id} onItem={onItem} onMenuToggle={() => setOpenMenuItemId((current) => current === item.id ? null : item.id)} onRemoveMaterial={onRemoveMaterial} onRenameMaterial={onRenameMaterial} openingMaterialId={openingMaterialId} />)}</div></details>
         : null}
