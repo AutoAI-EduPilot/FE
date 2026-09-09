@@ -15,6 +15,7 @@ export const routes = {
   classroomAnnouncements: '/classrooms/:classroomId/announcements',
   classroomExams: '/classrooms/:classroomId/exams',
   classroomExamDetail: '/classrooms/:classroomId/exams/:examId',
+  classroomExamSubmission: '/classrooms/:classroomId/exams/:examId/submissions/:submissionId',
   classroomEntranceRequests: '/classrooms/:classroomId/entrance-requests',
   classroomReports: '/classrooms/:classroomId/reports',
   classroomStudentReports: '/classrooms/:classroomId/students/:studentId/reports',
@@ -41,8 +42,15 @@ export const routes = {
   diagnosis: '/sessions/:sessionId/diagnosis/:diagnosisId',
 } as const
 
-export function noteEditPath(noteKind: 'manual' | 'session', noteId: string | number): string {
-  return `/notes/${noteKind}/${encodeURIComponent(String(noteId))}/edit`
+export function noteEditPath(
+  noteKind: 'manual' | 'session',
+  noteId: string | number,
+  sessionId?: string | number,
+): string {
+  const path = `/notes/${noteKind}/${encodeURIComponent(String(noteId))}/edit`
+  return sessionId === undefined
+    ? path
+    : `${path}?sessionId=${encodeURIComponent(String(sessionId))}`
 }
 
 export function classroomDetailPath(classroomId: string | number): string {
@@ -95,6 +103,14 @@ export function classroomExamsPath(classroomId: string | number): string {
 
 export function classroomExamDetailPath(classroomId: string | number, examId: string | number): string {
   return `${classroomExamsPath(classroomId)}/${encodeURIComponent(String(examId))}`
+}
+
+export function classroomExamSubmissionPath(
+  classroomId: string | number,
+  examId: string | number,
+  submissionId: string | number,
+): string {
+  return `${classroomExamDetailPath(classroomId, examId)}/submissions/${encodeURIComponent(String(submissionId))}`
 }
 
 export function classroomEntranceRequestsPath(classroomId: string | number): string {

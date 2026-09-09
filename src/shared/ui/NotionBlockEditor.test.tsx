@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 import { ThemeProvider } from '../theme'
 import { NotionBlockEditor } from './NotionBlockEditor'
+import { filterNoteSlashMenuItems } from './noteSlashMenu'
 
 afterEach(cleanup)
 
@@ -19,6 +20,22 @@ beforeEach(() => {
 })
 
 describe('NotionBlockEditor', () => {
+  it('removes media insertion commands from the note slash menu', () => {
+    const items = [
+      { key: 'paragraph' },
+      { key: 'image' },
+      { key: 'file' },
+      { key: 'video' },
+      { key: 'audio' },
+      { key: 'table' },
+    ]
+
+    expect(filterNoteSlashMenuItems(items).map((item) => item.key)).toEqual([
+      'paragraph',
+      'table',
+    ])
+  })
+
   it('offers programming language selection for code blocks', async () => {
     const initialDocument = JSON.stringify([
       {

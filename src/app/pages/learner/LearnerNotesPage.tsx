@@ -1,6 +1,6 @@
 import { ArrowLeft, ChevronDown, FileText, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 
 import { useAuth } from '../../../features/auth'
 import { createNotesRepository, type Note } from '../../../features/notes'
@@ -8,7 +8,7 @@ import {
   createSessionsRepository,
   type LearningSession,
 } from '../../../features/sessions'
-import { getRequestErrorMessage } from '../../../shared/api'
+import { ApiClientError, getRequestErrorMessage } from '../../../shared/api'
 import { usePageTitle } from '../../../shared/lib/usePageTitle'
 import {
   Button,
@@ -97,6 +97,10 @@ export function LearnerNotesPage() {
     () => getManualNotesStorageKey(user?.id ?? user?.email ?? 'anonymous'),
     [user?.email, user?.id],
   )
+  const unavailableSessionsStorageKey = useMemo(
+    () => getUnavailableNoteSessionsStorageKey(user?.id ?? user?.email ?? 'anonymous'),
+    [user?.email, user?.id],
+  )
   const [sessionItems, setSessionItems] = useState<SessionNoteItem[]>([])
   const [manualNotes, setManualNotes] = useState<ManualNote[]>(() =>
     readManualNotes(manualNotesStorageKey),
@@ -112,18 +116,11 @@ export function LearnerNotesPage() {
     setIsLoading(true)
     setError(null)
     try {
-      const sessions = (await sessionsRepository.list()).filter(
-        (session) => session.status !== 'DELETED',
-      )
-      const notesBySession = await Promise.all(
-        sessions.map(async (session) => ({
-          notes: await notesRepository.listForSession(session.id).catch(() => []),
-          session,
-        })),
-      )
       setSessionItems(
-        notesBySession.flatMap(({ notes, session }) =>
-          notes.map((note): SessionNoteItem => ({ kind: 'session', note, session })),
+        await loadSessionNoteItems(
+          sessionsRepository,
+          notesRepository,
+          unavailableSessionsStorageKey,
         ),
       )
     } catch (requestError) {
@@ -135,37 +132,29 @@ export function LearnerNotesPage() {
 
   useEffect(() => {
     let cancelled = false
-    sessionsRepository
-      .list()
-      .then((sessions) =>
-        Promise.all(
-          sessions
-            .filter((session) => session.status !== 'DELETED')
-            .map(async (session) => ({
-              notes: await notesRepository.listForSession(session.id).catch(() => []),
-              session,
-            })),
-        ),
-      )
-      .then((notesBySession) => {
-        if (!cancelled) {
-          setSessionItems(
-            notesBySession.flatMap(({ notes, session }) =>
-              notes.map((note): SessionNoteItem => ({ kind: 'session', note, session })),
-            ),
-          )
-        }
+    const controller = new AbortController()
+    loadSessionNoteItems(
+      sessionsRepository,
+      notesRepository,
+      unavailableSessionsStorageKey,
+      controller.signal,
+    )
+      .then((items) => {
+        if (!cancelled) setSessionItems(items)
       })
       .catch((requestError) => {
-        if (!cancelled) setError(getRequestErrorMessage(requestError))
+        if (!cancelled && !controller.signal.aborted) {
+          setError(getRequestErrorMessage(requestError))
+        }
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false)
       })
     return () => {
       cancelled = true
+      controller.abort()
     }
-  }, [notesRepository, sessionsRepository])
+  }, [notesRepository, sessionsRepository, unavailableSessionsStorageKey])
 
   const allItems = useMemo<LearnerNoteItem[]>(
     () => [
@@ -356,7 +345,11 @@ export function LearnerNotesPage() {
                         <button
                           aria-label="노트 수정"
                           className="flex size-8 shrink-0 items-center justify-center rounded-md text-stone-400 hover:bg-stone-100 hover:text-stone-700"
-                          onClick={() => navigate(noteEditPath(item.kind, item.note.id))}
+                          onClick={() => navigate(noteEditPath(
+                            item.kind,
+                            item.note.id,
+                            item.kind === 'session' ? item.session.id : undefined,
+                          ))}
                           type="button"
                         >
                           <Pencil size={13} />
@@ -394,6 +387,7 @@ export function LearnerNotesPage() {
 
 export function LearnerNoteCreatePage() {
   usePageTitle('새 노트 작성')
+  const location = useLocation()
   const navigate = useNavigate()
   const { user } = useAuth()
   const { show: showToast } = useToast()
@@ -401,7 +395,8 @@ export function LearnerNoteCreatePage() {
     () => getManualNotesStorageKey(user?.id ?? user?.email ?? 'anonymous'),
     [user?.email, user?.id],
   )
-  const [content, setContent] = useState('# 새 노트\n\n')
+  const initialContent = getInitialNoteContent(location.state)
+  const [content, setContent] = useState(initialContent)
   const [document, setDocument] = useState<string | undefined>()
 
   function saveNote() {
@@ -450,7 +445,7 @@ export function LearnerNoteCreatePage() {
             className="min-h-[calc(100dvh-16rem)]"
             initialDocument={document}
             initialValue={content}
-            key="manual-note-composer"
+            key={initialContent}
             onChange={(markdown, nextDocument) => {
               setContent(markdown)
               setDocument(nextDocument)
@@ -462,10 +457,20 @@ export function LearnerNoteCreatePage() {
   )
 }
 
+function getInitialNoteContent(state: unknown) {
+  if (!state || typeof state !== 'object' || !('initialContent' in state)) return '# 새 노트\n\n'
+  const initialContent = (state as { initialContent?: unknown }).initialContent
+  return typeof initialContent === 'string' && initialContent.trim()
+    ? initialContent
+    : '# 새 노트\n\n'
+}
+
 export function LearnerNoteEditPage() {
   usePageTitle('노트 수정')
   const navigate = useNavigate()
   const { noteId = '', noteKind = '' } = useParams()
+  const [searchParams] = useSearchParams()
+  const sourceSessionId = searchParams.get('sessionId')
   const { apiRequest, user } = useAuth()
   const { show: showToast } = useToast()
   const notesRepository = useMemo(
@@ -478,6 +483,10 @@ export function LearnerNoteEditPage() {
   )
   const storageKey = useMemo(
     () => getManualNotesStorageKey(user?.id ?? user?.email ?? 'anonymous'),
+    [user?.email, user?.id],
+  )
+  const unavailableSessionsStorageKey = useMemo(
+    () => getUnavailableNoteSessionsStorageKey(user?.id ?? user?.email ?? 'anonymous'),
     [user?.email, user?.id],
   )
   const [content, setContent] = useState('')
@@ -506,18 +515,14 @@ export function LearnerNoteEditPage() {
         }
 
         if (noteKind !== 'session') throw new Error('잘못된 노트 경로입니다.')
-        const sessions = (await sessionsRepository.list()).filter(
-          (session) => session.status !== 'DELETED',
+        const sessionItems = await loadSessionNoteItems(
+          sessionsRepository,
+          notesRepository,
+          unavailableSessionsStorageKey,
+          undefined,
+          sourceSessionId,
         )
-        const notesBySession = await Promise.all(
-          sessions.map(async (session) => ({
-            notes: await notesRepository.listForSession(session.id).catch(() => []),
-            session,
-          })),
-        )
-        const match = notesBySession
-          .flatMap(({ notes, session }) => notes.map((note) => ({ note, session })))
-          .find((item) => item.note.id === noteId)
+        const match = sessionItems.find((item) => item.note.id === noteId)
         if (!match) throw new Error('수정할 노트를 찾을 수 없습니다.')
         if (!cancelled) {
           setContent(match.note.content)
@@ -535,7 +540,7 @@ export function LearnerNoteEditPage() {
     return () => {
       cancelled = true
     }
-  }, [noteId, noteKind, notesRepository, sessionsRepository, storageKey])
+  }, [noteId, noteKind, notesRepository, sessionsRepository, sourceSessionId, storageKey, unavailableSessionsStorageKey])
 
   async function saveNote() {
     if (!content.trim() || isSaving) return
@@ -661,6 +666,99 @@ function groupNoteItems(items: LearnerNoteItem[]): LearnerNoteGroup[] {
 
 function getManualNotesStorageKey(userId: string | number): string {
   return `edupilot:manual-notes:${String(userId)}`
+}
+
+type NotesRepository = ReturnType<typeof createNotesRepository>
+type SessionsRepository = ReturnType<typeof createSessionsRepository>
+
+const NOTE_REQUEST_CONCURRENCY = 4
+const UNAVAILABLE_SESSION_CACHE_LIMIT = 200
+
+async function loadSessionNoteItems(
+  sessionsRepository: SessionsRepository,
+  notesRepository: NotesRepository,
+  unavailableSessionsStorageKey: string,
+  signal?: AbortSignal,
+  sourceSessionId?: string | null,
+): Promise<SessionNoteItem[]> {
+  const sessions = (await sessionsRepository.list(signal)).filter(
+    (session) => session.status !== 'DELETED'
+      && (sourceSessionId ? session.id === sourceSessionId : true),
+  )
+  const unavailableSessionIds = readUnavailableSessionIds(unavailableSessionsStorageKey)
+  const availableSessions = sessions.filter(
+    (session) => !unavailableSessionIds.has(session.id),
+  )
+  const notesBySession = await mapWithConcurrency(
+    availableSessions,
+    NOTE_REQUEST_CONCURRENCY,
+    async (session) => {
+      try {
+        return {
+          notes: await notesRepository.listForSession(session.id, signal),
+          session,
+        }
+      } catch (error) {
+        if (error instanceof ApiClientError && error.status === 404) {
+          unavailableSessionIds.add(session.id)
+        }
+        return { notes: [], session }
+      }
+    },
+  )
+  persistUnavailableSessionIds(unavailableSessionsStorageKey, unavailableSessionIds)
+  return notesBySession.flatMap(({ notes, session }) =>
+    notes.map((note): SessionNoteItem => ({ kind: 'session', note, session })),
+  )
+}
+
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  concurrency: number,
+  task: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length)
+  let nextIndex = 0
+
+  async function worker() {
+    while (nextIndex < items.length) {
+      const currentIndex = nextIndex
+      nextIndex += 1
+      results[currentIndex] = await task(items[currentIndex])
+    }
+  }
+
+  await Promise.all(
+    Array.from(
+      { length: Math.min(concurrency, items.length) },
+      () => worker(),
+    ),
+  )
+  return results
+}
+
+function getUnavailableNoteSessionsStorageKey(userId: string | number): string {
+  return `uteum:notes:unavailable-sessions:${String(userId)}`
+}
+
+function readUnavailableSessionIds(storageKey: string): Set<string> {
+  try {
+    const value = JSON.parse(window.sessionStorage.getItem(storageKey) ?? '[]') as unknown
+    return new Set(Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : [])
+  } catch {
+    return new Set()
+  }
+}
+
+function persistUnavailableSessionIds(storageKey: string, sessionIds: Set<string>) {
+  try {
+    window.sessionStorage.setItem(
+      storageKey,
+      JSON.stringify([...sessionIds].slice(-UNAVAILABLE_SESSION_CACHE_LIMIT)),
+    )
+  } catch {
+    // Browsers can disable session storage; note loading should still continue.
+  }
 }
 
 function readManualNotes(storageKey: string): ManualNote[] {
