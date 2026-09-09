@@ -36,7 +36,7 @@ export interface Exam {
   createdAt?: string
   description?: string
   id: string
-  mySubmission?: Pick<ExamSubmission, 'attemptNo' | 'normalizedScore' | 'status' | 'submittedAt'>
+  mySubmission?: ExamSubmissionSummary
   publishedAt?: string
   questionCount: number
   questions: ExamQuestion[]
@@ -47,6 +47,15 @@ export interface Exam {
   totalScore: number
   updatedAt?: string
   weekNumber?: number
+}
+
+export interface ExamSubmissionSummary {
+  attemptNo: number
+  id: string
+  maxScore?: number
+  normalizedScore?: number
+  score?: number
+  status: ExamSubmissionStatus
 }
 
 export interface CreateExamInput {
@@ -159,7 +168,8 @@ interface ExamDto {
   createdAt?: string
   description?: string | null
   examId: number | string
-  mySubmission?: ExamSubmissionDto | null
+  latestSubmission?: ExamSubmissionSummaryDto | null
+  mySubmission?: ExamSubmissionSummaryDto | null
   publishedAt?: string | null
   questionCount?: number
   questions?: ExamQuestionDto[]
@@ -170,6 +180,14 @@ interface ExamDto {
   totalScore?: number
   updatedAt?: string
   weekNumber?: number | null
+}
+interface ExamSubmissionSummaryDto {
+  attemptNo: number
+  maxScore?: number | null
+  normalizedScore?: number | null
+  score?: number | null
+  status: ExamSubmissionStatus
+  submissionId: number | string
 }
 interface ExamSubmissionDto {
   attemptNo: number
@@ -332,6 +350,7 @@ function mapExam(value: ExamDto): Exam {
     options: question.options?.map((option) => ({ id: option.optionId, text: option.text })),
     points: question.maxScore,
   }))
+  const latestSubmission = value.latestSubmission ?? value.mySubmission
   return {
     ...value,
     allowRetake: value.allowRetake ?? false,
@@ -339,12 +358,23 @@ function mapExam(value: ExamDto): Exam {
     closedAt: value.closedAt ?? undefined,
     description: value.description ?? undefined,
     id: String(value.examId),
-    mySubmission: value.mySubmission ? mapSubmission(value.mySubmission) : undefined,
+    mySubmission: latestSubmission ? mapLatestSubmission(latestSubmission) : undefined,
     publishedAt: value.publishedAt ?? undefined,
     questionCount: value.questionCount ?? questions.length,
     questions,
     totalScore: value.totalScore ?? questions.reduce((sum, question) => sum + question.maxScore, 0),
     weekNumber: value.weekNumber ?? undefined,
+  }
+}
+
+function mapLatestSubmission(value: ExamSubmissionSummaryDto): ExamSubmissionSummary {
+  return {
+    attemptNo: value.attemptNo,
+    id: String(value.submissionId),
+    maxScore: value.maxScore ?? undefined,
+    normalizedScore: value.normalizedScore ?? undefined,
+    score: value.score ?? undefined,
+    status: value.status,
   }
 }
 
