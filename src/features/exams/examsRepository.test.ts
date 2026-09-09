@@ -26,6 +26,32 @@ const submissionDto = {
 }
 
 describe('exams repository', () => {
+  it('maps the learner latestSubmission field from the backend contract', async () => {
+    const request = vi.fn().mockResolvedValueOnce(success({
+      ...examDto,
+      latestSubmission: {
+        attemptNo: 2,
+        maxScore: 20,
+        normalizedScore: 80,
+        score: 16,
+        status: 'GRADED',
+        submissionId: 301,
+      },
+      status: 'PUBLISHED',
+    }))
+    const repository = createExamsRepository(request as AuthenticatedRequest)
+
+    await expect(repository.get('10')).resolves.toMatchObject({
+      mySubmission: {
+        attemptNo: 2,
+        id: '301',
+        normalizedScore: 80,
+        score: 16,
+        status: 'GRADED',
+      },
+    })
+  })
+
   it('connects instructor exam lifecycle endpoints and maps patch presence fields', async () => {
     const request = vi.fn()
       .mockResolvedValueOnce(success({ items: [examDto], page: 0, size: 100, totalElements: 1, totalPages: 1 }))

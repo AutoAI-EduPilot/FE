@@ -30,6 +30,7 @@ interface AuthProviderProps {
 }
 
 export const AUTH_IDLE_TIMEOUT_MS = 30 * 60 * 1000
+export const AUTH_IDLE_WARNING_MS = 28 * 60 * 1000
 export const AUTH_RESTORE_TIMEOUT_MS = 5_000
 export const AUTH_REFRESH_TIMEOUT_MS = 10_000
 const IDLE_CHECK_INTERVAL_MS = 30_000
@@ -51,6 +52,7 @@ export function AuthProvider({
   )
   const [isInitializing, setIsInitializing] = useState(!hasExplicitInitialUser)
   const [logoutReason, setLogoutReason] = useState<LogoutReason | null>(null)
+  const [isIdleWarningOpen, setIsIdleWarningOpen] = useState(false)
   const [pendingGoogleIdToken, setPendingGoogleIdToken] = useState<string | null>(
     null,
   )
@@ -58,6 +60,7 @@ export function AuthProvider({
   const sessionRevisionRef = useRef(0)
   // 로그인/복원 시점에 beginSession·restore가 현재 시각으로 초기화한다.
   const lastActivityAtRef = useRef(0)
+  const examInProgressRef = useRef(false)
   const refreshPromiseRef = useRef<Promise<string | null> | null>(null)
   const repository = getAuthRepository()
 
@@ -70,6 +73,12 @@ export function AuthProvider({
     sessionRef.current = null
     setSession(null)
     setLogoutReason(reason)
+    setIsIdleWarningOpen(false)
+  }, [])
+
+  const setExamInProgress = useCallback((isInProgress: boolean) => {
+    examInProgressRef.current = isInProgress
+    if (!isInProgress) setIsIdleWarningOpen(false)
   }, [])
 
   // access 재발급 — 동시 401이 몰려도 refresh 호출은 하나만 나간다.
@@ -92,7 +101,15 @@ export function AuthProvider({
           }
           return accessToken
         })
-        .catch(() => null)
+        .catch((error: unknown) => {
+          if (
+            error instanceof ApiClientError &&
+            (error.status === 401 || error.status === 403)
+          ) {
+            return null
+          }
+          throw error
+        })
         .finally(() => {
           window.clearTimeout(timeoutId)
           refreshPromiseRef.current = null
@@ -154,18 +171,46 @@ export function AuthProvider({
 
     const recordActivity = () => {
       lastActivityAtRef.current = Date.now()
+      setIsIdleWarningOpen(false)
     }
 
     const checkIdle = () => {
       if (!sessionRef.current) return
-      if (Date.now() - lastActivityAtRef.current >= AUTH_IDLE_TIMEOUT_MS) {
+      const elapsedMs = Date.now() - lastActivityAtRef.current
+
+      if (
+        examInProgressRef.current &&
+        document.visibilityState !== 'visible'
+      ) {
+        return
+      }
+
+      if (elapsedMs >= AUTH_IDLE_TIMEOUT_MS) {
         void repository.logout().catch(() => undefined)
         clearSession('idle')
+      } else if (
+        examInProgressRef.current &&
+        elapsedMs >= AUTH_IDLE_WARNING_MS
+      ) {
+        setIsIdleWarningOpen(true)
       }
     }
 
     const checkVisibility = () => {
-      if (document.visibilityState === 'visible') checkIdle()
+      if (document.visibilityState !== 'visible') return
+
+      if (
+        examInProgressRef.current &&
+        Date.now() - lastActivityAtRef.current >= AUTH_IDLE_TIMEOUT_MS
+      ) {
+        // 시험 중 자료를 확인하고 돌아온 사용자를 즉시 내보내지 않고
+        // 경고에 응답할 2분을 다시 보장한다.
+        lastActivityAtRef.current = Date.now() - AUTH_IDLE_WARNING_MS
+        setIsIdleWarningOpen(true)
+        return
+      }
+
+      checkIdle()
     }
 
     const activityEvents: Array<keyof WindowEventMap> = [
@@ -196,6 +241,7 @@ export function AuthProvider({
     const nextSession = { accessToken, user }
     sessionRef.current = nextSession
     setLogoutReason(null)
+    setIsIdleWarningOpen(false)
     setSession(nextSession)
   }, [])
 
@@ -349,6 +395,7 @@ export function AuthProvider({
       logout,
       pendingGoogleIdToken,
       prepareGoogleSignup,
+      setExamInProgress,
       signup,
       user: session?.user ?? null,
       updateUser,
@@ -366,6 +413,7 @@ export function AuthProvider({
       logoutReason,
       pendingGoogleIdToken,
       prepareGoogleSignup,
+      setExamInProgress,
       session,
       signup,
       updateUser,
@@ -373,5 +421,40 @@ export function AuthProvider({
     ],
   )
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
+  return (
+    <AuthContext.Provider value={value}>
+      {children}
+      {isIdleWarningOpen ? (
+        <div
+          aria-labelledby="exam-idle-warning-title"
+          aria-modal="true"
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-stone-950/45 px-4"
+          role="dialog"
+        >
+          <div className="w-full max-w-sm rounded-xl border border-stone-200 bg-white p-6 shadow-2xl">
+            <h2
+              className="type-dialog-title font-bold text-stone-950"
+              id="exam-idle-warning-title"
+            >
+              계속 응시 중이신가요?
+            </h2>
+            <p className="mt-2 type-body text-stone-600">
+              2분 안에 응답하지 않으면 보안을 위해 로그아웃됩니다. 작성한
+              답안은 이 기기에 임시 저장됩니다.
+            </p>
+            <button
+              className="mt-6 flex min-h-11 w-full items-center justify-center rounded-lg bg-brand-700 px-4 type-control font-semibold text-white hover:bg-brand-800"
+              onClick={() => {
+                lastActivityAtRef.current = Date.now()
+                setIsIdleWarningOpen(false)
+              }}
+              type="button"
+            >
+              계속 응시
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </AuthContext.Provider>
+  )
 }

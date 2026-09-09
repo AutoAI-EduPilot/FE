@@ -49,6 +49,7 @@ export interface AuthContextValue {
   logout: () => Promise<void>
   pendingGoogleIdToken: string | null
   prepareGoogleSignup: (idToken: string) => void
+  setExamInProgress: (isInProgress: boolean) => void
   signup: (values: SignupFormValues) => Promise<void>
   user: AuthUser | null
   updateUser: (user: AuthUser) => void
