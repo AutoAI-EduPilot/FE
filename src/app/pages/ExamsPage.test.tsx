@@ -1,14 +1,19 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
 import { AuthProvider } from '../../features/auth'
 import { ToastProvider } from '../../shared/ui'
 import { ExamsPage } from './ExamsPage'
 
+beforeEach(() => {
+  vi.stubEnv('VITE_API_BASE_URL', 'http://localhost:8080')
+})
+
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
+  vi.unstubAllEnvs()
 })
 
 describe('ExamsPage creation entry', () => {
@@ -142,7 +147,7 @@ const examFixture = {
   classroomId: 12,
   createdAt: '2026-08-01T00:00:00Z',
   examId: 30,
-  mySubmission: null,
+  latestSubmission: null,
   publishedAt: '2026-08-02T00:00:00Z',
   questionCount: 4,
   questions: [],
