@@ -129,23 +129,52 @@ function AiExamDraftDialog({ initialWeekNumber, onClose, onGenerate }: { initial
 }
 
 function LearnerExamView({ exam, repository }: { exam: Exam; repository: ReturnType<typeof createExamsRepository> }) {
-  const [answers, setAnswers] = useState<Record<string, string>>({}); const [index, setIndex] = useState(0); const [submission, setSubmission] = useState<ExamSubmission | null>(exam.mySubmission ? { ...exam.mySubmission, id: '', items: [], maxScore: exam.totalScore } as ExamSubmission : null); const [isSubmitting, setIsSubmitting] = useState(false); const [error, setError] = useState<string | null>(null)
+  const { setExamInProgress, user } = useAuth()
+  const draftStorageKey = createExamDraftStorageKey(exam.id, user?.id)
+  const [answers, setAnswers] = useState<Record<string, string>>(() => readExamDraft(draftStorageKey, exam.questions)); const [index, setIndex] = useState(0); const [submission, setSubmission] = useState<ExamSubmission | null>(null); const [isSubmitting, setIsSubmitting] = useState(false); const [isRestoringSubmission, setIsRestoringSubmission] = useState(Boolean(exam.mySubmission)); const [error, setError] = useState<string | null>(null)
   const question = exam.questions[index]
   const fetchSubmission = useCallback((signal: AbortSignal) => repository.getMySubmission(exam.id, undefined, signal), [exam.id, repository])
   const handlePollingError = useCallback((requestError: unknown) => setError(getRequestErrorMessage(requestError)), [])
   const handlePollingDelay = useCallback(() => setError('자동 재시도까지 완료되지 않았습니다. 약 90분 이상 지속되면 강의자에게 문의해 주세요.'), [])
+  useEffect(() => {
+    if (!exam.mySubmission) return
+    const controller = new AbortController()
+    fetchSubmission(controller.signal)
+      .then((value) => { setSubmission(value); setError(null) })
+      .catch((requestError) => { if (!controller.signal.aborted) setError(getRequestErrorMessage(requestError)) })
+      .finally(() => { if (!controller.signal.aborted) setIsRestoringSubmission(false) })
+    return () => controller.abort()
+  }, [exam.mySubmission, fetchSubmission])
+  useEffect(() => {
+    const isInProgress = Boolean(!exam.mySubmission && !submission && exam.submittable)
+    setExamInProgress(isInProgress)
+    return () => setExamInProgress(false)
+  }, [exam.mySubmission, exam.submittable, setExamInProgress, submission])
+  useEffect(() => {
+    if (!draftStorageKey) return
+    if (exam.mySubmission || submission) {
+      removeExamDraft(draftStorageKey)
+      return
+    }
+    writeExamDraft(draftStorageKey, answers)
+  }, [answers, draftStorageKey, exam.mySubmission, submission])
   useAsyncJobPolling({ enabled: submission?.status === 'SUBMITTED', fetchNext: fetchSubmission, getDelayMs: getExamPollingDelay, isPending: isExamSubmissionPending, maxDurationMs: 90 * 60_000, onDelayed: handlePollingDelay, onError: handlePollingError, onResult: setSubmission })
-  async function submit(event: FormEvent) { event.preventDefault(); if (isSubmitting || !exam.submittable) return; setIsSubmitting(true); try { setSubmission(await repository.submit(exam.id, answers, createRequestId())); setError(null) } catch (requestError) { setError(getRequestErrorMessage(requestError)) } finally { setIsSubmitting(false) } }
-  if (submission && submission.status !== 'SUBMITTED') return <SubmissionResult exam={exam} submission={submission} />
+  async function submit(event: FormEvent) { event.preventDefault(); if (isSubmitting || !exam.submittable) return; setIsSubmitting(true); try { const nextSubmission = await repository.submit(exam.id, answers, createRequestId()); if (draftStorageKey) removeExamDraft(draftStorageKey); setSubmission(nextSubmission); setError(null) } catch (requestError) { setError(getRequestErrorMessage(requestError)) } finally { setIsSubmitting(false) } }
+  if (isRestoringSubmission) return <LoadingState message="제출 결과를 불러오는 중입니다." />
+  if (exam.mySubmission && !submission) return <ErrorState title="제출 결과를 불러오지 못했습니다" description={error ?? '잠시 후 다시 시도해 주세요.'} />
+  if (submission?.status === 'SUBMITTED') return <SubmissionPending error={error} exam={exam} submission={submission} />
+  if (submission) return <SubmissionResult exam={exam} submission={submission} />
   if (!question) return <EmptyState title="공개된 문항이 없습니다" description="강의자에게 시험 상태를 문의하세요." />
-  return <form className="overflow-hidden rounded-xl border border-stone-200 bg-white" onSubmit={submit}><div className="border-b border-stone-200 px-5 py-4"><p className="type-body text-stone-600">{exam.description || '시험 문항에 답한 뒤 제출하세요.'}</p><div className="mt-3 flex items-center justify-between type-caption text-stone-500"><span>{index + 1}/{exam.questions.length} 문항</span><span>{Object.values(answers).filter(Boolean).length}개 답변</span></div></div><div className="p-5 sm:p-7"><QuestionAnswerInput onChange={(value) => setAnswers((current) => ({ ...current, [question.id]: value }))} question={question} value={answers[question.id] ?? ''} />{submission?.status === 'SUBMITTED' ? <p className="mt-5 rounded-lg bg-brand-50 px-4 py-3 type-body font-semibold text-brand-800" role="status">답안을 제출했습니다. 채점이 지연되면 자동으로 재시도 중입니다.</p> : null}{error ? <p className="mt-4 type-body text-rose-700" role="alert">{error}</p> : null}<div className="mt-7 flex flex-wrap items-center justify-between gap-3 border-t border-stone-200 pt-4"><div className="flex gap-2"><Button disabled={index === 0 || Boolean(submission)} onClick={() => setIndex((current) => current - 1)} variant="secondary"><ChevronLeft size={15} />이전</Button><Button disabled={index === exam.questions.length - 1 || Boolean(submission)} onClick={() => setIndex((current) => current + 1)} variant="secondary">다음<ChevronRight size={15} /></Button></div><Button disabled={!exam.submittable || isSubmitting || Boolean(submission)} type="submit"><Send size={15} />{isSubmitting ? '제출 중' : exam.submittable ? '시험 제출' : '제출 불가'}</Button></div></div></form>
+  return <form className="overflow-hidden rounded-xl border border-stone-200 bg-white" onSubmit={submit}><div className="border-b border-stone-200 px-5 py-4"><p className="type-body text-stone-600">{exam.description || '시험 문항에 답한 뒤 제출하세요.'}</p><div className="mt-3 flex items-center justify-between type-caption text-stone-500"><span>{index + 1}/{exam.questions.length} 문항</span><span>{Object.values(answers).filter(Boolean).length}개 답변</span></div></div><div className="p-5 sm:p-7"><QuestionAnswerInput disabled={isSubmitting} onChange={(value) => setAnswers((current) => ({ ...current, [question.id]: value }))} question={question} value={answers[question.id] ?? ''} />{error ? <p className="mt-4 type-body text-rose-700" role="alert">{error}</p> : null}<div className="mt-7 flex flex-wrap items-center justify-between gap-3 border-t border-stone-200 pt-4"><div className="flex gap-2"><Button disabled={index === 0 || isSubmitting} onClick={() => setIndex((current) => current - 1)} variant="secondary"><ChevronLeft size={15} />이전</Button><Button disabled={index === exam.questions.length - 1 || isSubmitting} onClick={() => setIndex((current) => current + 1)} variant="secondary">다음<ChevronRight size={15} /></Button></div><Button disabled={!exam.submittable || isSubmitting} type="submit"><Send size={15} />{isSubmitting ? '제출 중' : exam.submittable ? '시험 제출' : '제출 불가'}</Button></div></div></form>
 }
 
-function QuestionAnswerInput({ onChange, question, value }: { onChange: (value: string) => void; question: ExamQuestion; value: string }) {
-  return <fieldset><legend className="type-section-title font-bold text-stone-950"><span className="mr-2 text-brand-700">Q.</span>{question.questionText}</legend><p className="mt-2 type-caption text-stone-500">{question.maxScore}점</p>{question.questionType === 'MCQ' ? <div className="mt-5 grid gap-2">{(question.options ?? []).map((option) => <label className={`flex min-h-11 items-center gap-3 rounded-lg border px-4 type-body ${value === option.id ? 'border-brand-600 bg-brand-50' : 'border-stone-200'}`} key={option.id}><input checked={value === option.id} onChange={() => onChange(option.id)} type="radio" /><strong>{option.id.toUpperCase()}.</strong>{option.text}</label>)}</div> : question.questionType === 'OX' ? <div className="mt-5 flex gap-3">{[['true', 'O'], ['false', 'X']].map(([answer, label]) => <label className={`flex h-16 flex-1 items-center justify-center rounded-lg border type-dialog-title font-bold ${value === answer ? 'border-brand-600 bg-brand-50 text-brand-800' : 'border-stone-200'}`} key={answer}><input checked={value === answer} className="sr-only" onChange={() => onChange(answer)} type="radio" />{label}</label>)}</div> : <textarea className="mt-5 min-h-40 w-full resize-none rounded-lg border border-stone-300 px-4 py-3 type-body" onChange={(event) => onChange(event.target.value)} placeholder="답안을 입력하세요" value={value} />}</fieldset>
+function QuestionAnswerInput({ disabled = false, onChange, question, value }: { disabled?: boolean; onChange: (value: string) => void; question: ExamQuestion; value: string }) {
+  return <fieldset disabled={disabled}><legend className="type-section-title font-bold text-stone-950"><span className="mr-2 text-brand-700">Q.</span>{question.questionText}</legend><p className="mt-2 type-caption text-stone-500">{question.maxScore}점</p>{question.questionType === 'MCQ' ? <div className="mt-5 grid gap-2">{(question.options ?? []).map((option) => <label className={`flex min-h-11 items-center gap-3 rounded-lg border px-4 type-body ${value === option.id ? 'border-brand-600 bg-brand-50' : 'border-stone-200'}`} key={option.id}><input checked={value === option.id} onChange={() => onChange(option.id)} type="radio" /><strong>{option.id.toUpperCase()}.</strong>{option.text}</label>)}</div> : question.questionType === 'OX' ? <div className="mt-5 flex gap-3">{[['true', 'O'], ['false', 'X']].map(([answer, label]) => <label className={`flex h-16 flex-1 items-center justify-center rounded-lg border type-dialog-title font-bold ${value === answer ? 'border-brand-600 bg-brand-50 text-brand-800' : 'border-stone-200'}`} key={answer}><input checked={value === answer} className="sr-only" onChange={() => onChange(answer)} type="radio" />{label}</label>)}</div> : <textarea className="mt-5 min-h-40 w-full resize-none rounded-lg border border-stone-300 px-4 py-3 type-body" onChange={(event) => onChange(event.target.value)} placeholder="답안을 입력하세요" value={value} />}</fieldset>
 }
 
-function SubmissionResult({ exam, submission }: { exam: Exam; submission: ExamSubmission }) { return <section className="rounded-xl border border-stone-200 bg-white p-6"><div className="flex items-start gap-4"><span className={`flex size-11 items-center justify-center rounded-full ${submission.status === 'GRADED' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}><CheckCircle2 size={22} /></span><div><h2 className="type-dialog-title font-bold">{submission.status === 'GRADED' ? '채점이 완료되었습니다' : '채점을 완료하지 못했습니다'}</h2><p className="mt-1 type-body text-stone-500">{exam.title} · {submission.attemptNo}회차</p>{submission.status === 'GRADED' ? <p className="mt-4 type-page-title font-bold text-brand-700">{submission.score ?? 0}/{submission.maxScore ?? exam.totalScore}점 <span className="type-body text-stone-500">({submission.normalizedScore ?? 0}점)</span></p> : <p className="mt-4 type-body text-rose-700">자동 재시도를 완료했지만 채점하지 못했습니다. 강의자에게 문의하세요.</p>}</div></div>{submission.items.length > 0 ? <div className="mt-6 divide-y divide-stone-100 border-t border-stone-200">{submission.items.map((item, index) => <div className="py-4" key={item.questionId}><div className="flex items-center gap-2"><strong className="type-body">{index + 1}번</strong>{item.verdict ? <Badge tone={item.verdict === 'CORRECT' ? 'success' : item.verdict === 'PARTIAL' ? 'warning' : 'danger'}>{item.verdict === 'CORRECT' ? '정답' : item.verdict === 'PARTIAL' ? '부분 정답' : '오답'}</Badge> : null}<span className="ml-auto type-control font-semibold">{item.score ?? '-'}/{item.maxScore}</span></div>{item.feedback ? <p className="mt-2 type-body text-stone-600">{item.feedback}</p> : null}</div>)}</div> : null}</section> }
+function SubmissionPending({ error, exam, submission }: { error: string | null; exam: Exam; submission: ExamSubmission }) { return <section className="rounded-xl border border-stone-200 bg-white p-6" role="status"><div className="flex items-start gap-4"><span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-700"><CheckCircle2 aria-hidden="true" size={22} /></span><div><h2 className="type-dialog-title font-bold">시험 제출이 완료되었습니다</h2><p className="mt-1 type-body text-stone-500">{exam.title} · {submission.attemptNo}회차</p><p className="mt-3 type-body font-semibold text-stone-700">제출한 답안은 수정할 수 없습니다.</p></div></div><div className="mt-6 flex items-center gap-2 rounded-lg bg-brand-50 px-4 py-3 type-body font-semibold text-brand-800"><LoaderCircle aria-hidden="true" className="animate-spin" size={16} />채점이 진행 중입니다. 완료되면 결과가 자동으로 표시됩니다.</div>{error ? <p className="mt-4 type-body text-rose-700" role="alert">{error}</p> : null}</section> }
+
+function SubmissionResult({ exam, submission }: { exam: Exam; submission: ExamSubmission }) { return <section className="rounded-xl border border-stone-200 bg-white p-6"><div className="flex items-start gap-4"><span className={`flex size-11 items-center justify-center rounded-full ${submission.status === 'GRADED' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}><CheckCircle2 size={22} /></span><div><h2 className="type-dialog-title font-bold">{submission.status === 'GRADED' ? '시험 제출 및 채점이 완료되었습니다' : '시험 제출은 완료되었지만 채점하지 못했습니다'}</h2><p className="mt-1 type-body text-stone-500">{exam.title} · {submission.attemptNo}회차</p>{submission.status === 'GRADED' ? <p className="mt-4 type-page-title font-bold text-brand-700">{submission.score ?? 0}/{submission.maxScore ?? exam.totalScore}점 <span className="type-body text-stone-500">({submission.normalizedScore ?? 0}점)</span></p> : <p className="mt-4 type-body text-rose-700">자동 재시도를 완료했지만 채점하지 못했습니다. 강의자에게 문의하세요.</p>}</div></div>{submission.items.length > 0 ? <div className="mt-6 divide-y divide-stone-100 border-t border-stone-200">{submission.items.map((item, index) => <div className="py-4" key={item.questionId}><div className="flex items-center gap-2"><strong className="type-body">{index + 1}번</strong>{item.verdict ? <Badge tone={item.verdict === 'CORRECT' ? 'success' : item.verdict === 'PARTIAL' ? 'warning' : 'danger'}>{item.verdict === 'CORRECT' ? '정답' : item.verdict === 'PARTIAL' ? '부분 정답' : '오답'}</Badge> : null}<span className="ml-auto type-control font-semibold">{item.score ?? '-'}/{item.maxScore}</span></div>{item.feedback ? <p className="mt-2 type-body text-stone-600">{item.feedback}</p> : null}</div>)}</div> : null}</section> }
 
 function PrivateAnswer({ question }: { question: ExamQuestion }) { const answer = question.questionType === 'MCQ' ? question.answerChoiceId?.toUpperCase() : question.questionType === 'OX' ? (question.answerValue ? 'O' : 'X') : question.questionType === 'SHORT' ? question.referenceAnswer : question.modelAnswer; return answer ? <p className="mt-2 type-caption text-stone-600"><strong>정답:</strong> {answer}</p> : null }
 function toExamInput(exam: Exam): CreateExamInput { return { allowRetake: exam.allowRetake, description: exam.description, questions: exam.questions.map((question) => ({ answerChoiceId: question.answerChoiceId, answerValue: question.answerValue, explanation: question.explanation, modelAnswer: question.modelAnswer, options: question.options, points: question.maxScore, questionText: question.questionText, questionType: question.questionType, referenceAnswer: question.referenceAnswer, rubric: question.rubric })), title: exam.title, weekNumber: exam.weekNumber } }
@@ -155,3 +184,45 @@ function isInstructorSubmissionPending(submission: InstructorSubmissionSummary) 
 function hasPendingInstructorSubmission(submissions: InstructorSubmissionSummary[]) { return submissions.some(isInstructorSubmissionPending) }
 function getExamPollingDelay(elapsedMs: number) { return elapsedMs < 30_000 ? 2000 : 5000 }
 function createRequestId() { return typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `exam-${Date.now()}` }
+
+function createExamDraftStorageKey(examId: number | string, userId?: number) {
+  return userId === undefined ? null : `exam-draft:${examId}:${userId}`
+}
+
+function readExamDraft(storageKey: string | null, questions: ExamQuestion[]) {
+  if (!storageKey) return {}
+  try {
+    const stored = window.sessionStorage.getItem(storageKey)
+    if (!stored) return {}
+    const parsed = JSON.parse(stored) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    const questionIds = new Set(questions.map((question) => String(question.id)))
+    return Object.fromEntries(
+      Object.entries(parsed).filter(
+        ([questionId, answer]) => questionIds.has(questionId) && typeof answer === 'string',
+      ),
+    )
+  } catch {
+    return {}
+  }
+}
+
+function writeExamDraft(storageKey: string, answers: Record<string, string>) {
+  try {
+    if (Object.values(answers).some((answer) => answer.length > 0)) {
+      window.sessionStorage.setItem(storageKey, JSON.stringify(answers))
+    } else {
+      window.sessionStorage.removeItem(storageKey)
+    }
+  } catch {
+    // 저장 공간이 차단된 환경에서도 시험 응시는 계속할 수 있어야 한다.
+  }
+}
+
+function removeExamDraft(storageKey: string) {
+  try {
+    window.sessionStorage.removeItem(storageKey)
+  } catch {
+    // 저장 공간 접근 실패는 제출 완료 처리를 막지 않는다.
+  }
+}
