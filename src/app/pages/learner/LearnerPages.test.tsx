@@ -11,6 +11,7 @@ afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
   window.localStorage.clear()
+  window.sessionStorage.clear()
 })
 
 function renderPage(page: ReactNode) {
@@ -22,9 +23,9 @@ function renderPage(page: ReactNode) {
 }
 
 describe('learner collection pages', () => {
-  it('keeps the notes page usable when older sessions have no notes endpoint', async () => {
+  it('keeps the notes page usable and caches sessions with no notes endpoint', async () => {
     mockLearnerCollectionApi({ notesUnavailable: true })
-    renderPage(<LearnerNotesPage />)
+    const firstRender = renderPage(<LearnerNotesPage />)
 
     expect(
       await screen.findByRole('heading', { name: '저장한 노트가 없습니다' }),
@@ -34,6 +35,20 @@ describe('learner collection pages', () => {
       'href',
       '/notes/new',
     )
+    firstRender.unmount()
+
+    renderPage(<LearnerNotesPage />)
+    expect(
+      await screen.findByRole('heading', { name: '저장한 노트가 없습니다' }),
+    ).toBeInTheDocument()
+    expect(vi.mocked(globalThis.fetch).mock.calls.filter(([input]) => {
+      const url = new URL(input instanceof Request ? input.url : String(input), 'http://localhost')
+      return url.pathname === '/api/sessions/100/notes'
+    })).toHaveLength(1)
+    expect(vi.mocked(globalThis.fetch).mock.calls.some(([input]) => {
+      const url = new URL(input instanceof Request ? input.url : String(input), 'http://localhost')
+      return url.pathname === '/api/sessions/101/notes'
+    })).toBe(false)
   })
 
   it('opens manual note creation as a full page instead of a dialog', () => {
@@ -188,10 +203,18 @@ function mockLearnerCollectionApi(
             status: 'ACTIVE',
             updatedAt: '2026-08-01T06:00:00Z',
           },
+          {
+            currentPage: 1,
+            materialId: 11,
+            materialTitle: '삭제된 자료.pdf',
+            sessionId: 101,
+            status: 'DELETED',
+            updatedAt: '2026-07-01T06:00:00Z',
+          },
         ],
         page: 0,
         size: 20,
-        totalElements: 1,
+        totalElements: 2,
         totalPages: 1,
       })
     }

@@ -19,6 +19,7 @@ const DiagnosisPage = lazy(() => import('./pages/DiagnosisPage').then((module) =
 const ForgotPasswordPage = lazy(() => import('./pages/ForgotPasswordPage').then((module) => ({ default: module.ForgotPasswordPage })))
 const EntranceRequestsPage = lazy(() => import('./pages/EntranceRequestsPage').then((module) => ({ default: module.EntranceRequestsPage })))
 const ExamDetailPage = lazy(() => import('./pages/ExamDetailPage').then((module) => ({ default: module.ExamDetailPage })))
+const InstructorExamSubmissionPage = lazy(() => import('./pages/InstructorExamSubmissionPage').then((module) => ({ default: module.InstructorExamSubmissionPage })))
 const ExamsPage = lazy(() => import('./pages/ExamsPage').then((module) => ({ default: module.ExamsPage })))
 const InstructorCalendarPage = lazy(() => import('./pages/instructor/InstructorCalendarPage').then((module) => ({ default: module.InstructorCalendarPage })))
 const InstructorClassroomEditPage = lazy(() => import('./pages/instructor/InstructorClassroomEditPage').then((module) => ({ default: module.InstructorClassroomEditPage })))
@@ -98,6 +99,7 @@ export function AppRoutes() {
             </Route>
           </Route>
           <Route element={<RequireInstructor />}>
+            <Route path={routes.classroomExamSubmission} element={<InstructorExamSubmissionPage />} />
             <Route path={routes.legacyClassroomEdit} element={<LegacyClassroomSettingsRedirect />} />
             <Route
               path={routes.learningStatus}

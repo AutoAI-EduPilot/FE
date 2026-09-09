@@ -80,10 +80,13 @@ export interface ExamDraftResult {
 
 export interface ExamSubmission {
   attemptNo: number
+  durationSeconds?: number
   gradedAt?: string
   id: string
   items: Array<{
     answer?: string
+    correctAnswer?: string
+    explanation?: string
     feedback?: string
     maxScore: number
     questionId: string
@@ -92,7 +95,9 @@ export interface ExamSubmission {
   }>
   maxScore?: number
   normalizedScore?: number
+  reviewAvailable: boolean
   score?: number
+  startedAt?: string
   status: ExamSubmissionStatus
   submittedAt: string
 }
@@ -123,6 +128,7 @@ export interface ExamsRepository {
   listSubmissions: (examId: string, signal?: AbortSignal) => Promise<InstructorSubmissionSummary[]>
   publish: (examId: string, signal?: AbortSignal) => Promise<Exam>
   regrade: (examId: string, submissionId: string, signal?: AbortSignal) => Promise<ExamSubmission>
+  startAttempt: (examId: string, signal?: AbortSignal) => Promise<void>
   submit: (examId: string, answers: Record<string, string>, requestId: string, signal?: AbortSignal) => Promise<ExamSubmission>
   update: (examId: string, input: Partial<CreateExamInput>, signal?: AbortSignal) => Promise<Exam>
 }
@@ -191,11 +197,14 @@ interface ExamSubmissionSummaryDto {
 }
 interface ExamSubmissionDto {
   attemptNo: number
+  durationSeconds?: number | null
   gradedAt?: string | null
-  items?: Array<{ answer?: string | null; feedback?: string | null; maxScore: number; questionId: string; score?: number | null; verdict?: 'CORRECT' | 'PARTIAL' | 'WRONG' | null }>
+  items?: Array<{ answer?: string | null; correctAnswer?: string | null; explanation?: string | null; feedback?: string | null; maxScore: number; questionId: string; score?: number | null; verdict?: 'CORRECT' | 'PARTIAL' | 'WRONG' | null }>
   maxScore?: number | null
   normalizedScore?: number | null
+  reviewAvailable?: boolean
   score?: number | null
+  startedAt?: string | null
   status: ExamSubmissionStatus
   submissionId: number | string
   submittedAt: string
@@ -278,6 +287,12 @@ export function createExamsRepository(request: AuthenticatedRequest): ExamsRepos
         signal,
       })
       return mapSubmission(data)
+    },
+    async startAttempt(examId, signal) {
+      await request(`/api/exams/${encodeURIComponent(examId)}/attempts/start`, {
+        method: 'POST',
+        signal,
+      })
     },
     async submit(examId, answers, requestId, signal) {
       const { data } = await request<ExamSubmissionDto>(`/api/exams/${encodeURIComponent(examId)}/submissions`, {
@@ -381,12 +396,23 @@ function mapLatestSubmission(value: ExamSubmissionSummaryDto): ExamSubmissionSum
 function mapSubmission(value: ExamSubmissionDto): ExamSubmission {
   return {
     attemptNo: value.attemptNo,
+    durationSeconds: value.durationSeconds ?? undefined,
     gradedAt: value.gradedAt ?? undefined,
     id: String(value.submissionId),
-    items: (value.items ?? []).map((item) => ({ ...item, answer: item.answer ?? undefined, feedback: item.feedback ?? undefined, score: item.score ?? undefined, verdict: item.verdict ?? undefined })),
+    items: (value.items ?? []).map((item) => ({
+      ...item,
+      answer: item.answer ?? undefined,
+      correctAnswer: item.correctAnswer ?? undefined,
+      explanation: item.explanation ?? undefined,
+      feedback: item.feedback ?? undefined,
+      score: item.score ?? undefined,
+      verdict: item.verdict ?? undefined,
+    })),
     maxScore: value.maxScore ?? undefined,
     normalizedScore: value.normalizedScore ?? undefined,
+    reviewAvailable: value.reviewAvailable ?? false,
     score: value.score ?? undefined,
+    startedAt: value.startedAt ?? undefined,
     status: value.status,
     submittedAt: value.submittedAt,
   }

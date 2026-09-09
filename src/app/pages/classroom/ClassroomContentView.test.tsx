@@ -187,6 +187,34 @@ describe('ClassroomContentView week periods', () => {
     expect(screen.getByText('테스트 공지').closest('details')).not.toBeInTheDocument()
   })
 
+  it('shows global exams without the all-items label or section dividers', () => {
+    render(
+      <ClassroomContentPanel
+        canManage={false}
+        draggingWeek={null}
+        errors={{}}
+        filter="exam"
+        globalItems={[globalExam]}
+        isUploading={false}
+        items={[]}
+        onAdd={vi.fn()}
+        onDrop={vi.fn()}
+        onFilter={vi.fn()}
+        onItem={vi.fn()}
+        onRemoveMaterial={vi.fn()}
+        onRenameMaterial={vi.fn()}
+        onRetry={vi.fn()}
+        openingMaterialId={null}
+        processingMaterialTitle={null}
+        selectedWeekNumber={null}
+        setDragging={vi.fn()}
+      />,
+    )
+
+    expect(screen.queryByText('전체 항목')).not.toBeInTheDocument()
+    expect(screen.getByText('개념 이해 시험').closest('details')).not.toBeInTheDocument()
+  })
+
   it('keeps only one material action menu open at a time', () => {
     render(
       <ClassroomContentPanel
@@ -284,4 +312,24 @@ const scheduledNotice: ClassroomContentItem = {
     title: '예약 공지',
   },
   title: '예약 공지',
+}
+
+const globalExam: ClassroomContentItem = {
+  id: 'exam-30',
+  kind: 'exam',
+  occurredAt: '2026-08-03T00:00:00Z',
+  source: {
+    allowRetake: false,
+    classroomId: '1',
+    createdAt: '2026-08-03T00:00:00Z',
+    id: '30',
+    questionCount: 0,
+    questions: [],
+    status: 'PUBLISHED',
+    title: '개념 이해 시험',
+    totalScore: 0,
+  },
+  title: '개념 이해 시험',
+  weekNumber: null,
+  weekOrder: null,
 }

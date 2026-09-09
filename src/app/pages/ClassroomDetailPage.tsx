@@ -451,8 +451,7 @@ export function ClassroomDetailPage() {
             if (item.kind === 'resource') void openClassroomResource(item.source)
             if (item.kind === 'notice') updateQuery({ panel: `notice-${item.source.id}` })
             if (item.kind === 'exam') {
-              if (isInstructor) updateQuery({ panel: `exam-${item.source.id}` })
-              else navigate(examDetailPath(item.source.id, classroomId))
+              navigate(examDetailPath(item.source.id, classroomId))
             }
           }}
           onRemoveMaterial={removeMaterial}
