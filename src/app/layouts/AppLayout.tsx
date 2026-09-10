@@ -45,6 +45,7 @@ import { formatDateTime } from '../../shared/lib/format'
 import {
   classroomAnnouncementsPath,
   classroomDetailPath,
+  examDetailPath,
   materialViewerPath,
   routes,
 } from '../routes'
@@ -777,6 +778,10 @@ function NotificationPanel({
 
 function NotificationIcon({ type }: { type: AppNotificationType }) {
   switch (type) {
+    case 'EXAM_PUBLISHED':
+    case 'EXAM_DEADLINE_APPROACHING':
+    case 'EXAM_GRADED':
+      return <FileCheck2 aria-hidden="true" size={14} />
     case 'MATERIAL_UPLOADED':
       return <BookOpenCheck aria-hidden="true" size={14} />
     case 'NOTICE_PUBLISHED':
@@ -788,8 +793,12 @@ function NotificationIcon({ type }: { type: AppNotificationType }) {
 }
 
 function getNotificationPath(notification: AppNotification): string {
-  const { classroomId, materialId } = notification.link
+  const { classroomId, examId, materialId } = notification.link
   switch (notification.type) {
+    case 'EXAM_PUBLISHED':
+    case 'EXAM_DEADLINE_APPROACHING':
+    case 'EXAM_GRADED':
+      return examId ? examDetailPath(examId, classroomId) : routes.exams
     case 'MATERIAL_UPLOADED':
       return materialId
         ? materialViewerPath(materialId)

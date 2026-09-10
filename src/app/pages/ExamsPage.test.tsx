@@ -26,7 +26,7 @@ describe('ExamsPage creation entry', () => {
         return success({ items: [classroomFixture, secondClassroomFixture], page: 0, size: 100, totalElements: 2, totalPages: 1 })
       }
       if (url.pathname === '/api/classrooms/12/exams') {
-        return success({ items: [examFixture], page: 0, size: 100, totalElements: 1, totalPages: 1 })
+        return success({ items: [{ ...examFixture, latestSubmission: { attemptNo: 1, maxScore: 10, normalizedScore: 80, score: 8, status: 'GRADED', submissionId: 300 } }], page: 0, size: 100, totalElements: 1, totalPages: 1 })
       }
       if (url.pathname === '/api/classrooms/13/exams') {
         return success({ items: [{ ...examFixture, classroomId: 13, examId: 31, title: '알고리즘 중간 시험' }], page: 0, size: 100, totalElements: 1, totalPages: 1 })
@@ -50,6 +50,8 @@ describe('ExamsPage creation entry', () => {
     expect(screen.getByText('알고리즘 중간 시험')).toBeInTheDocument()
     expect(screen.getByText(/자료구조 · 2주차/)).toBeInTheDocument()
     expect(screen.getByText(/알고리즘 · 2주차/)).toBeInTheDocument()
+    expect(screen.getByText('응시 완료')).toBeInTheDocument()
+    expect(screen.getByText('80점')).toBeInTheDocument()
     expect(requestedPaths).toContain('/api/classrooms/12/exams')
     expect(requestedPaths).toContain('/api/classrooms/13/exams')
     expect(screen.queryByLabelText('강의실 선택')).not.toBeInTheDocument()

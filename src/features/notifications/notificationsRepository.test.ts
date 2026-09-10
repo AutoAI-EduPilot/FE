@@ -7,13 +7,13 @@ import { createNotificationsRepository } from './notificationsRepository'
 describe('notifications repository', () => {
   it('connects list, read, and delete endpoints and normalizes resource ids', async () => {
     const dto = {
-      body: '3주차 공지를 확인해 주세요.',
+      body: '시험이 공개되었습니다.',
       createdAt: '2026-08-14T03:00:00Z',
-      link: { classroomId: 30, noticeId: 70 },
+      link: { classroomId: 30, examId: 70 },
       notificationId: 100,
       readAt: null,
-      title: '중간고사 안내',
-      type: 'NOTICE_PUBLISHED' as const,
+      title: '중간고사 공개',
+      type: 'EXAM_PUBLISHED' as const,
     }
     const request = vi.fn()
       .mockResolvedValueOnce(success({
@@ -35,7 +35,7 @@ describe('notifications repository', () => {
     await expect(repository.list()).resolves.toEqual([
       expect.objectContaining({
         id: '100',
-        link: expect.objectContaining({ classroomId: '30', noticeId: '70' }),
+        link: expect.objectContaining({ classroomId: '30', examId: '70' }),
         readAt: undefined,
       }),
     ])

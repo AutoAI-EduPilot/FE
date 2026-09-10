@@ -7,6 +7,7 @@ export type {
   AdminUserDetail,
   AdminUserRole,
   AdminUserStatus,
+  AdminUserSort,
   AdminUserSummary,
   AiUsageFeature,
   AiUsageSummary,

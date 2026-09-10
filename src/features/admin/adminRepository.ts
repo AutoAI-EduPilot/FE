@@ -3,6 +3,7 @@ import type { AuthenticatedRequest } from '../auth'
 export type AdminUserRole = 'ADMIN' | 'INSTRUCTOR' | 'LEARNER'
 export type AdminUserStatus = 'ACTIVE' | 'DELETED'
 export type AdminSort = 'RECENT' | 'NAME'
+export type AdminUserSort = AdminSort | 'RECENT_ACTIVITY_ASC' | 'RECENT_ACTIVITY_DESC'
 
 export interface AdminUserSummary {
   id: number
@@ -12,6 +13,7 @@ export interface AdminUserSummary {
   status: AdminUserStatus
   authProvider: string
   createdAt: string
+  lastActiveAt?: string | null
 }
 
 export interface AdminUserDetail extends AdminUserSummary {
@@ -156,11 +158,12 @@ export interface AdminRepository {
   getInfraCost: (signal?: AbortSignal) => Promise<InfraCost>
   getInfraApp: (signal?: AbortSignal) => Promise<InfraApp>
   getUser: (userId: number, signal?: AbortSignal) => Promise<AdminUserDetail>
+  resetUserPassword: (userId: number, signal?: AbortSignal) => Promise<{ message: string; temporaryPassword: string }>
   listUsers: (filters: {
     q?: string
     role?: AdminUserRole
     status?: AdminUserStatus
-    sort?: AdminSort
+    sort?: AdminUserSort
     page?: number
     size?: number
   }, signal?: AbortSignal) => Promise<AdminPageResult<AdminUserSummary>>
@@ -193,6 +196,13 @@ export function createAdminRepository(request: AuthenticatedRequest): AdminRepos
     },
     async getUser(userId, signal) {
       const response = await request<AdminUserDetail>(`/api/admin/users/${userId}`, { signal })
+      return response.data
+    },
+    async resetUserPassword(userId, signal) {
+      const response = await request<{ message: string; temporaryPassword: string }>(
+        `/api/admin/users/${userId}/password-reset`,
+        { method: 'POST', signal },
+      )
       return response.data
     },
     async listUsers(filters, signal) {

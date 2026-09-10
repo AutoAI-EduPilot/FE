@@ -48,6 +48,39 @@ describe('AdminPage', () => {
     await waitFor(() => expect(countRequests(requestedPaths, '/api/admin/ai-usage/summary')).toBe(2))
     expect(countRequests(requestedPaths, '/api/admin/ai-usage/users')).toBe(2)
   })
+
+  it('shows recent activity and issues a one-time temporary password', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : String(input), 'http://localhost')
+      if (url.pathname === '/api/admin/users/7/password-reset' && init?.method === 'POST') {
+        return success({ message: '로그인 후 즉시 변경하세요.', temporaryPassword: 'Temporary1234' })
+      }
+      if (url.pathname === '/api/admin/users/7') {
+        return success({ affiliation: '테스트 학교', authProvider: 'LOCAL', consentedAt: null, createdAt: '2026-09-01T00:00:00Z', email: 'member@example.com', id: 7, name: '회원', role: 'LEARNER', status: 'ACTIVE' })
+      }
+      if (url.pathname === '/api/admin/users') {
+        return success({ items: [{ authProvider: 'LOCAL', createdAt: '2026-09-01T00:00:00Z', email: 'member@example.com', id: 7, lastActiveAt: new Date().toISOString(), name: '회원', role: 'LEARNER', status: 'ACTIVE' }], page: 0, size: 20, totalElements: 1, totalPages: 1 })
+      }
+      return new Response(null, { status: 404 })
+    })
+
+    render(
+      <ResponsiveViewportProvider>
+        <TestAuthProvider>
+          <MemoryRouter><AdminPage /></MemoryRouter>
+        </TestAuthProvider>
+      </ResponsiveViewportProvider>,
+    )
+
+    expect(await screen.findByText('방금 전')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('정렬'), { target: { value: 'RECENT_ACTIVITY_DESC' } })
+    await waitFor(() => expect(vi.mocked(globalThis.fetch).mock.calls.some(([input]) => String(input instanceof Request ? input.url : input).includes('sort=RECENT_ACTIVITY_DESC'))).toBe(true))
+    fireEvent.click(screen.getByRole('button', { name: '회원 상세 정보' }))
+    expect(await screen.findByRole('button', { name: '임시 비밀번호 발급' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '임시 비밀번호 발급' }))
+    expect(await screen.findByText('Temporary1234')).toBeInTheDocument()
+  })
 })
 
 function countRequests(paths: string[], path: string) {

@@ -10,6 +10,8 @@ export interface ExamOption {
   text: string
 }
 
+export type ExamCorrectAnswer = boolean | string | { choiceId: string; text: string }
+
 export interface ExamQuestionInput {
   answerChoiceId?: string
   answerValue?: boolean
@@ -35,6 +37,7 @@ export interface Exam {
   closedAt?: string
   createdAt?: string
   description?: string
+  dueAt?: string
   id: string
   mySubmission?: ExamSubmissionSummary
   publishedAt?: string
@@ -61,6 +64,7 @@ export interface ExamSubmissionSummary {
 export interface CreateExamInput {
   allowRetake: boolean
   description?: string
+  dueAt?: string
   questions: ExamQuestionInput[]
   title: string
   weekNumber?: number
@@ -85,10 +89,12 @@ export interface ExamSubmission {
   id: string
   items: Array<{
     answer?: string
-    correctAnswer?: string
+    adjustedAt?: string
+    correctAnswer?: ExamCorrectAnswer
     explanation?: string
     feedback?: string
     maxScore: number
+    manualScore?: number
     questionId: string
     score?: number
     verdict?: 'CORRECT' | 'PARTIAL' | 'WRONG'
@@ -123,6 +129,7 @@ export interface ExamsRepository {
   get: (examId: string, signal?: AbortSignal) => Promise<Exam>
   getMySubmission: (examId: string, attemptNo?: number, signal?: AbortSignal) => Promise<ExamSubmission>
   getSubmission: (examId: string, submissionId: string, signal?: AbortSignal) => Promise<ExamSubmission>
+  adjustScore: (examId: string, submissionId: string, questionId: string, score: number, signal?: AbortSignal) => Promise<ExamSubmission>
   generateDraftQuestions: (classroomId: string, examId: string, input: GenerateExamDraftInput, signal?: AbortSignal) => Promise<ExamDraftResult>
   list: (classroomId: string, status?: ExamStatus, signal?: AbortSignal) => Promise<Exam[]>
   listSubmissions: (examId: string, signal?: AbortSignal) => Promise<InstructorSubmissionSummary[]>
@@ -173,6 +180,7 @@ interface ExamDto {
   closedAt?: string | null
   createdAt?: string
   description?: string | null
+  dueAt?: string | null
   examId: number | string
   latestSubmission?: ExamSubmissionSummaryDto | null
   mySubmission?: ExamSubmissionSummaryDto | null
@@ -199,7 +207,7 @@ interface ExamSubmissionDto {
   attemptNo: number
   durationSeconds?: number | null
   gradedAt?: string | null
-  items?: Array<{ answer?: string | null; correctAnswer?: string | null; explanation?: string | null; feedback?: string | null; maxScore: number; questionId: string; score?: number | null; verdict?: 'CORRECT' | 'PARTIAL' | 'WRONG' | null }>
+  items?: Array<{ adjustedAt?: string | null; answer?: string | null; correctAnswer?: ExamCorrectAnswer | null; explanation?: string | null; feedback?: string | null; manualScore?: number | null; maxScore: number; questionId: string; score?: number | null; verdict?: 'CORRECT' | 'PARTIAL' | 'WRONG' | null }>
   maxScore?: number | null
   normalizedScore?: number | null
   reviewAvailable?: boolean
@@ -225,6 +233,14 @@ interface SubmissionSummaryDto {
 
 export function createExamsRepository(request: AuthenticatedRequest): ExamsRepository {
   return {
+    async adjustScore(examId, submissionId, questionId, score, signal) {
+      const { data } = await request<ExamSubmissionDto>(`/api/exams/${encodeURIComponent(examId)}/submissions/${encodeURIComponent(submissionId)}/answers/${encodeURIComponent(questionId)}/score`, {
+        body: { score },
+        method: 'PATCH',
+        signal,
+      })
+      return mapSubmission(data)
+    },
     async close(examId, signal) {
       const { data } = await request<ExamDto>(`/api/exams/${encodeURIComponent(examId)}/close`, { method: 'POST', signal })
       return mapExam(data)
@@ -303,7 +319,7 @@ export function createExamsRepository(request: AuthenticatedRequest): ExamsRepos
     },
     async update(examId, input, signal) {
       const body: Record<string, unknown> = {}
-      for (const key of ['title', 'description', 'weekNumber', 'allowRetake', 'questions'] as const) {
+      for (const key of ['title', 'description', 'weekNumber', 'allowRetake', 'dueAt', 'questions'] as const) {
         if (input[key] !== undefined) {
           body[`${key}Present`] = true
           body[key] = key === 'questions' ? input.questions?.map(mapQuestionInput) : input[key]
@@ -316,7 +332,7 @@ export function createExamsRepository(request: AuthenticatedRequest): ExamsRepos
 }
 
 function mapExamInput(input: CreateExamInput) {
-  return { ...input, description: input.description || undefined, questions: input.questions.map(mapQuestionInput), weekNumber: input.weekNumber || undefined }
+  return { ...input, description: input.description || undefined, dueAt: input.dueAt || undefined, questions: input.questions.map(mapQuestionInput), weekNumber: input.weekNumber || undefined }
 }
 
 function mapQuestionInput(question: ExamQuestionInput) {
@@ -372,6 +388,7 @@ function mapExam(value: ExamDto): Exam {
     classroomId: String(value.classroomId),
     closedAt: value.closedAt ?? undefined,
     description: value.description ?? undefined,
+    dueAt: value.dueAt ?? undefined,
     id: String(value.examId),
     mySubmission: latestSubmission ? mapLatestSubmission(latestSubmission) : undefined,
     publishedAt: value.publishedAt ?? undefined,
@@ -402,9 +419,11 @@ function mapSubmission(value: ExamSubmissionDto): ExamSubmission {
     items: (value.items ?? []).map((item) => ({
       ...item,
       answer: item.answer ?? undefined,
+      adjustedAt: item.adjustedAt ?? undefined,
       correctAnswer: item.correctAnswer ?? undefined,
       explanation: item.explanation ?? undefined,
       feedback: item.feedback ?? undefined,
+      manualScore: item.manualScore ?? undefined,
       score: item.score ?? undefined,
       verdict: item.verdict ?? undefined,
     })),

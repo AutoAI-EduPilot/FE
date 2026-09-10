@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 
@@ -18,7 +18,7 @@ afterEach(() => {
 
 describe('InstructorExamSubmissionPage', () => {
   it('shows the learner answer, correct answer, feedback, and adjacent learner navigation', async () => {
-    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = new URL(input instanceof Request ? input.url : String(input), 'http://localhost')
       if (url.pathname === '/api/exams/10' && !url.pathname.includes('submissions')) {
         return success({
@@ -48,6 +48,19 @@ describe('InstructorExamSubmissionPage', () => {
           maxScore: 10,
           normalizedScore: 90,
           score: 9,
+          status: 'GRADED',
+          submissionId: 300,
+          submittedAt: '2026-09-09T01:01:12Z',
+        })
+      }
+      if (url.pathname === '/api/exams/10/submissions/300/answers/q1/score' && init?.method === 'PATCH') {
+        return success({
+          attemptNo: 1,
+          gradedAt: '2026-09-09T01:02:00Z',
+          items: [{ adjustedAt: '2026-09-10T01:02:00Z', answer: '나중에 넣은 값부터 꺼냅니다.', feedback: '핵심 개념을 정확히 설명했습니다.', manualScore: 10, maxScore: 10, questionId: 'q1', score: 10, verdict: 'CORRECT' }],
+          maxScore: 10,
+          normalizedScore: 100,
+          score: 10,
           status: 'GRADED',
           submissionId: 300,
           submittedAt: '2026-09-09T01:01:12Z',
@@ -98,6 +111,13 @@ describe('InstructorExamSubmissionPage', () => {
     expect(screen.getByText(/소요 1분 12초/)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: '이전 학습자' })).toHaveAttribute('href', '/classrooms/30/exams/10/submissions/299')
     expect(screen.getByRole('link', { name: '다음 학습자' })).toHaveAttribute('href', '/classrooms/30/exams/10/submissions/301')
+
+    fireEvent.change(screen.getByLabelText('1번 점수'), { target: { value: '10' } })
+    fireEvent.click(screen.getByRole('button', { name: '점수 저장' }))
+    await waitFor(() => expect(screen.getByText('직접 수정됨')).toBeInTheDocument())
+    expect(screen.getByText('10', { selector: 'strong' })).toBeInTheDocument()
+    const scoreCall = vi.mocked(globalThis.fetch).mock.calls.find(([input]) => String(input instanceof Request ? input.url : input).endsWith('/api/exams/10/submissions/300/answers/q1/score'))
+    expect(JSON.parse(String(scoreCall?.[1]?.body))).toEqual({ score: 10 })
   })
 })
 

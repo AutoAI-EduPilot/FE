@@ -20,6 +20,13 @@ interface UserDto {
 
 export function createUserSettingsRepository(request: AuthenticatedRequest, rawRequest: AuthenticatedRawRequest) {
   return {
+    async changePassword(input: { currentPassword: string; newPassword: string }) {
+      const { data } = await request<{ reauthenticationRequired: boolean }>('/api/users/me/password', {
+        body: input,
+        method: 'PATCH',
+      })
+      return data
+    },
     async updateProfile(input: { affiliation: string; name: string }) {
       const { data } = await request<UserDto>('/api/users/me', { body: input, method: 'PATCH' })
       return mapUser(data)

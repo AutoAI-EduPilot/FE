@@ -213,6 +213,7 @@ describe('ClassroomContentView week periods', () => {
 
     expect(screen.queryByText('전체 항목')).not.toBeInTheDocument()
     expect(screen.getByText('개념 이해 시험').closest('details')).not.toBeInTheDocument()
+    expect(screen.getByText('응시 완료')).toBeInTheDocument()
   })
 
   it('keeps only one material action menu open at a time', () => {
@@ -325,6 +326,14 @@ const globalExam: ClassroomContentItem = {
     id: '30',
     questionCount: 0,
     questions: [],
+    mySubmission: {
+      attemptNo: 1,
+      id: '300',
+      maxScore: 10,
+      normalizedScore: 80,
+      score: 8,
+      status: 'GRADED',
+    },
     status: 'PUBLISHED',
     title: '개념 이해 시험',
     totalScore: 0,
