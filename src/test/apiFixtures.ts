@@ -166,6 +166,10 @@ export async function handleApiFixtureRequest(
     return apiSuccess(null)
   }
 
+  if (request.method === 'PATCH' && path === '/api/users/me/password') {
+    return apiSuccess({ reauthenticationRequired: true })
+  }
+
   if (request.method === 'POST' && path === '/api/auth/signup') {
     const body = await readJson<{ email: string; name: string }>(request)
     return apiSuccess({

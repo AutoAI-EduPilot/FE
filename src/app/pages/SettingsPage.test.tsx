@@ -123,6 +123,21 @@ describe('SettingsPage', () => {
     })
   })
 
+  it('changes a local password and requires login again', async () => {
+    renderSettings()
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호 변경' }))
+
+    fireEvent.change(screen.getByLabelText('현재 비밀번호'), { target: { value: 'password123' } })
+    fireEvent.change(screen.getByLabelText('새 비밀번호'), { target: { value: 'newPassword456' } })
+    fireEvent.change(screen.getByLabelText('새 비밀번호 확인'), { target: { value: 'newPassword456' } })
+    fireEvent.click(screen.getByRole('button', { name: '비밀번호 변경 실행' }))
+
+    expect(await screen.findByText('로그인 화면')).toBeInTheDocument()
+    const passwordCall = vi.mocked(globalThis.fetch).mock.calls.find(([input]) => String(input instanceof Request ? input.url : input).endsWith('/api/users/me/password'))
+    expect(passwordCall?.[1]).toMatchObject({ method: 'PATCH' })
+    expect(JSON.parse(String(passwordCall?.[1]?.body))).toEqual({ currentPassword: 'password123', newPassword: 'newPassword456' })
+  })
+
   it('withdraws the account after password confirmation', async () => {
     vi.spyOn(window, 'confirm').mockReturnValue(true)
     renderSettings()

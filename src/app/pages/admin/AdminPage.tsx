@@ -1,4 +1,4 @@
-import { BarChart3, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, RefreshCw, Search, ShieldCheck } from 'lucide-react'
+import { BarChart3, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Copy, KeyRound, RefreshCw, Search, ShieldCheck, X } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 
 import {
@@ -10,12 +10,14 @@ import {
   type AdminUserDetail,
   type AdminUserRole,
   type AdminUserStatus,
+  type AdminUserSort,
   type AdminUserSummary,
   type AiUsageSummary,
   type AiUsageUser,
 } from '../../../features/admin'
 import { useAuth } from '../../../features/auth'
 import { usePageTitle } from '../../../shared/lib/usePageTitle'
+import { formatDetailedRelativeActivityDate } from '../../../shared/lib/format'
 import { useResponsiveViewport } from '../../../shared/responsive'
 import { Button } from '../../../shared/ui'
 import {
@@ -86,18 +88,20 @@ export function AdminPage() {
 type Repository = ReturnType<typeof createAdminRepository>
 
 function UsersPanel({ repository }: { repository: Repository }) {
+  const { user: currentUser } = useAuth()
   const { isMobileWeb } = useResponsiveViewport()
   const [query, setQuery] = useState('')
   const [submittedQuery, setSubmittedQuery] = useState('')
   const [role, setRole] = useState<AdminUserRole | ''>('')
   const [status, setStatus] = useState<AdminUserStatus | ''>('')
-  const [sort, setSort] = useState<AdminSort>('RECENT')
+  const [sort, setSort] = useState<AdminUserSort>('RECENT')
   const [page, setPage] = useState(0)
   const [result, setResult] = useState<AdminPageResult<AdminUserSummary> | null>(null)
   const [expandedId, setExpandedId] = useState<number | null>(null)
   const [detail, setDetail] = useState<AdminUserDetail | null>(null)
   const [error, setError] = useState<AdminErrorInfo | null>(null)
   const [loading, setLoading] = useState(true)
+  const [resetResult, setResetResult] = useState<{ message: string; name: string; temporaryPassword: string } | null>(null)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -133,6 +137,17 @@ function UsersPanel({ repository }: { repository: Repository }) {
     void repository.getUser(userId).then(setDetail).catch((reason: unknown) => setError(toAdminError(reason)))
   }
 
+  async function resetPassword(target: AdminUserSummary) {
+    if (!window.confirm(`${target.name} 회원의 비밀번호를 임시 비밀번호로 초기화할까요?`)) return
+    try {
+      const result = await repository.resetUserPassword(target.id)
+      setResetResult({ ...result, name: target.name })
+      setError(null)
+    } catch (reason) {
+      setError(toAdminError(reason))
+    }
+  }
+
   return (
     <div className="flex h-full min-h-[560px] flex-col">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 px-4 py-3">
@@ -148,18 +163,18 @@ function UsersPanel({ repository }: { repository: Repository }) {
           </label>
           <FilterSelect label="역할" onChange={(value) => { setPage(0); setRole(value as AdminUserRole | '') }} value={role} options={[['', '전체 역할'], ['LEARNER', '학습자'], ['INSTRUCTOR', '강의자'], ['ADMIN', '관리자']]} />
           <FilterSelect label="상태" onChange={(value) => { setPage(0); setStatus(value as AdminUserStatus | '') }} value={status} options={[['', '전체 상태'], ['ACTIVE', '활성'], ['DELETED', '탈퇴']]} />
-          <FilterSelect label="정렬" onChange={(value) => { setPage(0); setSort(value as AdminSort) }} value={sort} options={[['RECENT', '최근 가입순'], ['NAME', '이름순']]} />
+          <FilterSelect label="정렬" onChange={(value) => { setPage(0); setSort(value as AdminUserSort) }} value={sort} options={[['RECENT', '최근 가입순'], ['NAME', '이름순'], ['RECENT_ACTIVITY_DESC', '최근 활동순'], ['RECENT_ACTIVITY_ASC', '오래된 활동순']]} />
         </form>
       </div>
       {error ? <AdminErrorMessage error={error} /> : null}
       <div className="min-h-0 flex-1 overflow-auto">
-        {isMobileWeb ? <div aria-label="회원 목록" className="divide-y divide-stone-100">{result?.items.map((user) => <MobileUserRow detail={expandedId === user.id ? detail : null} expanded={expandedId === user.id} key={user.id} onToggle={() => toggleDetail(user.id)} user={user} />)}</div> : <table className="w-full min-w-[780px] border-collapse text-left">
+        {isMobileWeb ? <div aria-label="회원 목록" className="divide-y divide-stone-100">{result?.items.map((user) => <MobileUserRow currentUserId={currentUser?.id} detail={expandedId === user.id ? detail : null} expanded={expandedId === user.id} key={user.id} onResetPassword={() => void resetPassword(user)} onToggle={() => toggleDetail(user.id)} user={user} />)}</div> : <table className="w-full min-w-[900px] border-collapse text-left">
           <thead className="sticky top-0 z-10 bg-[#F7F8FA] type-caption font-semibold text-stone-500">
-            <tr><th className="px-4 py-3">회원</th><th className="px-4 py-3">역할</th><th className="px-4 py-3">상태</th><th className="px-4 py-3">가입일</th><th className="px-4 py-3">인증</th><th className="w-12 px-4 py-3"><span className="sr-only">상세</span></th></tr>
+            <tr><th className="px-4 py-3">회원</th><th className="px-4 py-3">역할</th><th className="px-4 py-3">상태</th><th className="px-4 py-3">최근 활동</th><th className="px-4 py-3">가입일</th><th className="px-4 py-3">인증</th><th className="w-12 px-4 py-3"><span className="sr-only">상세</span></th></tr>
           </thead>
           <tbody>
             {result?.items.map((user) => (
-              <UserRows detail={expandedId === user.id ? detail : null} expanded={expandedId === user.id} key={user.id} onToggle={() => toggleDetail(user.id)} user={user} />
+              <UserRows currentUserId={currentUser?.id} detail={expandedId === user.id ? detail : null} expanded={expandedId === user.id} key={user.id} onResetPassword={() => void resetPassword(user)} onToggle={() => toggleDetail(user.id)} user={user} />
             ))}
           </tbody>
         </table>}
@@ -167,25 +182,32 @@ function UsersPanel({ repository }: { repository: Repository }) {
         {loading ? <PanelMessage message="회원 정보를 불러오는 중입니다." /> : null}
       </div>
       <Pagination page={page} totalPages={result?.totalPages ?? 0} onChange={setPage} />
+      {resetResult ? <PasswordResetDialog onClose={() => setResetResult(null)} result={resetResult} /> : null}
     </div>
   )
 }
 
-function MobileUserRow({ detail, expanded, onToggle, user }: { detail: AdminUserDetail | null; expanded: boolean; onToggle: () => void; user: AdminUserSummary }) {
-  return <article><button aria-expanded={expanded} className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left" onClick={onToggle} type="button"><span className="min-w-0 flex-1"><strong className="block truncate type-body text-stone-950">{user.name}</strong><span className="block truncate type-caption text-stone-500">{user.email}</span><span className="mt-2 flex flex-wrap items-center gap-2 type-caption text-stone-600"><span>{roleLabel(user.role)}</span><StatusBadge status={user.status} /><span>{formatDate(user.createdAt)}</span></span></span>{expanded ? <ChevronUp aria-hidden="true" size={17} /> : <ChevronDown aria-hidden="true" size={17} />}</button>{expanded ? <div className="bg-stone-50 px-4 py-3 type-caption text-stone-600">{detail ? <dl className="grid gap-2 sm:grid-cols-2"><div><dt className="text-stone-400">회원 ID</dt><dd className="font-semibold text-stone-900">{detail.id}</dd></div><div><dt className="text-stone-400">인증</dt><dd className="font-semibold text-stone-900">{user.authProvider}</dd></div><div><dt className="text-stone-400">소속</dt><dd className="font-semibold text-stone-900">{detail.affiliation || '-'}</dd></div><div><dt className="text-stone-400">동의 일시</dt><dd className="font-semibold text-stone-900">{detail.consentedAt ? formatDateTime(detail.consentedAt) : '-'}</dd></div></dl> : '상세 정보를 불러오는 중입니다.'}</div> : null}</article>
+function MobileUserRow({ currentUserId, detail, expanded, onResetPassword, onToggle, user }: { currentUserId?: number; detail: AdminUserDetail | null; expanded: boolean; onResetPassword: () => void; onToggle: () => void; user: AdminUserSummary }) {
+  const canResetPassword = user.authProvider === 'LOCAL' && user.status === 'ACTIVE' && user.id !== currentUserId
+  return <article><button aria-expanded={expanded} className="flex min-h-16 w-full items-center gap-3 px-4 py-3 text-left" onClick={onToggle} type="button"><span className="min-w-0 flex-1"><strong className="block truncate type-body text-stone-950">{user.name}</strong><span className="block truncate type-caption text-stone-500">{user.email}</span><span className="mt-2 flex flex-wrap items-center gap-2 type-caption text-stone-600"><span>{roleLabel(user.role)}</span><StatusBadge status={user.status} /><span>최근 활동 {formatDetailedRelativeActivityDate(user.lastActiveAt ?? undefined)}</span></span></span>{expanded ? <ChevronUp aria-hidden="true" size={17} /> : <ChevronDown aria-hidden="true" size={17} />}</button>{expanded ? <div className="bg-stone-50 px-4 py-3 type-caption text-stone-600">{detail ? <><dl className="grid gap-2 sm:grid-cols-2"><div><dt className="text-stone-400">회원 ID</dt><dd className="font-semibold text-stone-900">{detail.id}</dd></div><div><dt className="text-stone-400">인증</dt><dd className="font-semibold text-stone-900">{user.authProvider}</dd></div><div><dt className="text-stone-400">소속</dt><dd className="font-semibold text-stone-900">{detail.affiliation || '-'}</dd></div><div><dt className="text-stone-400">가입일</dt><dd className="font-semibold text-stone-900">{formatDate(user.createdAt)}</dd></div><div><dt className="text-stone-400">동의 일시</dt><dd className="font-semibold text-stone-900">{detail.consentedAt ? formatDateTime(detail.consentedAt) : '-'}</dd></div></dl>{canResetPassword ? <Button className="mt-4" onClick={onResetPassword} size="sm" variant="secondary"><KeyRound aria-hidden="true" size={14} />임시 비밀번호 발급</Button> : null}</> : '상세 정보를 불러오는 중입니다.'}</div> : null}</article>
 }
 
-function UserRows({ detail, expanded, onToggle, user }: { detail: AdminUserDetail | null; expanded: boolean; onToggle: () => void; user: AdminUserSummary }) {
+function UserRows({ currentUserId, detail, expanded, onResetPassword, onToggle, user }: { currentUserId?: number; detail: AdminUserDetail | null; expanded: boolean; onResetPassword: () => void; onToggle: () => void; user: AdminUserSummary }) {
+  const canResetPassword = user.authProvider === 'LOCAL' && user.status === 'ACTIVE' && user.id !== currentUserId
   return (
     <>
       <tr className="border-b border-stone-100 type-body text-stone-700 hover:bg-stone-50">
         <td className="px-4 py-3"><p className="font-semibold text-stone-950">{user.name}</p><p className="type-caption text-stone-500">{user.email}</p></td>
-        <td className="px-4 py-3">{roleLabel(user.role)}</td><td className="px-4 py-3"><StatusBadge status={user.status} /></td><td className="px-4 py-3">{formatDate(user.createdAt)}</td><td className="px-4 py-3">{user.authProvider}</td>
+        <td className="px-4 py-3">{roleLabel(user.role)}</td><td className="px-4 py-3"><StatusBadge status={user.status} /></td><td className="px-4 py-3">{formatDetailedRelativeActivityDate(user.lastActiveAt ?? undefined)}</td><td className="px-4 py-3">{formatDate(user.createdAt)}</td><td className="px-4 py-3">{user.authProvider}</td>
         <td className="px-4 py-3"><button aria-expanded={expanded} aria-label={`${user.name} 상세 정보`} className="flex size-8 items-center justify-center rounded-md text-stone-400 hover:bg-stone-100 hover:text-stone-800" onClick={onToggle} type="button">{expanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}</button></td>
       </tr>
-      {expanded ? <tr className="border-b border-stone-100 bg-[#F7F8FA]"><td className="px-4 py-3 type-caption text-stone-600" colSpan={6}>{detail ? <div className="flex flex-wrap gap-x-8 gap-y-2"><span>회원 ID <strong className="text-stone-900">{detail.id}</strong></span><span>소속 <strong className="text-stone-900">{detail.affiliation || '-'}</strong></span><span>동의 일시 <strong className="text-stone-900">{detail.consentedAt ? formatDateTime(detail.consentedAt) : '-'}</strong></span></div> : '상세 정보를 불러오는 중입니다.'}</td></tr> : null}
+      {expanded ? <tr className="border-b border-stone-100 bg-[#F7F8FA]"><td className="px-4 py-3 type-caption text-stone-600" colSpan={7}>{detail ? <div className="flex flex-wrap items-center gap-x-8 gap-y-2"><span>회원 ID <strong className="text-stone-900">{detail.id}</strong></span><span>소속 <strong className="text-stone-900">{detail.affiliation || '-'}</strong></span><span>동의 일시 <strong className="text-stone-900">{detail.consentedAt ? formatDateTime(detail.consentedAt) : '-'}</strong></span>{canResetPassword ? <Button onClick={onResetPassword} size="sm" variant="secondary"><KeyRound aria-hidden="true" size={14} />임시 비밀번호 발급</Button> : null}</div> : '상세 정보를 불러오는 중입니다.'}</td></tr> : null}
     </>
   )
+}
+
+function PasswordResetDialog({ onClose, result }: { onClose: () => void; result: { message: string; name: string; temporaryPassword: string } }) {
+  return <div aria-labelledby="password-reset-title" aria-modal="true" className="fixed inset-0 z-[80] flex items-center justify-center bg-stone-950/40 px-4" role="dialog"><section className="w-full max-w-md rounded-xl border border-stone-200 bg-white p-5 shadow-2xl"><div className="flex items-center justify-between gap-3"><h2 className="type-dialog-title font-bold text-stone-950" id="password-reset-title">임시 비밀번호 발급 완료</h2><button aria-label="닫기" className="flex size-9 items-center justify-center rounded-lg text-stone-400 hover:bg-stone-100" onClick={onClose} type="button"><X aria-hidden="true" size={17} /></button></div><p className="mt-2 type-body text-stone-600">{result.name} 회원에게 아래 비밀번호를 전달하세요. 이 값은 닫은 뒤 다시 확인할 수 없습니다.</p><div className="mt-5 flex items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 p-3"><code className="min-w-0 flex-1 break-all type-body font-bold text-stone-950">{result.temporaryPassword}</code><Button aria-label="임시 비밀번호 복사" onClick={() => void navigator.clipboard.writeText(result.temporaryPassword)} size="sm" title="복사" variant="secondary"><Copy aria-hidden="true" size={15} /></Button></div>{result.message ? <p className="mt-3 type-caption text-stone-500">{result.message}</p> : null}<div className="mt-5 flex justify-end"><Button onClick={onClose}>확인</Button></div></section></div>
 }
 
 function ClassroomsPanel({ repository }: { repository: Repository }) {

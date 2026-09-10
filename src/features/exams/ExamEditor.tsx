@@ -19,17 +19,20 @@ export function ExamEditor({ onChange, value }: ExamEditorProps) {
   }
 
   return <div className="space-y-5">
-    <div className="grid gap-4 md:grid-cols-[minmax(0,2fr)_minmax(8rem,0.7fr)_auto]">
+    <div className="grid gap-4 md:grid-cols-2">
       <label className="min-w-0 type-control font-semibold text-stone-700">시험 제목
         <input className="mt-1 h-11 w-full rounded-lg border border-stone-300 px-3 type-body" maxLength={200} onChange={(event) => onChange({ ...value, title: event.target.value })} value={value.title} />
       </label>
       <label className="type-control font-semibold text-stone-700">주차 (선택)
         <input className="mt-1 h-11 w-full rounded-lg border border-stone-300 px-3 type-body" min={1} onChange={(event) => onChange({ ...value, weekNumber: event.target.value ? Number(event.target.value) : undefined })} type="number" value={value.weekNumber ?? ''} />
       </label>
+      <label className="type-control font-semibold text-stone-700">마감 일시 (선택)
+        <input className="mt-1 h-11 w-full rounded-lg border border-stone-300 px-3 type-body" min={toDateTimeLocal(new Date().toISOString())} onChange={(event) => onChange({ ...value, dueAt: fromDateTimeLocal(event.target.value) })} type="datetime-local" value={toDateTimeLocal(value.dueAt)} />
+      </label>
       <label className="flex h-11 items-center gap-2 self-end whitespace-nowrap type-control font-semibold text-stone-700">
         <input checked={value.allowRetake} className="size-4 accent-brand-700" onChange={(event) => onChange({ ...value, allowRetake: event.target.checked })} type="checkbox" /> 재응시 허용
       </label>
-      <label className="md:col-span-3 type-control font-semibold text-stone-700">설명 (선택)
+      <label className="md:col-span-2 type-control font-semibold text-stone-700">설명 (선택)
         <textarea className="mt-1 min-h-24 w-full resize-none rounded-lg border border-stone-300 px-3 py-2.5 type-body" maxLength={500} onChange={(event) => onChange({ ...value, description: event.target.value })} value={value.description ?? ''} />
       </label>
     </div>
@@ -60,6 +63,19 @@ export function ExamEditor({ onChange, value }: ExamEditorProps) {
       </label>
     </section>)}
   </div>
+}
+
+function toDateTimeLocal(value?: string): string {
+  if (!value) return ''
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return new Date(date.getTime() - date.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)
+}
+
+function fromDateTimeLocal(value: string): string | undefined {
+  if (!value) return undefined
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? undefined : date.toISOString()
 }
 
 function AnswerEditor({ onChange, question }: { onChange: (value: ExamQuestionInput) => void; question: ExamQuestionInput }) {

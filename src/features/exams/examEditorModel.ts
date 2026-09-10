@@ -9,5 +9,7 @@ export function createQuestion(type: ExamQuestionType, questionText = '', points
 }
 
 export function isExamDraftValid(value: CreateExamInput): boolean {
-  return Boolean(value.title.trim()) && value.questions.every((question) => question.questionText.trim() && question.points > 0)
+  const dueAt = value.dueAt ? new Date(value.dueAt) : null
+  const hasValidDueAt = !dueAt || (!Number.isNaN(dueAt.getTime()) && dueAt.getTime() > Date.now())
+  return Boolean(value.title.trim()) && hasValidDueAt && value.questions.every((question) => question.questionText.trim() && question.points > 0)
 }

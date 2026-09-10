@@ -83,7 +83,7 @@ export function ExamsPage() {
     {isLoading ? <p className="py-16 text-center type-body text-stone-500" role="status">시험을 불러오는 중입니다.</p> : null}
     {error ? <EmptyState description={error} title="시험을 불러오지 못했습니다" /> : null}
     {!isLoading && !error && exams.length === 0 ? <EmptyState description={isInstructor ? '시험 초안을 만들고 문항을 구성해 보세요.' : '강의자가 시험을 공개하면 여기에 표시됩니다.'} title="등록된 시험이 없습니다" /> : null}
-    {exams.length > 0 ? <section className="overflow-hidden rounded-lg border border-stone-200 bg-white" aria-label="시험 목록">{exams.map((exam) => <Link className="flex min-h-20 items-center gap-4 border-b border-stone-100 px-5 py-4 last:border-0 hover:bg-stone-50" key={exam.id} to={examDetailPath(exam.id, exam.classroomId)}><span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700"><ClipboardList size={17} /></span><span className="min-w-0 flex-1"><span className="flex items-center gap-2"><strong className="truncate type-body text-stone-950">{exam.title}</strong><ExamStatusBadge status={exam.status} /></span><span className="mt-1 block type-caption text-stone-500">{isGlobalRoute ? `${classroomNameById.get(exam.classroomId) ?? '강의실'} · ` : ''}{exam.weekNumber ? `${exam.weekNumber}주차 · ` : ''}{exam.questionCount}문항 · {exam.totalScore}점{exam.updatedAt ? ` · ${formatDateTime(exam.updatedAt)}` : ''}</span></span>{!isInstructor && exam.mySubmission ? <span className="type-control font-semibold text-stone-700">{exam.mySubmission.status === 'GRADED' ? `${exam.mySubmission.normalizedScore ?? 0}점` : '채점 중'}</span> : null}</Link>)}</section> : null}
+    {exams.length > 0 ? <section className="overflow-hidden rounded-lg border border-stone-200 bg-white" aria-label="시험 목록">{exams.map((exam) => <Link className="flex min-h-20 items-center gap-4 border-b border-stone-100 px-5 py-4 last:border-0 hover:bg-stone-50" key={exam.id} to={examDetailPath(exam.id, exam.classroomId)}><span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-700"><ClipboardList size={17} /></span><span className="min-w-0 flex-1"><span className="flex items-center gap-2"><strong className="truncate type-body text-stone-950">{exam.title}</strong><ExamStatusBadge status={exam.status} /></span><span className="mt-1 block type-caption text-stone-500">{isGlobalRoute ? `${classroomNameById.get(exam.classroomId) ?? '강의실'} · ` : ''}{exam.weekNumber ? `${exam.weekNumber}주차 · ` : ''}{exam.questionCount}문항 · {exam.totalScore}점{exam.dueAt ? ` · 마감 ${formatDateTime(exam.dueAt)}` : exam.updatedAt ? ` · ${formatDateTime(exam.updatedAt)}` : ''}</span></span>{!isInstructor && exam.mySubmission ? <LearnerExamStatus exam={exam} /> : null}</Link>)}</section> : null}
     {isComposerOpen ? <ExamComposer classroomId={classroomId} initialWeekNumber={composerWeekNumber} onClose={() => setIsComposerOpen(false)} onCreated={(exam) => { setExams((items) => [exam, ...items]); setIsComposerOpen(false) }} repository={examsRepository} /> : null}
   </ClassroomWorkspaceContainer>
 }
@@ -99,6 +99,14 @@ function ExamComposer({ classroomId, initialWeekNumber, onClose, onCreated, repo
 }
 
 export function ExamStatusBadge({ status }: { status: ExamStatus }) { const values = { DRAFT: ['초안', 'neutral'], PUBLISHED: ['공개', 'success'], CLOSED: ['종료', 'warning'] } as const; return <Badge tone={values[status][1]}>{values[status][0]}</Badge> }
+
+function LearnerExamStatus({ exam }: { exam: Exam }) {
+  const submission = exam.mySubmission
+  if (!submission) return null
+  if (submission.status === 'GRADED') return <span className="flex shrink-0 items-center gap-2"><Badge tone="success">응시 완료</Badge><strong className="type-control text-stone-700">{submission.normalizedScore ?? 0}점</strong></span>
+  if (submission.status === 'GRADING_FAILED') return <Badge tone="danger">채점 확인 필요</Badge>
+  return <Badge tone="warning">제출 완료</Badge>
+}
 
 function sortExamsByRecent(items: Exam[]): Exam[] {
   return [...items].sort((left, right) => getExamTimestamp(right) - getExamTimestamp(left))
