@@ -30,6 +30,19 @@ describe('admin repository', () => {
     expect(request.mock.calls.every(([path]) => path.startsWith('/api/admin/'))).toBe(true)
   })
 
+  it('connects recent activity sorting and the one-time password reset response', async () => {
+    const request = vi.fn()
+      .mockResolvedValueOnce({ data: { items: [], page: 0, size: 20, totalElements: 0, totalPages: 0 } })
+      .mockResolvedValueOnce({ data: { message: '로그인 후 변경하세요.', temporaryPassword: 'Temporary1234' } })
+    const repository = createAdminRepository(request as AuthenticatedRequest)
+
+    await repository.listUsers({ page: 0, size: 20, sort: 'RECENT_ACTIVITY_DESC' })
+    await expect(repository.resetUserPassword(7)).resolves.toEqual({ message: '로그인 후 변경하세요.', temporaryPassword: 'Temporary1234' })
+
+    expect(request).toHaveBeenNthCalledWith(1, '/api/admin/users?sort=RECENT_ACTIVITY_DESC&page=0&size=20', { signal: undefined })
+    expect(request).toHaveBeenNthCalledWith(2, '/api/admin/users/7/password-reset', { method: 'POST', signal: undefined })
+  })
+
   it('unwraps infrastructure responses and sends the documented query', async () => {
     const metrics = { available: true, env: 'prod', range: '6h' }
     const cost = { available: true, currency: 'USD' }

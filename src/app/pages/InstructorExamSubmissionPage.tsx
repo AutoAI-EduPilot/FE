@@ -8,7 +8,7 @@ import { createExamsRepository, type Exam, type ExamQuestion, type ExamSubmissio
 import { getRequestErrorMessage } from '../../shared/api'
 import { formatDateTime } from '../../shared/lib/format'
 import { usePageTitle } from '../../shared/lib/usePageTitle'
-import { Badge, Button, ButtonLink, ErrorState, LoadingState, PageContainer } from '../../shared/ui'
+import { Badge, Button, ButtonLink, ErrorState, LoadingState, PageContainer, useToast } from '../../shared/ui'
 import { classroomExamDetailPath, classroomExamSubmissionPath } from '../routes'
 
 interface SubmissionPageData {
@@ -25,8 +25,12 @@ export function InstructorExamSubmissionPage() {
   const { classroomId = '', examId = '', submissionId = '' } = useParams()
   const examsRepository = useMemo(() => createExamsRepository(apiRequest), [apiRequest])
   const classroomsRepository = useMemo(() => createClassroomsRepository(apiRequest), [apiRequest])
+  const { show } = useToast()
   const [data, setData] = useState<SubmissionPageData | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [adjustmentError, setAdjustmentError] = useState<string | null>(null)
+  const [adjustingQuestionId, setAdjustingQuestionId] = useState<string | null>(null)
+  const [scoreDrafts, setScoreDrafts] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (!classroomId || !examId || !submissionId) return
@@ -45,12 +49,34 @@ export function InstructorExamSubmissionPage() {
         submissions,
         summary,
       })
+      setScoreDrafts(Object.fromEntries(submission.items.map((item) => [item.questionId, item.score === undefined ? '' : String(item.score)])))
       setError(null)
     }).catch((requestError) => {
       if (!controller.signal.aborted) setError(getRequestErrorMessage(requestError))
     })
     return () => controller.abort()
   }, [classroomId, classroomsRepository, examId, examsRepository, submissionId])
+
+  async function adjustScore(questionId: string, maxScore: number) {
+    if (!data || adjustingQuestionId) return
+    const score = Number(scoreDrafts[questionId])
+    if (!Number.isFinite(score) || score < 0 || score > maxScore || !/^\d+(?:\.\d{1,2})?$/.test(scoreDrafts[questionId] ?? '')) {
+      setAdjustmentError(`점수는 0점부터 ${formatScore(maxScore)}점까지 소수 둘째 자리 이내로 입력하세요.`)
+      return
+    }
+    setAdjustingQuestionId(questionId)
+    setAdjustmentError(null)
+    try {
+      const submission = await examsRepository.adjustScore(examId, submissionId, questionId, score)
+      setData((current) => current ? { ...current, submission } : current)
+      setScoreDrafts(Object.fromEntries(submission.items.map((item) => [item.questionId, item.score === undefined ? '' : String(item.score)])))
+      show('문항 점수를 저장했습니다.', 'success')
+    } catch (requestError) {
+      setAdjustmentError(getRequestErrorMessage(requestError))
+    } finally {
+      setAdjustingQuestionId(null)
+    }
+  }
 
   if (!classroomId || !examId || !submissionId) {
     return <ErrorState description="시험 또는 제출 식별자가 없습니다." title="답안을 찾을 수 없습니다" />
@@ -119,6 +145,7 @@ export function InstructorExamSubmissionPage() {
               <div className="flex flex-wrap items-center gap-2">
                 <strong className="type-body text-stone-950">{index + 1}번</strong>
                 {item.verdict ? <Badge size="compact" tone={verdictTone(item.verdict)}>{verdictLabel(item.verdict)}</Badge> : null}
+                {item.manualScore !== undefined ? <Badge size="compact" tone="info">직접 수정됨</Badge> : null}
                 {question ? <span className="type-caption text-stone-400">{questionTypeLabel(question.questionType)}</span> : null}
                 <strong className="ml-auto type-control text-stone-900">{formatNullableScore(item.score)}/{formatScore(item.maxScore)}</strong>
               </div>
@@ -127,10 +154,12 @@ export function InstructorExamSubmissionPage() {
               {correctAnswer ? <AnswerBox correct label="정답" value={correctAnswer} /> : null}
               {item.feedback ? <div className="mt-3 flex gap-2 rounded-lg border border-brand-100 bg-brand-50 px-3 py-2.5 type-caption leading-5 text-stone-700"><Sparkles aria-hidden="true" className="mt-0.5 shrink-0 text-brand-600" size={13} /><p>{item.feedback}</p></div> : null}
               {question?.explanation ? <div className="mt-3 border-t border-stone-100 pt-3"><p className="type-caption font-semibold text-stone-500">해설</p><p className="mt-1 whitespace-pre-wrap type-caption leading-5 text-stone-600">{question.explanation}</p></div> : null}
+              {data.submission.status === 'GRADED' ? <div className="mt-4 flex items-end gap-2 border-t border-stone-100 pt-3"><label className="min-w-0 flex-1 type-caption font-semibold text-stone-600">점수<input aria-label={`${index + 1}번 점수`} className="mt-1 h-10 w-full rounded-lg border border-stone-300 bg-white px-3 type-control text-stone-900 outline-none focus:border-brand-600" max={item.maxScore} min={0} onChange={(event) => { setScoreDrafts((current) => ({ ...current, [item.questionId]: event.target.value })); setAdjustmentError(null) }} step="0.01" type="number" value={scoreDrafts[item.questionId] ?? ''} /></label><Button disabled={adjustingQuestionId !== null} onClick={() => void adjustScore(item.questionId, item.maxScore)} size="sm" variant="secondary">{adjustingQuestionId === item.questionId ? '저장 중' : '점수 저장'}</Button></div> : null}
             </article>
           )
         })}
       </section>
+      {adjustmentError ? <p className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 type-body font-medium text-rose-700" role="alert">{adjustmentError}</p> : null}
     </PageContainer>
   )
 }

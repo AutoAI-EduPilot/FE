@@ -119,6 +119,33 @@ describe('ExamDetailPage AI draft', () => {
 })
 
 describe('ExamDetailPage learner submission', () => {
+  it('shows the submit button only on the last question and confirms the answered count', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : String(input), 'http://localhost')
+      const method = input instanceof Request ? input.method : (init?.method ?? 'GET')
+      if (method === 'GET' && url.pathname === '/api/exams/10') return success({
+        ...learnerExamFixture,
+        questions: [
+          ...learnerExamFixture.questions,
+          { maxScore: 10, questionId: 'q2', questionText: '큐의 특징을 설명하세요.', questionType: 'SHORT' },
+        ],
+        totalScore: 20,
+      })
+      if (method === 'POST' && url.pathname === '/api/exams/10/attempts/start') return success({ startedAt: '2026-09-09T00:58:50Z' })
+      return new Response(null, { status: 404 })
+    })
+
+    renderLearnerExam()
+
+    expect(await screen.findByText('스택의 특징을 설명하세요.')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: '시험 제출' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '다음' }))
+    expect(await screen.findByText('큐의 특징을 설명하세요.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '시험 제출' }))
+    expect(confirmSpy).toHaveBeenCalledWith('전체 2문항 중 0문항에 답변했습니다. 제출하시겠습니까?')
+  })
+
   it('restores a saved answer draft for the current learner and exam', async () => {
     sessionStorage.setItem('exam-draft:10:8', JSON.stringify({ q1: '복원된 답안' }))
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
@@ -140,6 +167,7 @@ describe('ExamDetailPage learner submission', () => {
   })
 
   it('replaces the answer form with an immutable completion state after async submission', async () => {
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       const url = new URL(input instanceof Request ? input.url : String(input), 'http://localhost')
       const method = input instanceof Request ? input.method : (init?.method ?? 'GET')
@@ -167,8 +195,10 @@ describe('ExamDetailPage learner submission', () => {
     await waitFor(() => expect(sessionStorage.getItem('exam-draft:10:8')).not.toBeNull())
     fireEvent.click(screen.getByRole('button', { name: '시험 제출' }))
 
+    expect(confirmSpy).toHaveBeenCalledWith('전체 1문항 중 1문항에 답변했습니다. 제출하시겠습니까?')
     expect(await screen.findByRole('heading', { name: '시험 제출이 완료되었습니다' })).toBeInTheDocument()
     expect(screen.getByText('제출한 답안은 수정할 수 없습니다.')).toBeInTheDocument()
+    expect(screen.getByLabelText('제출한 답안')).toHaveTextContent('스택')
     expect(screen.queryByPlaceholderText('답안을 입력하세요')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: '시험 제출' })).not.toBeInTheDocument()
     expect(sessionStorage.getItem('exam-draft:10:8')).toBeNull()

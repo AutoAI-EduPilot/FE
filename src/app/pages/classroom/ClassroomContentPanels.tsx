@@ -248,6 +248,7 @@ function examToDraft(exam: Exam): CreateExamInput {
   return {
     allowRetake: exam.allowRetake,
     description: exam.description,
+    dueAt: exam.dueAt,
     questions: exam.questions,
     title: exam.title,
     weekNumber: exam.weekNumber,

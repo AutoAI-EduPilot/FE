@@ -18,7 +18,7 @@ import { routes } from '../routes'
 import { usePageTitle } from '../../shared/lib/usePageTitle'
 import { useTheme, type ThemeMode } from '../../shared/theme'
 
-type SettingsSection = 'account' | 'appearance' | 'assistant' | 'feedback' | 'notification' | 'profile'
+type SettingsSection = 'account' | 'appearance' | 'assistant' | 'feedback' | 'notification' | 'password' | 'profile'
 
 const SECTIONS: Array<{ id: SettingsSection; label: string }> = [
   { id: 'profile', label: '프로필' },
@@ -26,6 +26,7 @@ const SECTIONS: Array<{ id: SettingsSection; label: string }> = [
   { id: 'notification', label: '알림' },
   { id: 'assistant', label: 'AI 학습 도우미' },
   { id: 'feedback', label: '피드백' },
+  { id: 'password', label: '비밀번호 변경' },
   { id: 'account', label: '회원 탈퇴' },
 ]
 
@@ -59,7 +60,7 @@ export function SettingsPage() {
 }
 
 export function SettingsContent({ className }: { className?: string } = {}) {
-  const { apiRequest, rawApiRequest, updateUser, user, withdraw } = useAuth()
+  const { apiRequest, logout, rawApiRequest, updateUser, user, withdraw } = useAuth()
   const { mode, setMode } = useTheme()
   const { show: showToast } = useToast()
   const navigate = useNavigate()
@@ -76,6 +77,11 @@ export function SettingsContent({ className }: { className?: string } = {}) {
   const [isSubmittingFeedback, setIsSubmittingFeedback] = useState(false)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
   const [isSavingProfile, setIsSavingProfile] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState('')
+  const [passwordChangeError, setPasswordChangeError] = useState<string | null>(null)
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
   const [password, setPassword] = useState('')
   const [passwordError, setPasswordError] = useState<string | undefined>()
   const [isWithdrawing, setIsWithdrawing] = useState(false)
@@ -184,6 +190,32 @@ export function SettingsContent({ className }: { className?: string } = {}) {
     }
   }
 
+  async function changePassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (isChangingPassword) return
+    if (!currentPassword) { setPasswordChangeError('현재 비밀번호를 입력하세요.'); return }
+    if (!/^(?=.*[A-Za-z])(?=.*\d).{8,64}$/.test(newPassword)) { setPasswordChangeError('새 비밀번호는 영문과 숫자를 포함해 8~64자로 입력하세요.'); return }
+    if (currentPassword === newPassword) { setPasswordChangeError('현재 비밀번호와 다른 비밀번호를 입력하세요.'); return }
+    if (newPassword !== newPasswordConfirm) { setPasswordChangeError('새 비밀번호 확인이 일치하지 않습니다.'); return }
+    setIsChangingPassword(true)
+    setPasswordChangeError(null)
+    try {
+      const result = await repository.changePassword({ currentPassword, newPassword })
+      setCurrentPassword('')
+      setNewPassword('')
+      setNewPasswordConfirm('')
+      showToast('비밀번호를 변경했습니다. 다시 로그인하세요.', 'success')
+      if (result.reauthenticationRequired) {
+        await logout()
+        navigate(routes.login, { replace: true })
+      }
+    } catch (error) {
+      setPasswordChangeError(getRequestErrorMessage(error))
+    } finally {
+      setIsChangingPassword(false)
+    }
+  }
+
   return (
     <>
       <div className={cx('flex flex-col gap-5 lg:flex-row lg:gap-0', className)}>
@@ -260,6 +292,20 @@ export function SettingsContent({ className }: { className?: string } = {}) {
                 </div>
               </form>
             </section>
+          ) : null}
+
+          {section === 'password' ? (
+            <PasswordSection
+              currentPassword={currentPassword}
+              error={passwordChangeError}
+              isSubmitting={isChangingPassword}
+              newPassword={newPassword}
+              newPasswordConfirm={newPasswordConfirm}
+              onCurrentPasswordChange={(value) => { setCurrentPassword(value); setPasswordChangeError(null) }}
+              onNewPasswordChange={(value) => { setNewPassword(value); setPasswordChangeError(null) }}
+              onNewPasswordConfirmChange={(value) => { setNewPasswordConfirm(value); setPasswordChangeError(null) }}
+              onSubmit={changePassword}
+            />
           ) : null}
 
           {section === 'appearance' ? (
@@ -354,6 +400,20 @@ export function SettingsContent({ className }: { className?: string } = {}) {
       <input accept="image/jpeg,image/png,image/webp" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadAvatar(file); event.target.value = '' }} ref={avatarInputRef} type="file" />
     </>
   )
+}
+
+function PasswordSection({ currentPassword, error, isSubmitting, newPassword, newPasswordConfirm, onCurrentPasswordChange, onNewPasswordChange, onNewPasswordConfirmChange, onSubmit }: {
+  currentPassword: string
+  error: string | null
+  isSubmitting: boolean
+  newPassword: string
+  newPasswordConfirm: string
+  onCurrentPasswordChange: (value: string) => void
+  onNewPasswordChange: (value: string) => void
+  onNewPasswordConfirmChange: (value: string) => void
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void
+}) {
+  return <form onSubmit={onSubmit}><h2 className="type-section-title font-bold text-stone-950">비밀번호 변경</h2><p className="mt-1 type-body text-stone-500">변경 후에는 모든 기기에서 다시 로그인해야 합니다.</p><div className="mt-5 grid gap-3"><TextInput autoComplete="current-password" id="current-password" label="현재 비밀번호" onChange={(event) => onCurrentPasswordChange(event.target.value)} type="password" value={currentPassword} /><TextInput autoComplete="new-password" id="new-password" label="새 비밀번호" onChange={(event) => onNewPasswordChange(event.target.value)} type="password" value={newPassword} /><TextInput autoComplete="new-password" id="new-password-confirm" label="새 비밀번호 확인" onChange={(event) => onNewPasswordConfirmChange(event.target.value)} type="password" value={newPasswordConfirm} /></div>{error ? <p className="mt-3 type-body font-medium text-rose-700" role="alert">{error}</p> : null}<div className="mt-5 flex justify-end"><Button aria-label="비밀번호 변경 실행" disabled={isSubmitting || !currentPassword || !newPassword || !newPasswordConfirm} type="submit">{isSubmitting ? '변경 중' : '비밀번호 변경'}</Button></div></form>
 }
 
 function AppearanceSection({

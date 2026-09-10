@@ -153,7 +153,7 @@ function ContentRow({ canManage, isMenuOpen, item, onItem, onMenuToggle, onRemov
       <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         <strong className="min-w-0 max-w-full truncate type-body font-bold text-stone-950">{displayTitle(item.title)}</strong>
         {item.kind === 'notice' && !item.source.published ? <Badge size="compact" tone="warning">예약</Badge> : null}
-        {item.kind === 'exam' ? <span className="flex shrink-0 items-center gap-1.5"><Badge size="compact" tone="info">시험</Badge><Badge size="compact" tone={item.source.status === 'PUBLISHED' ? 'success' : item.source.status === 'CLOSED' ? 'warning' : 'neutral'}>{item.source.status === 'PUBLISHED' ? '공개' : item.source.status === 'CLOSED' ? '종료' : '초안'}</Badge></span> : null}
+        {item.kind === 'exam' ? <span className="flex shrink-0 items-center gap-1.5"><Badge size="compact" tone="info">시험</Badge><Badge size="compact" tone={item.source.status === 'PUBLISHED' ? 'success' : item.source.status === 'CLOSED' ? 'warning' : 'neutral'}>{item.source.status === 'PUBLISHED' ? '공개' : item.source.status === 'CLOSED' ? '종료' : '초안'}</Badge>{!canManage && item.source.mySubmission ? <Badge size="compact" tone={item.source.mySubmission.status === 'GRADED' ? 'success' : item.source.mySubmission.status === 'GRADING_FAILED' ? 'danger' : 'warning'}>{item.source.mySubmission.status === 'GRADED' ? '응시 완료' : item.source.mySubmission.status === 'GRADING_FAILED' ? '채점 확인 필요' : '제출 완료'}</Badge> : null}</span> : null}
       </span>
     </button>
     {item.kind === 'material' && openingMaterialId === item.source.id ? <span className="type-caption text-brand-700">수업 여는 중</span> : null}

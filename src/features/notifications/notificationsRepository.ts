@@ -2,6 +2,9 @@ import type { PagedResponse } from '../../shared/api'
 import type { AuthenticatedRequest } from '../auth'
 
 export type AppNotificationType =
+  | 'EXAM_DEADLINE_APPROACHING'
+  | 'EXAM_GRADED'
+  | 'EXAM_PUBLISHED'
   | 'JOIN_REQUEST_PROCESSED'
   | 'JOIN_REQUEST_RECEIVED'
   | 'MATERIAL_UPLOADED'
@@ -9,6 +12,7 @@ export type AppNotificationType =
 
 export interface AppNotificationLink {
   classroomId?: string
+  examId?: string
   joinRequestId?: string
   materialId?: string
   noticeId?: string
@@ -74,6 +78,7 @@ function mapNotification(value: NotificationDto): AppNotification {
     id: String(value.notificationId),
     link: {
       classroomId: mapId(value.link?.classroomId),
+      examId: mapId(value.link?.examId),
       joinRequestId: mapId(value.link?.joinRequestId),
       materialId: mapId(value.link?.materialId),
       noticeId: mapId(value.link?.noticeId),
