@@ -90,7 +90,7 @@ function renderPanel(repository = createRepository()) {
 
 describe('InfraPanel', () => {
   it('renders server thresholds, cost and the BE app metrics contract', async () => {
-    renderPanel()
+    const { container } = renderPanel()
 
     const serverSection = await screen.findByRole('region', { name: '서버 상태' })
     expect(within(serverSection).getByText('82.4%')).toHaveClass('text-rose-700')
@@ -101,6 +101,13 @@ describe('InfraPanel', () => {
     expect(screen.getByText('50.0%')).toBeInTheDocument()
     expect(screen.getByText('3일 4시간 12분')).toBeInTheDocument()
     expect(screen.getByText('100건')).toBeInTheDocument()
+    const systemHeader = screen.getByRole('heading', { name: '시스템' }).parentElement
+    const costHeader = screen.getByRole('heading', { name: 'AWS 비용' }).parentElement
+    expect(systemHeader).toHaveTextContent('조회')
+    expect(costHeader).toHaveTextContent('조회')
+    expect(costHeader?.textContent).not.toMatch(/:\d{2}:\d{2}/)
+    expect(container.querySelectorAll('[data-cost-date]')).toHaveLength(7)
+    expect(container.querySelector('[data-cost-date="2026-08-31"]')).toHaveClass('fill-brand-700')
   })
 
   it('treats disabled metrics as information while other sections still render', async () => {
@@ -178,15 +185,15 @@ describe('InfraPanel', () => {
 
     const rangeControl = screen.getByLabelText('AWS 비용 조회 기간')
     expect(rangeControl).toHaveTextContent('08.25 - 08.31')
-    expect(screen.getByTitle('2026-08-31: $2.25')).toBeInTheDocument()
-    expect(screen.queryByTitle('2026-08-24: $1.25')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('2026-08-31: $2.25')).toBeInTheDocument()
+    expect(screen.queryByLabelText('2026-08-24: $1.25')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'AWS 비용 다음 주' })).toBeDisabled()
 
     fireEvent.click(screen.getByRole('button', { name: 'AWS 비용 이전 주' }))
 
     expect(rangeControl).toHaveTextContent('08.18 - 08.24')
-    expect(screen.getByTitle('2026-08-24: $1.25')).toBeInTheDocument()
-    expect(screen.queryByTitle('2026-08-31: $2.25')).not.toBeInTheDocument()
+    expect(screen.getByLabelText('2026-08-24: $1.25')).toBeInTheDocument()
+    expect(screen.queryByLabelText('2026-08-31: $2.25')).not.toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'AWS 비용 다음 주' })).toBeEnabled()
     expect(repository.getInfraCost).toHaveBeenCalledTimes(1)
   })
@@ -235,6 +242,9 @@ describe('InfraLineChart', () => {
     expect(screen.getByRole('img', { name: 'CPU 추이' })).toHaveAttribute('viewBox', '0 0 1200 128')
     expect(container.querySelector('path[data-series="CPU"]')).toHaveAttribute('stroke-width', '1.25')
     expect(container.querySelector('path[data-series="CPU"]')?.getAttribute('d')?.match(/M/g)).toHaveLength(2)
+    const timeTicks = container.querySelectorAll('[data-time-tick="true"]')
+    expect(timeTicks.item(0)).toHaveAttribute('text-anchor', 'start')
+    expect(timeTicks.item(timeTicks.length - 1)).toHaveAttribute('text-anchor', 'end')
   })
 
   it('shows the empty message when every point is unavailable', () => {

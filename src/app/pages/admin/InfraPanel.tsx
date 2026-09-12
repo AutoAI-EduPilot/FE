@@ -173,7 +173,7 @@ function SummaryMetric({ danger = false, label, value, valueClassName }: { dange
 
 function SystemSection({ app, metrics, range }: { app: LoadState<InfraApp>; metrics: LoadState<InfraMetrics>; range: InfraRange }) {
   const series = metrics.data?.series ?? emptySeries
-  return <section aria-labelledby="system-title" className="overflow-hidden rounded-lg border border-stone-200 bg-white"><SectionHeader id="system-title" title="시스템" updatedAt={metrics.data?.to ?? app.receivedAt} />{app.error ? <AdminErrorMessage error={app.error} /> : null}{metrics.loading || app.loading ? <PanelMessage message="시스템 상태를 불러오는 중입니다." /> : <div className="grid xl:grid-cols-[minmax(340px,1fr)_minmax(0,1.45fr)]"><AppStatusTable data={app.data} /><div className="min-w-0 border-t border-stone-200 xl:border-t-0 xl:border-l"><InfraLineChart ariaLabel="CPU, 메모리, 디스크 사용률 추이" formatValue={formatPercent} range={range} series={[{ color: '#20263A', label: 'CPU', points: series.cpu }, { color: '#10B981', label: '메모리', points: series.mem }, { color: '#E11D48', label: '디스크', points: series.disk }]} title="리소스 사용률" yMax={100} /><InfraLineChart ariaLabel="네트워크 수신 및 송신 추이" formatValue={formatBytes} range={range} series={[{ color: '#2563EB', label: '수신', points: series.netIn }, { color: '#F59E0B', label: '송신', points: series.netOut }]} title="네트워크" /></div></div>}</section>
+  return <section aria-labelledby="system-title" className="overflow-hidden rounded-lg border border-stone-200 bg-white"><SectionHeader id="system-title" label="조회" title="시스템" updatedAt={metrics.data?.to ?? app.receivedAt} />{app.error ? <AdminErrorMessage error={app.error} /> : null}{metrics.loading || app.loading ? <PanelMessage message="시스템 상태를 불러오는 중입니다." /> : <div className="grid xl:grid-cols-[minmax(340px,1fr)_minmax(0,1.45fr)]"><AppStatusTable data={app.data} /><div className="min-w-0 border-t border-stone-200 xl:border-t-0 xl:border-l"><InfraLineChart ariaLabel="CPU, 메모리, 디스크 사용률 추이" formatValue={formatPercent} range={range} series={[{ color: '#20263A', label: 'CPU', points: series.cpu }, { color: '#10B981', label: '메모리', points: series.mem }, { color: '#E11D48', label: '디스크', points: series.disk }]} title="리소스 사용률" yMax={100} /><InfraLineChart ariaLabel="네트워크 수신 및 송신 추이" formatValue={formatBytes} range={range} series={[{ color: '#2563EB', label: '수신', points: series.netIn }, { color: '#F59E0B', label: '송신', points: series.netOut }]} title="네트워크" /></div></div>}</section>
 }
 
 function AppStatusTable({ data }: { data: InfraApp | null }) {
@@ -201,9 +201,13 @@ function CostSection({ state }: { state: LoadState<InfraCost> }) {
   const latestWeek = weekEndingAt(latestDate)
   const [weekOffset, setWeekOffset] = useState(0)
   const selectedWeek = shiftDateRange(latestWeek, weekOffset * 7)
-  const daily = allDaily.filter((item) => item.date >= selectedWeek.from && item.date <= selectedWeek.to)
+  const selectedDaily = allDaily.filter((item) => item.date >= selectedWeek.from && item.date <= selectedWeek.to)
+  const dailyByDate = new Map(selectedDaily.map((item) => [item.date, item.total]))
+  const daily = Array.from({ length: 7 }, (_, index) => {
+    const date = shiftIsoDate(selectedWeek.from, index)
+    return { date, total: dailyByDate.get(date) ?? 0 }
+  })
   const totalCost = Math.max(1, data?.monthToDate?.total ?? 0)
-  const maxDaily = Math.max(1, ...daily.map((item) => item.total))
   const canGoPrevious = allDaily.length > 0 && selectedWeek.from > allDaily[0].date
   const canGoNext = weekOffset < 0
   return (
@@ -212,7 +216,6 @@ function CostSection({ state }: { state: LoadState<InfraCost> }) {
         detail={data?.updatedAt ? `비용 데이터 기준 ${formatDateTime(data.updatedAt)}` : undefined}
         id="cost-title"
         label="조회"
-        showSeconds
         title="AWS 비용"
         updatedAt={state.receivedAt}
       />
@@ -253,22 +256,51 @@ function CostSection({ state }: { state: LoadState<InfraCost> }) {
                   range={selectedWeek}
                 />
               </div>
-              {daily.length === 0 ? <p className="py-8 text-center type-caption text-stone-500">일별 비용 내역이 없습니다.</p> : (
-                <div className="mt-2 flex h-32 items-end gap-2 overflow-x-auto pb-1" role="img" aria-label={`${selectedWeek.from}부터 ${selectedWeek.to}까지 일별 AWS 비용`}>
-                  {daily.map((item) => (
-                    <div className="flex h-full min-w-10 flex-1 flex-col items-center justify-end" key={item.date} title={`${item.date}: ${formatMoney(item.total, data.currency ?? 'USD')}`}>
-                      <strong className="mb-1 type-micro text-stone-600">{formatMoney(item.total, data.currency ?? 'USD')}</strong>
-                      <div className="w-6 rounded-t-sm bg-brand-700" style={{ height: `${Math.max(2, (item.total / maxDaily) * 100)}%` }} />
-                      <span className="mt-1 type-micro text-stone-400">{formatMonthDay(item.date)}</span>
-                    </div>
-                  ))}
-                </div>
+              {selectedDaily.length === 0 ? <p className="py-8 text-center type-caption text-stone-500">일별 비용 내역이 없습니다.</p> : (
+                <DailyCostChart currency={data.currency ?? 'USD'} daily={daily} range={selectedWeek} />
               )}
             </div>
           </div>
         </>
       ) : null}
     </section>
+  )
+}
+
+function DailyCostChart({ currency, daily, range }: { currency: string; daily: Array<{ date: string; total: number }>; range: { from: string; to: string } }) {
+  const yMax = costAxisMaximum(daily.map((item) => item.total))
+  const slotWidth = (COST_CHART_RIGHT - COST_CHART_LEFT) / daily.length
+  const chartHeight = COST_CHART_BOTTOM - COST_CHART_TOP
+  return (
+    <div className="mt-2 overflow-x-auto pb-1">
+      <svg aria-label={`${range.from}부터 ${range.to}까지 일별 AWS 비용`} className="h-auto min-w-[680px] w-full" role="img" viewBox="0 0 860 230">
+        <title>{range.from}부터 {range.to}까지 일별 AWS 비용</title>
+        {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+          const y = COST_CHART_TOP + ratio * chartHeight
+          const value = yMax * (1 - ratio)
+          return (
+            <g key={ratio}>
+              <line stroke="#E8EAF1" strokeWidth="1" x1={COST_CHART_LEFT} x2={COST_CHART_RIGHT} y1={y} y2={y} />
+              <text className="fill-stone-400 type-micro" textAnchor="end" x={COST_CHART_LEFT - 10} y={y + 4}>{formatMoney(value, currency)}</text>
+            </g>
+          )
+        })}
+        {daily.map((item, index) => {
+          const x = COST_CHART_LEFT + slotWidth * index + slotWidth / 2
+          const barHeight = item.total <= 0 ? 0 : Math.max(2, (item.total / yMax) * chartHeight)
+          const y = COST_CHART_BOTTOM - barHeight
+          return (
+            <g key={item.date}>
+              {item.total > 0 ? <text className="fill-stone-700 type-micro font-semibold" textAnchor="middle" x={x} y={Math.max(COST_CHART_TOP + 10, y - 8)}>{formatMoney(item.total, currency)}</text> : null}
+              <rect aria-label={`${item.date}: ${formatMoney(item.total, currency)}`} className="fill-brand-700" data-cost-date={item.date} height={barHeight} rx="2" width="28" x={x - 14} y={y}>
+                <title>{item.date}: {formatMoney(item.total, currency)}</title>
+              </rect>
+              <text className="fill-stone-500 type-micro" textAnchor="middle" x={x} y="216">{formatMonthDay(item.date)}</text>
+            </g>
+          )
+        })}
+      </svg>
+    </div>
   )
 }
 
@@ -343,8 +375,8 @@ export function InfraLineChart({
               ))}
               <text className="fill-stone-400 type-micro" textAnchor="end" x="44" y={CHART_TOP + 3}>{formatValue(resolvedMax)}</text>
               <text className="fill-stone-400 type-micro" textAnchor="end" x="44" y={CHART_BOTTOM + 3}>{formatValue(0)}</text>
-              {ticks.map((timestamp) => (
-                <text className="fill-stone-400 type-micro" key={timestamp} textAnchor="middle" x={scaleTime(timestamp, minTime, maxTime)} y="121">
+              {ticks.map((timestamp, index) => (
+                <text className="fill-stone-400 type-micro" data-time-tick="true" key={timestamp} textAnchor={index === 0 ? 'start' : index === ticks.length - 1 ? 'end' : 'middle'} x={scaleTime(timestamp, minTime, maxTime)} y="121">
                   {formatChartTime(new Date(timestamp).toISOString(), range)}
                 </text>
               ))}
@@ -370,11 +402,11 @@ function buildLinePath(points: InfraPoint[], minTime: number, maxTime: number, y
   }).filter(Boolean).join(' ')
 }
 
-function SectionHeader({ detail, id, label = '갱신', showSeconds = false, title, updatedAt }: { detail?: string; id: string; label?: string; showSeconds?: boolean; title: string; updatedAt: string | null | undefined }) {
+function SectionHeader({ detail, id, label = '갱신', title, updatedAt }: { detail?: string; id: string; label?: string; title: string; updatedAt: string | null | undefined }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 px-4 py-3">
       <h2 className="type-control font-bold text-stone-950" id={id}>{title}</h2>
-      <p className="type-micro text-stone-400" title={detail}>{label} {updatedAt ? formatInfraTimestamp(updatedAt, showSeconds) : '-'}</p>
+      <p className="type-micro text-stone-400" title={detail}>{label} {updatedAt ? formatDateTime(updatedAt) : '-'}</p>
     </div>
   )
 }
@@ -444,19 +476,6 @@ function formatPercent(value: number | null | undefined) {
   return value == null ? '-' : `${value.toFixed(1)}%`
 }
 
-function formatInfraTimestamp(value: string, showSeconds: boolean) {
-  if (!showSeconds) return formatDateTime(value)
-  return new Intl.DateTimeFormat('ko-KR', {
-    day: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-    month: 'numeric',
-    second: '2-digit',
-    timeZone: 'Asia/Seoul',
-    year: 'numeric',
-  }).format(new Date(value))
-}
-
 function formatUptime(seconds: number) {
   const minutes = Math.max(0, Math.floor(seconds / 60))
   const days = Math.floor(minutes / 1440)
@@ -513,6 +532,10 @@ const CHART_LEFT = 52
 const CHART_RIGHT = 1188
 const CHART_TOP = 8
 const CHART_BOTTOM = 94
+const COST_CHART_LEFT = 58
+const COST_CHART_RIGHT = 848
+const COST_CHART_TOP = 22
+const COST_CHART_BOTTOM = 190
 
 function scaleTime(value: number, min: number, max: number) {
   if (max <= min) return (CHART_LEFT + CHART_RIGHT) / 2
@@ -521,6 +544,12 @@ function scaleTime(value: number, min: number, max: number) {
 
 function scaleValue(value: number, max: number) {
   return CHART_BOTTOM - (Math.max(0, Math.min(value, max)) / Math.max(1, max)) * (CHART_BOTTOM - CHART_TOP)
+}
+
+function costAxisMaximum(values: number[]) {
+  const maximum = Math.max(0, ...values)
+  const step = Math.max(0.25, Math.ceil(maximum) / 4)
+  return step * 4
 }
 
 function chartTicks(timestamps: number[], count: number) {
