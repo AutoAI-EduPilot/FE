@@ -5,13 +5,16 @@ import {
   Check,
   ChevronsLeft,
   ChevronsRight,
+  CircleUserRound,
   ClipboardCheck,
   FileCheck2,
   LayoutGrid,
+  List,
   LogOut,
   NotebookPen,
+  ServerCog,
   Settings,
-  ShieldCheck,
+  Sparkles,
   Trash2,
   UserPlus,
   X,
@@ -129,7 +132,7 @@ export function AppLayout() {
     if (!isMobileWeb) return
     const activeItem = primaryNavigationRef.current?.querySelector<HTMLElement>('[aria-current="page"]')
     activeItem?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' })
-  }, [isMobileWeb, location.pathname])
+  }, [isMobileWeb, location.pathname, location.search])
 
   useEffect(() => {
     document.documentElement.classList.toggle(
@@ -457,19 +460,24 @@ export function AppLayout() {
             className="mobile-horizontal-scroll order-2 mt-3 flex w-full gap-1 overflow-x-auto lg:mt-6 lg:ml-0 lg:w-auto lg:flex-col lg:gap-0.5 mobile-web:!mt-3 mobile-web:!w-full mobile-web:!flex-row mobile-web:!gap-1 mobile-web:scroll-px-3"
             ref={primaryNavigationRef}
           >
-            {primaryNavigation.map((item) => (
+            {primaryNavigation.map((item) => {
+              const itemPath = item.to.split('?')[0]
+              const isEntranceRequestsPath = location.pathname.endsWith('/entrance-requests')
+              const isPathActive = location.pathname === itemPath || location.pathname.startsWith(`${itemPath}/`)
+              const isItemActive = isAdmin && item.to.startsWith(routes.admin)
+                ? adminTabFromLocation(item.to) === adminTabFromLocation(`${location.pathname}${location.search}`)
+                : item.to === routes.entranceRequests
+                  ? isEntranceRequestsPath
+                  : item.to === routes.classrooms
+                    ? isPathActive && !isEntranceRequestsPath
+                    : isPathActive
+
+              return (
               <div className="contents" key={item.label}>
-                <NavLink
+                <Link
+                  aria-current={isItemActive ? 'page' : undefined}
+                  className={navLinkClassName(isItemActive, isCollapsed && !isMobileWeb)}
                   to={item.to}
-                  className={({ isActive }) => {
-                    const isEntranceRequestsPath = location.pathname.endsWith('/entrance-requests')
-                    const isItemActive = item.to === routes.entranceRequests
-                      ? isEntranceRequestsPath
-                      : item.to === routes.classrooms
-                        ? isActive && !isEntranceRequestsPath
-                        : isActive
-                    return navLinkClassName(isItemActive, isCollapsed && !isMobileWeb)
-                  }}
                   title={item.label}
                 >
                   <item.icon aria-hidden="true" className="shrink-0" size={16} />
@@ -485,7 +493,7 @@ export function AppLayout() {
                       {pendingJoinRequestCount > 99 ? '99+' : pendingJoinRequestCount}
                     </span>
                   ) : null}
-                </NavLink>
+                </Link>
                 {item.label === '강의실' && sidebarClassrooms.length > 0 ? (
                   <div className={cx('ml-5 hidden border-l border-stone-200 py-1 pl-2 lg:flex lg:flex-col lg:gap-0.5', isCollapsed && 'lg:hidden')}>
                     {sidebarClassrooms.map((classroom) => (
@@ -505,7 +513,8 @@ export function AppLayout() {
                   </div>
                 ) : null}
               </div>
-            ))}
+              )
+            })}
           </nav>
         </div>
 
@@ -572,14 +581,16 @@ export function AppLayout() {
           'min-w-0 flex-1',
           isStudyWorkspace
             ? 'h-[calc(100dvh-61px)] overflow-hidden p-0 lg:h-dvh mobile-web:!h-[calc(100dvh-113px)]'
-            : 'px-4 py-4 sm:px-6 lg:px-12 lg:py-5 mobile-phone:px-3 mobile-web:mobile-safe-bottom',
+            : cx('px-4 py-4 sm:px-6 lg:py-5 mobile-phone:px-3 mobile-web:mobile-safe-bottom', isAdmin ? 'lg:px-8' : 'lg:px-12'),
         )}
       >
         <div
           className={
             isStudyWorkspace
               ? 'h-full min-h-0'
-              : 'app-page-frame'
+              : isAdmin
+                ? 'w-full min-w-0'
+                : 'app-page-frame'
           }
         >
           <Outlet />
@@ -834,8 +845,16 @@ const instructorNavigation: Array<{ icon: LucideIcon; label: string; to: string 
 ]
 
 const adminNavigation: Array<{ icon: LucideIcon; label: string; to: string }> = [
-  { icon: ShieldCheck, label: '관리자', to: routes.admin },
+  { icon: CircleUserRound, label: '회원', to: routes.admin },
+  { icon: List, label: '강의실', to: `${routes.admin}?tab=classrooms` },
+  { icon: Sparkles, label: 'AI 사용량', to: `${routes.admin}?tab=ai-usage` },
+  { icon: ServerCog, label: '인프라', to: `${routes.admin}?tab=infra` },
 ]
+
+function adminTabFromLocation(value: string): string {
+  const query = value.split('?')[1] ?? ''
+  return new URLSearchParams(query).get('tab') ?? 'users'
+}
 
 function classroomDotClassName(_color: Classroom['color']): string {
   void _color

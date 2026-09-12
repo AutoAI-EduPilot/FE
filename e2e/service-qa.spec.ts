@@ -13,7 +13,7 @@ import {
 const roleRoutes: Record<QaRole, string[]> = {
   LEARNER: ['/classrooms', '/calendar', '/notes', '/review-quizzes', '/exams', '/settings', '/updates'],
   INSTRUCTOR: ['/classrooms', '/calendar', '/entrance-requests', '/settings', '/updates'],
-  ADMIN: ['/admin'],
+  ADMIN: ['/admin', '/admin?tab=classrooms', '/admin?tab=ai-usage', '/admin?tab=infra'],
 }
 
 test.describe('public and authentication', () => {

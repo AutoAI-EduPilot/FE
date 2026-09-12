@@ -27,6 +27,17 @@ beforeEach(() => {
   installApiFixtureServer()
 })
 
+function previousWeekRange() {
+  const to = new Date()
+  to.setDate(to.getDate() - 7)
+  const from = new Date(to)
+  from.setDate(from.getDate() - 6)
+  const format = (value: Date) =>
+    new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul' }).format(value)
+
+  return { from: format(from), to: format(to) }
+}
+
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
@@ -113,18 +124,18 @@ describe('AppRoutes', () => {
       role: 'ADMIN',
     })
 
-    expect(await screen.findByRole('heading', { name: '관리자' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '회원' })).toBeInTheDocument()
     const adminNavigation = screen.getByRole('navigation', { name: '관리자 메뉴' })
     expect(adminNavigation).toBeInTheDocument()
     expect(within(adminNavigation).getAllByRole('button')).toHaveLength(4)
     fireEvent.click(within(adminNavigation).getByRole('button', { name: '인프라' }))
-    expect(await screen.findByRole('heading', { name: '서버 상태' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '인프라' })).toBeInTheDocument()
     expect(
       screen.getAllByRole('button', { name: '프로필 메뉴' }).some((button) =>
         within(button).queryByText('관리자'),
       ),
     ).toBe(true)
-    expect(screen.queryByRole('link', { name: '강의실' })).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: '강의실' })).toHaveAttribute('href', '/admin?tab=classrooms')
     expect(screen.queryByRole('button', { name: /알림/ })).not.toBeInTheDocument()
   })
 
@@ -146,23 +157,24 @@ describe('AppRoutes', () => {
     renderRoute('/admin', { email: 'admin@example.com', name: '관리자', role: 'ADMIN' })
     fireEvent.click(await screen.findByRole('button', { name: 'AI 사용량' }))
 
-    expect(await screen.findByRole('heading', { name: '일별 사용 추이' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: '일별 호출' })).toBeInTheDocument()
     expect(screen.getByText('총 토큰').parentElement).toHaveTextContent('-')
-    expect(screen.getByTitle('2026-08-30: 호출 4건, 토큰 -')).toBeInTheDocument()
+    expect(screen.getByTitle('2026-08-30: 성공 3건, 실패 1건, 토큰 -')).toBeInTheDocument()
   })
 
-  it('renders the reported dev AI usage response using the current token sum for the selected KST date', async () => {
+  it('renders the reported dev AI usage response using the current token sum for a selected KST week', async () => {
     const usageRequests: URL[] = []
     const totals = { callCount: 6, inputTokens: 12573, outputTokens: 3549, reasoningTokens: 1174 }
+    const selectedRange = previousWeekRange()
     installApiFixtureServer((request) => {
       const url = new URL(request.url)
       if (!url.pathname.startsWith('/api/admin/ai-usage/')) return undefined
       usageRequests.push(url)
-      const selectedDate = url.searchParams.get('from') === '2026-08-31'
-        && url.searchParams.get('to') === '2026-08-31'
+      const selectedWeek = url.searchParams.get('from') === selectedRange.from
+        && url.searchParams.get('to') === selectedRange.to
       if (url.pathname.endsWith('/summary')) {
-        return apiSuccess(selectedDate ? {
-          daily: [{ date: '2026-08-31', successCount: 6, failCount: 0, ...totals }],
+        return apiSuccess(selectedWeek ? {
+          daily: [{ date: selectedRange.from, successCount: 6, failCount: 0, ...totals }],
           features: [
             { feature: 'DIAGNOSIS', callCount: 1, inputTokens: 3192, outputTokens: 429, reasoningTokens: 562 },
             { feature: 'QUIZ_ASSESSMENT', callCount: 1, inputTokens: 2793, outputTokens: 977, reasoningTokens: 0 },
@@ -170,33 +182,29 @@ describe('AppRoutes', () => {
           ],
         } : { daily: [], features: [] })
       }
-      return apiSuccess({ items: selectedDate ? [
+      return apiSuccess({ items: selectedWeek ? [
         { userId: 1, email: 'usage-user@example.com', name: 'Usage fixture user', status: 'ACTIVE', ...totals },
       ] : [] })
     })
 
     renderRoute('/admin', { email: 'admin@example.com', name: '관리자', role: 'ADMIN' })
     fireEvent.click(await screen.findByRole('button', { name: 'AI 사용량' }))
-    await screen.findByRole('heading', { name: '일별 사용 추이' })
-    fireEvent.change(screen.getByLabelText('시작일'), { target: { value: '2026-08-31' } })
-    fireEvent.change(screen.getByLabelText('종료일'), { target: { value: '2026-08-31' } })
-    fireEvent.click(screen.getByRole('button', { name: '조회' }))
+    await screen.findByRole('heading', { name: '일별 호출' })
+    expect(screen.getByRole('button', { name: '다음 주' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: '이전 주' }))
 
-    expect(await screen.findByTitle('2026-08-31: 호출 6건, 토큰 17,296')).toBeInTheDocument()
+    expect(await screen.findByTitle(`${selectedRange.from}: 성공 6건, 실패 0건, 토큰 17,296`)).toBeInTheDocument()
     expect(screen.getByText('총 호출').parentElement).toHaveTextContent('6건')
-    expect(screen.getByText('실패', { exact: true }).parentElement).toHaveTextContent('0건')
+    expect(screen.getAllByText('실패', { exact: true })[0].parentElement).toHaveTextContent('0건')
     expect(screen.getByText('총 토큰').parentElement).toHaveTextContent('17,296')
-    expect(within(screen.getByRole('row', { name: '학습 대화 4 9,343' }))
-      .getAllByRole('cell').map((cell) => cell.textContent)).toEqual(['학습 대화', '4', '9,343'])
-    expect(within(screen.getByRole('row', { name: '퀴즈 평가 1 3,770' }))
-      .getAllByRole('cell').map((cell) => cell.textContent)).toEqual(['퀴즈 평가', '1', '3,770'])
-    expect(within(screen.getByRole('row', { name: '진단 1 4,183' }))
-      .getAllByRole('cell').map((cell) => cell.textContent)).toEqual(['진단', '1', '4,183'])
-    expect(screen.getByRole('row', { name: /usage-user@example.com 6 17,296/ })).toBeInTheDocument()
+    expect(screen.getByTitle('학습 대화: 4건, 토큰 9,343')).toBeInTheDocument()
+    expect(screen.getByTitle('퀴즈 평가: 1건, 토큰 3,770')).toBeInTheDocument()
+    expect(screen.getByTitle('진단: 1건, 토큰 4,183')).toBeInTheDocument()
+    expect(screen.getByRole('row', { name: /usage-user@example.com 6 100% 17,296/ })).toBeInTheDocument()
     for (const endpoint of ['summary', 'users']) {
       const latest = usageRequests.filter((url) => url.pathname.endsWith(`/${endpoint}`)).at(-1)
-      expect(latest?.searchParams.get('from')).toBe('2026-08-31')
-      expect(latest?.searchParams.get('to')).toBe('2026-08-31')
+      expect(latest?.searchParams.get('from')).toBe(selectedRange.from)
+      expect(latest?.searchParams.get('to')).toBe(selectedRange.to)
       if (endpoint === 'users') expect(latest?.searchParams.get('limit')).toBe('20')
     }
   })

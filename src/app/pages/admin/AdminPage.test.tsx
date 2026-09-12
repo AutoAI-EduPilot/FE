@@ -74,8 +74,11 @@ describe('AdminPage', () => {
     )
 
     expect(await screen.findByText('방금 전')).toBeInTheDocument()
-    fireEvent.change(screen.getByLabelText('정렬'), { target: { value: 'RECENT_ACTIVITY_DESC' } })
+    expect(screen.getByRole('button', { name: '가입일 내림차순 정렬' })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByRole('button', { name: '회원 · ID 오름차순 정렬' })).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.click(screen.getByRole('button', { name: '최근 활동 내림차순 정렬' }))
     await waitFor(() => expect(vi.mocked(globalThis.fetch).mock.calls.some(([input]) => String(input instanceof Request ? input.url : input).includes('sort=RECENT_ACTIVITY_DESC'))).toBe(true))
+    expect(screen.getByRole('button', { name: '최근 활동 오름차순 정렬' })).toHaveAttribute('aria-pressed', 'true')
     fireEvent.click(screen.getByRole('button', { name: '회원 상세 정보' }))
     expect(await screen.findByRole('button', { name: '임시 비밀번호 발급' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: '임시 비밀번호 발급' }))
