@@ -599,6 +599,81 @@ async function handleDevRoute(
     })
   }
 
+  if (method === 'GET' && pathname === '/api/admin/users') {
+    const users = [
+      { authProvider: 'LOCAL', createdAt: '2026-09-08T01:00:00Z', email: 'learner@example.com', id: 106, lastActiveAt: '2026-09-12T03:00:00Z', name: '테스트 학습자', role: 'LEARNER', status: 'ACTIVE' },
+      { authProvider: 'LOCAL', createdAt: '2026-09-08T00:00:00Z', email: 'instructor@example.com', id: 105, lastActiveAt: '2026-09-12T00:00:00Z', name: '윤창희', role: 'INSTRUCTOR', status: 'ACTIVE' },
+      { authProvider: 'GOOGLE', createdAt: '2026-09-07T01:00:00Z', email: 'member@example.com', id: 104, lastActiveAt: '2026-09-11T03:00:00Z', name: '매곡중1', role: 'LEARNER', status: 'ACTIVE' },
+      { authProvider: 'GOOGLE', createdAt: '2026-09-03T01:00:00Z', email: 'teacher@example.com', id: 103, lastActiveAt: '2026-09-10T03:00:00Z', name: '고영빈', role: 'INSTRUCTOR', status: 'ACTIVE' },
+      { authProvider: 'LOCAL', createdAt: '2026-08-30T01:00:00Z', email: 'admin@example.com', id: 1, lastActiveAt: '2026-09-12T04:00:00Z', name: 'admin', role: 'ADMIN', status: 'ACTIVE' },
+    ]
+    const role = url.searchParams.get('role')
+    const status = url.searchParams.get('status')
+    const query = (url.searchParams.get('q') ?? '').toLowerCase()
+    const filtered = users.filter((user) => (!role || user.role === role)
+      && (!status || user.status === status)
+      && (!query || user.name.toLowerCase().includes(query) || user.email.toLowerCase().includes(query)))
+    const size = Number(url.searchParams.get('size') ?? 20)
+    const page = Number(url.searchParams.get('page') ?? 0)
+    return apiSuccess({
+      items: filtered.slice(page * size, (page + 1) * size),
+      page,
+      size,
+      totalElements: filtered.length,
+      totalPages: Math.ceil(filtered.length / size),
+    })
+  }
+
+  const adminUserDetail = /^\/api\/admin\/users\/(\d+)$/.exec(pathname)
+  if (method === 'GET' && adminUserDetail) {
+    const id = Number(adminUserDetail[1])
+    return apiSuccess({ affiliation: id === 1 ? null : '울산대학교', authProvider: id === 1 ? 'LOCAL' : 'GOOGLE', consentedAt: '2026-09-01T00:00:00Z', createdAt: '2026-09-01T00:00:00Z', email: `member${id}@example.com`, id, lastActiveAt: '2026-09-12T03:00:00Z', name: `회원 ${id}`, role: id === 1 ? 'ADMIN' : 'LEARNER', status: 'ACTIVE' })
+  }
+
+  if (method === 'GET' && pathname === '/api/admin/classrooms') {
+    const classrooms = [
+      { createdAt: '2026-09-09T01:00:00Z', id: 24, instructor: { id: 21, name: '이건희' }, memberCount: 0, name: 'CER 논변 학습', status: 'ACTIVE' },
+      { createdAt: '2026-09-08T01:00:00Z', id: 23, instructor: { id: 22, name: '윤창희' }, memberCount: 1, name: '화학', status: 'ACTIVE' },
+      { createdAt: '2026-09-07T01:00:00Z', id: 22, instructor: { id: 23, name: '고영빈' }, memberCount: 12, name: 'AX대학원 데이터엔지니어링', status: 'ACTIVE' },
+      { createdAt: '2026-09-03T01:00:00Z', id: 21, instructor: { id: 24, name: '진동섭' }, memberCount: 51, name: 'SK-Mini-CDS과정', status: 'ACTIVE' },
+    ]
+    const size = Number(url.searchParams.get('size') ?? 20)
+    const page = Number(url.searchParams.get('page') ?? 0)
+    return apiSuccess({ items: classrooms.slice(page * size, (page + 1) * size), page, size, totalElements: classrooms.length, totalPages: Math.ceil(classrooms.length / size) })
+  }
+
+  const adminClassroomDetail = /^\/api\/admin\/classrooms\/(\d+)$/.exec(pathname)
+  if (method === 'GET' && adminClassroomDetail) {
+    const id = Number(adminClassroomDetail[1])
+    return apiSuccess({ createdAt: '2026-09-01T00:00:00Z', id, instructor: { id: 21, name: '강의자' }, memberCount: 2, members: [{ joinedAt: '2026-09-02T00:00:00Z', name: '학습자 1', role: 'LEARNER', userId: 31 }, { joinedAt: '2026-09-03T00:00:00Z', name: '학습자 2', role: 'LEARNER', userId: 32 }], name: `강의실 ${id}`, status: 'ACTIVE' })
+  }
+
+  if (method === 'GET' && pathname === '/api/admin/ai-usage/summary') {
+    return apiSuccess({
+      daily: [
+        { callCount: 32, date: '2026-09-06', failCount: 1, inputTokens: 420000, outputTokens: 180000, reasoningTokens: 70000, successCount: 31 },
+        { callCount: 89, date: '2026-09-07', failCount: 2, inputTokens: 1200000, outputTokens: 510000, reasoningTokens: 160000, successCount: 87 },
+        { callCount: 52, date: '2026-09-08', failCount: 1, inputTokens: 710000, outputTokens: 290000, reasoningTokens: 90000, successCount: 51 },
+        { callCount: 86, date: '2026-09-09', failCount: 2, inputTokens: 1180000, outputTokens: 470000, reasoningTokens: 160000, successCount: 84 },
+        { callCount: 39, date: '2026-09-10', failCount: 1, inputTokens: 530000, outputTokens: 210000, reasoningTokens: 80000, successCount: 38 },
+      ],
+      features: [
+        { callCount: 156, feature: 'TURN', inputTokens: 2200000, outputTokens: 810000, reasoningTokens: 270000 },
+        { callCount: 61, feature: 'DOC_CHAT', inputTokens: 840000, outputTokens: 330000, reasoningTokens: 110000 },
+        { callCount: 46, feature: 'QUIZ_ASSESSMENT', inputTokens: 620000, outputTokens: 260000, reasoningTokens: 90000 },
+        { callCount: 35, feature: 'GRADE', inputTokens: 470000, outputTokens: 190000, reasoningTokens: 70000 },
+      ],
+    })
+  }
+
+  if (method === 'GET' && pathname === '/api/admin/ai-usage/users') {
+    return apiSuccess({ items: [
+      { callCount: 93, email: 'gorilla.kr@example.com', inputTokens: 1300000, name: '고영빈', outputTokens: 500000, reasoningTokens: 153000, status: 'ACTIVE', userId: 103 },
+      { callCount: 91, email: 'teacher@example.com', inputTokens: 1270000, name: '김대현', outputTokens: 490000, reasoningTokens: 151000, status: 'ACTIVE', userId: 104 },
+      { callCount: 57, email: 'learner@example.com', inputTokens: 780000, name: '이정민', outputTokens: 300000, reasoningTokens: 117000, status: 'ACTIVE', userId: 106 },
+    ] })
+  }
+
   if (method === 'GET' && pathname === '/api/admin/infra/metrics') {
     const env = url.searchParams.get('env') ?? 'prod'
     const range = url.searchParams.get('range') ?? '24h'

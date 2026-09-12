@@ -222,7 +222,7 @@ function LearnerClassroomsPage() {
 
       {latestSession ? (
         <section className="flex flex-col gap-4 rounded-lg bg-stone-100 px-5 py-4 sm:flex-row sm:items-center">
-          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-rose-50 type-micro font-bold text-rose-600">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-rose-50 type-micro font-bold text-rose-700">
             PDF
           </span>
           <div className="min-w-0 flex-1">

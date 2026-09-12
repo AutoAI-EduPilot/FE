@@ -463,7 +463,12 @@ export function InstructorReportCriteriaPage() {
   async function createCriterion(event: FormEvent) {
     event.preventDefault()
     if (!name.trim() || !description.trim() || !rubric.trim() || isSaving || activeCustomCriterionCount >= CUSTOM_CRITERIA_LIMIT) return
+    if (hasCriterionNameConflict(criteria, name)) {
+      setError(`'${name.trim()}' 이름의 평가 기준이 이미 있습니다. 기존 기준과 구분되는 이름을 입력해 주세요.`)
+      return
+    }
     setIsSaving(true)
+    setError(null)
     try {
       const created = await repository.createCriterion(classroomId, {
         active: true,
@@ -522,6 +527,10 @@ export function InstructorReportCriteriaPage() {
       || isUpdating
     ) return
     const previousCriterionId = editingCriterion.id
+    if (hasCriterionNameConflict(criteria, editName, previousCriterionId)) {
+      setError(`'${editName.trim()}' 이름의 평가 기준이 이미 있습니다. 기존 기준과 구분되는 이름을 입력해 주세요.`)
+      return
+    }
     setIsUpdating(true)
     setError(null)
     try {
@@ -570,19 +579,22 @@ export function InstructorReportCriteriaPage() {
     {reportsEnabled && isLoading ? <LoadingState message="평가 기준을 불러오는 중입니다." /> : null}
     {reportsEnabled && !isLoading ? <section aria-label="리포트 평가 기준 관리" className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-stone-200 bg-white">
       <div className="flex shrink-0 flex-col gap-3 border-b border-stone-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
-        <div><h2 className="type-body font-bold text-stone-900">평가 기준</h2><p className="mt-0.5 type-caption text-stone-400">리포트에 사용할 평가 기준을 추가하거나 수정하고 활성 상태를 관리하세요.</p></div>
+        <div><h2 className="type-body font-bold text-stone-900">평가 기준</h2><p className="mt-0.5 type-caption text-stone-500">리포트에 사용할 평가 기준을 추가하거나 수정하고 활성 상태를 관리하세요.</p></div>
         <div className="flex shrink-0 gap-2"><Button disabled={isGenerating} onClick={() => void generateCriteria()} variant="secondary">{isGenerating ? <LoaderCircle className="animate-spin" size={14} /> : <Sparkles size={14} />}{isGenerating ? '생성 중' : '지표 생성'}</Button><ButtonLink to={classroomReportsPath(classroomId)} variant="secondary">리포트로 돌아가기</ButtonLink></div>
       </div>
       <div className="min-h-0 flex-1 overflow-auto overscroll-contain p-5 [scrollbar-gutter:stable]">
+        <p className="mb-4 rounded-lg border border-brand-100 bg-brand-50 px-4 py-3 type-control text-brand-700" role="note">
+          변경한 평가 기준은 기존에 저장된 리포트에는 영향을 주지 않으며, 다음 리포트 생성부터 반영됩니다.
+        </p>
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
           <section className="overflow-hidden rounded-lg border border-stone-200 bg-white"><div className="border-b border-stone-200 bg-stone-50 px-5 py-3"><h3 className="type-body font-bold">활성 커스텀 기준 {activeCustomCriterionCount}/{CUSTOM_CRITERIA_LIMIT}</h3></div>{criteria.length === 0 ? <EmptyState description="기본 평가 기준은 서버 정책에 따라 제공되며 강의실별 기준을 추가할 수 있습니다." title="추가 평가 기준이 없습니다" /> : criteria.map((criterion) => {
         const isEditing = editingCriterion?.id === criterion.id
         return <div className="border-b border-stone-100 px-5 py-4 last:border-0" key={criterion.id ?? `builtin-${criterion.key}`}>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4"><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><strong className="type-body">{criterion.name}</strong><Badge tone={criterion.active ? 'success' : 'neutral'}>{criterion.active ? '사용 중' : '비활성'}</Badge>{criterion.builtin ? <Badge tone="neutral">기본</Badge> : null}</div><p className="mt-1 type-caption leading-5 text-stone-500">{criterion.description}</p><p className="mt-2 type-micro text-stone-400">최소 근거 {criterion.minimumEvidence}개 · 버전 {criterion.version || '-'}</p></div>{criterion.builtin || criterion.id === null ? null : <div className="flex shrink-0 flex-wrap justify-end gap-2"><Button disabled={isUpdating || deletingCriterionId !== null} onClick={() => startEditingCriterion(criterion)} size="sm" variant="secondary"><Pencil aria-hidden="true" size={13} />수정</Button><Button disabled={isUpdating || deletingCriterionId !== null} onClick={() => void toggleCriterion(criterion)} size="sm" variant="secondary">{criterion.active ? '비활성화' : '활성화'}</Button><Button aria-label={`${criterion.name} 삭제`} className="text-rose-700 hover:bg-rose-50 hover:text-rose-800" disabled={isUpdating || deletingCriterionId !== null} onClick={() => void deleteCriterion(criterion)} size="sm" variant="secondary"><Trash2 aria-hidden="true" size={13} />{deletingCriterionId === criterion.id ? '삭제 중' : '삭제'}</Button></div>}</div>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-4"><div className="min-w-0 flex-1"><div className="flex items-center gap-2"><strong className="type-body">{criterion.name}</strong><Badge tone={criterion.active ? 'success' : 'neutral'}>{criterion.active ? '사용 중' : '비활성'}</Badge>{criterion.builtin ? <Badge tone="neutral">기본</Badge> : null}</div><p className="mt-1 type-caption leading-5 text-stone-500">{criterion.description}</p><p className="mt-2 type-micro text-stone-500">최소 근거 {criterion.minimumEvidence}개 · 버전 {criterion.version || '-'}</p></div>{criterion.builtin || criterion.id === null ? null : <div className="flex shrink-0 flex-wrap justify-end gap-2"><Button disabled={isUpdating || deletingCriterionId !== null} onClick={() => startEditingCriterion(criterion)} size="sm" variant="secondary"><Pencil aria-hidden="true" size={13} />수정</Button><Button aria-pressed={criterion.active} disabled={isUpdating || deletingCriterionId !== null} onClick={() => void toggleCriterion(criterion)} size="sm" variant="secondary">{criterion.active ? '비활성화' : '활성화'}</Button><Button aria-label={`${criterion.name} 삭제`} className="text-rose-700 hover:bg-rose-50 hover:text-rose-800" disabled={isUpdating || deletingCriterionId !== null} onClick={() => void deleteCriterion(criterion)} size="sm" variant="secondary"><Trash2 aria-hidden="true" size={13} />{deletingCriterionId === criterion.id ? '삭제 중' : '삭제'}</Button></div>}</div>
           {isEditing ? <form aria-label={`${criterion.name} 수정`} className="mt-4 rounded-lg border border-stone-200 bg-stone-50 p-4" onSubmit={updateCriterion}><div className="grid gap-3 md:grid-cols-2"><label className="block type-control font-semibold">이름<input autoFocus className="mt-1 h-10 w-full rounded-lg border border-stone-300 bg-white px-3 type-body" maxLength={100} onChange={(event) => setEditName(event.target.value)} value={editName} /></label><label className="block type-control font-semibold">설명<input className="mt-1 h-10 w-full rounded-lg border border-stone-300 bg-white px-3 type-body" maxLength={500} onChange={(event) => setEditDescription(event.target.value)} value={editDescription} /></label></div><label className="mt-3 block type-control font-semibold">평가 기준<textarea className="mt-1 min-h-24 w-full resize-y rounded-lg border border-stone-300 bg-white px-3 py-2 type-body" onChange={(event) => setEditRubric(event.target.value)} value={editRubric} /></label><div className="mt-3 flex justify-end gap-2"><Button disabled={isUpdating} onClick={cancelEditingCriterion} size="sm" type="button" variant="secondary">취소</Button><Button disabled={!editName.trim() || !editDescription.trim() || !editRubric.trim() || isUpdating} size="sm" type="submit">{isUpdating ? '저장 중' : '변경사항 저장'}</Button></div></form> : null}
         </div>
           })}</section>
-          <form className="h-fit rounded-lg border border-stone-200 bg-white p-5" onSubmit={createCriterion}><div className="flex items-center gap-2"><Plus size={16} /><h3 className="type-section-title font-bold">기준 추가</h3></div><label className="mt-4 block type-control font-semibold">이름<input className="mt-1 h-10 w-full rounded-lg border border-stone-300 px-3 type-body" maxLength={60} onChange={(event) => setName(event.target.value)} value={name} /></label><label className="mt-4 block type-control font-semibold">설명<textarea className="mt-1 min-h-20 w-full resize-none rounded-lg border border-stone-300 px-3 py-2 type-body" onChange={(event) => setDescription(event.target.value)} value={description} /></label><label className="mt-4 block type-control font-semibold">평가 기준<textarea className="mt-1 min-h-28 w-full resize-none rounded-lg border border-stone-300 px-3 py-2 type-body" onChange={(event) => setRubric(event.target.value)} value={rubric} /></label><Button className="mt-4 w-full" disabled={!name.trim() || !description.trim() || !rubric.trim() || isSaving || activeCustomCriterionCount >= CUSTOM_CRITERIA_LIMIT} type="submit">{isSaving ? '저장 중' : '기준 추가'}</Button>{activeCustomCriterionCount >= CUSTOM_CRITERIA_LIMIT ? <p className="mt-2 type-caption text-amber-700">활성 커스텀 평가 기준은 최대 {CUSTOM_CRITERIA_LIMIT}개입니다.</p> : null}</form>
+          <form aria-label="기준 추가" className="h-fit rounded-lg border border-stone-200 bg-white p-5" onSubmit={createCriterion}><div className="flex items-center gap-2"><Plus aria-hidden="true" size={16} /><h3 className="type-section-title font-bold">기준 추가</h3></div><label className="mt-4 block type-control font-semibold">이름<input className="mt-1 h-10 w-full rounded-lg border border-stone-300 px-3 type-body" maxLength={60} onChange={(event) => setName(event.target.value)} value={name} /></label><label className="mt-4 block type-control font-semibold">설명<textarea className="mt-1 min-h-20 w-full resize-none rounded-lg border border-stone-300 px-3 py-2 type-body" onChange={(event) => setDescription(event.target.value)} value={description} /></label><label className="mt-4 block type-control font-semibold">평가 기준<textarea className="mt-1 min-h-28 w-full resize-none rounded-lg border border-stone-300 px-3 py-2 type-body" onChange={(event) => setRubric(event.target.value)} value={rubric} /></label><Button className="mt-4 w-full" disabled={!name.trim() || !description.trim() || !rubric.trim() || isSaving || activeCustomCriterionCount >= CUSTOM_CRITERIA_LIMIT} type="submit">{isSaving ? '저장 중' : '기준 추가'}</Button>{activeCustomCriterionCount >= CUSTOM_CRITERIA_LIMIT ? <p className="mt-2 type-caption text-amber-700">활성 커스텀 평가 기준은 최대 {CUSTOM_CRITERIA_LIMIT}개입니다.</p> : null}</form>
         </div>
         {error ? <p className="mt-4 type-body text-rose-700" role="alert">{error}</p> : null}
       </div>
@@ -675,6 +687,11 @@ function EvidenceDetails({ evidence, evidenceIds }: { evidence: StudentReport['e
 function isReportPending(report: StudentReport): boolean { return report.status === 'PENDING' || report.status === 'PROCESSING' }
 function createRequestId(): string { return typeof crypto.randomUUID === 'function' ? crypto.randomUUID() : `report-${Date.now()}` }
 function createCriterionKey(name: string): string { return `custom_${name.trim().toLowerCase().replace(/[^a-z0-9가-힣]+/g, '_').replace(/^_|_$/g, '')}_${Date.now().toString(36)}`.slice(0, 50) }
+function hasCriterionNameConflict(criteria: ReportCriterion[], name: string, ignoredId?: string): boolean {
+  const normalizedName = name.trim().normalize('NFKC').toLocaleLowerCase('ko-KR')
+  return criteria.some((criterion) => criterion.id !== ignoredId
+    && criterion.name.trim().normalize('NFKC').toLocaleLowerCase('ko-KR') === normalizedName)
+}
 function getTrendLabel(trend?: string | null): string { if (!trend) return '추세 정보 없음'; const values: Record<string, string> = { DECLINING: '하락', DOWN: '하락', FLAT: '유지', IMPROVING: '상승', STABLE: '유지', UP: '상승' }; return values[trend.toUpperCase()] ?? trend }
 
 const criterionTitles: Record<string, string> = {

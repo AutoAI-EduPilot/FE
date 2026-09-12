@@ -1,4 +1,4 @@
-import { Inbox, Users } from 'lucide-react'
+import { Check, Inbox, Users } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
@@ -250,7 +250,7 @@ export function EntranceRequestsPage() {
       <section className="overflow-hidden rounded-lg border border-stone-200 bg-white">
         <div className="hidden grid-cols-[36px_1fr_1.35fr_1fr_1fr_1fr_150px] items-center border-b border-stone-200 bg-stone-50 px-4 py-3 type-micro font-semibold text-stone-400 lg:grid">
           <span className="flex h-full items-center">
-            {tab === 'pending' ? <input aria-label="전체 요청 선택" checked={allRequestsSelected} className="size-4 shrink-0" onChange={toggleAllRequests} type="checkbox" /> : null}
+            {tab === 'pending' ? <SelectionCheckbox ariaLabel="전체 요청 선택" checked={allRequestsSelected} onChange={toggleAllRequests} /> : null}
           </span>
           <span>학생</span><span>이메일</span><span>강의실</span><span>학교·소속</span>
           <span>{tab === 'students' ? '입장 시각' : '요청 시각'}</span><span className="text-right">상태</span>
@@ -274,7 +274,7 @@ export function EntranceRequestsPage() {
           const isProcessing = processingRequestKeys.has(key) || isBatchProcessing
           return (
             <div className="grid gap-2 border-b border-stone-100 px-4 py-3 type-body last:border-0 lg:grid-cols-[36px_1fr_1.35fr_1fr_1fr_1fr_150px] lg:items-center" key={key}>
-              <span className="flex h-full items-center">{tab === 'pending' ? <input aria-label={`${request.learner?.name ?? '학습자'} 요청 선택`} checked={selectedRequestKeys.has(key)} className="size-4 shrink-0" disabled={isBatchProcessing} onChange={() => toggleRequest(request)} type="checkbox" /> : null}</span>
+              <span className="flex h-full items-center">{tab === 'pending' ? <SelectionCheckbox ariaLabel={`${request.learner?.name ?? '학습자'} 요청 선택`} checked={selectedRequestKeys.has(key)} disabled={isBatchProcessing} onChange={() => toggleRequest(request)} /> : null}</span>
               <strong>{request.learner?.name ?? '-'}</strong><span className="text-stone-500">{request.learner?.email ?? '-'}</span>
               <span className="font-medium text-stone-700">{request.classroomName ?? '-'}</span>
               <span className="text-stone-500">{request.learner?.affiliation ?? '-'}</span>
@@ -295,4 +295,32 @@ export function EntranceRequestsPage() {
 
 function TabButton({ active, label, onClick }: { active: boolean; label: string; onClick: () => void }) {
   return <button aria-selected={active} className={cx('h-8 shrink-0 rounded-md px-3 type-caption font-semibold mobile-web:h-11', active ? 'bg-stone-900 text-white dark:bg-stone-200 dark:text-stone-950' : 'text-stone-500 hover:bg-stone-100')} onClick={onClick} role="tab" type="button">{label}</button>
+}
+
+function SelectionCheckbox({
+  ariaLabel,
+  checked,
+  disabled = false,
+  onChange,
+}: {
+  ariaLabel: string
+  checked: boolean
+  disabled?: boolean
+  onChange: () => void
+}) {
+  return (
+    <label className="flex size-5 shrink-0 cursor-pointer items-center justify-center rounded mobile-web:size-11">
+      <input
+        aria-label={ariaLabel}
+        checked={checked}
+        className="peer sr-only"
+        disabled={disabled}
+        onChange={onChange}
+        type="checkbox"
+      />
+      <span className="flex size-4 items-center justify-center rounded border border-stone-400 bg-white text-white peer-checked:border-brand-700 peer-checked:bg-brand-700 peer-disabled:cursor-not-allowed peer-disabled:opacity-50">
+        {checked ? <Check aria-hidden="true" size={12} strokeWidth={3} /> : null}
+      </span>
+    </label>
+  )
 }

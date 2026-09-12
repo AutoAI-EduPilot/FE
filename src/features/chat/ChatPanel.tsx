@@ -7,6 +7,7 @@ import {
   LoaderCircle,
   Minus,
   NotebookPen,
+  Paperclip,
   Plus,
   RotateCcw,
   Save,
@@ -121,12 +122,14 @@ export function ChatPanel({
   const [messageActionStatus, setMessageActionStatus] = useState('')
   const [turnStatus, setTurnStatus] = useState('')
   const [isCancellingTurn, setIsCancellingTurn] = useState(false)
+  const [includeCurrentPage, setIncludeCurrentPage] = useState(true)
   const [learningTextSize, setLearningTextSize] = useState<LearningTextSize>(
     () => readLearningTextSize(textSizeOwnerId),
   )
   const logRef = useRef<HTMLDivElement | null>(null)
   const questionInputRef = useRef<HTMLTextAreaElement | null>(null)
   const turnSubmissionLockRef = useRef(false)
+  const olderMessagesScrollSnapshotRef = useRef<{ height: number; top: number } | null>(null)
   const notesRepository = useMemo(
     () => request ? createNotesRepository(request) : null,
     [request],
@@ -149,9 +152,16 @@ export function ChatPanel({
     return () => { cancelled = true }
   }, [notesRepository, sessionId])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const log = logRef.current
-    if (log) log.scrollTop = log.scrollHeight
+    if (!log) return
+    const snapshot = olderMessagesScrollSnapshotRef.current
+    if (snapshot) {
+      log.scrollTop = snapshot.top + (log.scrollHeight - snapshot.height)
+      olderMessagesScrollSnapshotRef.current = null
+      return
+    }
+    log.scrollTop = log.scrollHeight
   }, [chat.messages.length, chat.isTurnPending, conversationAction])
 
   useLayoutEffect(() => {
@@ -196,6 +206,7 @@ export function ChatPanel({
     chat.appendLocalMessage({
       content: trimmedQuestion,
       id: `user-${requestId}`,
+      includeCurrentPage,
       requestId: isLocalActionCommand ? undefined : requestId,
       role: 'user',
       status: 'sent',
@@ -225,7 +236,7 @@ export function ChatPanel({
         {
           eventType: 'USER_QUESTION',
           payload: {
-            includeCurrentPage: true,
+            includeCurrentPage,
             message: trimmedQuestion,
           },
           requestId,
@@ -250,7 +261,7 @@ export function ChatPanel({
         {
           eventType: 'USER_QUESTION',
           payload: {
-            includeCurrentPage: true,
+            includeCurrentPage: message.includeCurrentPage ?? true,
             message: message.content,
           },
           requestId: message.requestId,
@@ -315,6 +326,18 @@ export function ChatPanel({
     } finally {
       setIsCancellingTurn(false)
     }
+  }
+
+  async function loadOlderMessages() {
+    const log = logRef.current
+    if (log) {
+      olderMessagesScrollSnapshotRef.current = {
+        height: log.scrollHeight,
+        top: log.scrollTop,
+      }
+    }
+    const loaded = await chat.loadOlderMessages()
+    if (!loaded) olderMessagesScrollSnapshotRef.current = null
   }
 
   async function saveNote(content: string, pageNumber?: number, sourceMessageId?: string): Promise<boolean> {
@@ -480,6 +503,21 @@ export function ChatPanel({
         ref={logRef}
         role="log"
       >
+        {chat.hasOlderMessages ? (
+          <div className="flex justify-center pb-1">
+            <Button
+              disabled={chat.isLoadingOlderMessages}
+              onClick={() => void loadOlderMessages()}
+              size="sm"
+              type="button"
+              variant="secondary"
+            >
+              <ArrowUp aria-hidden="true" size={13} />
+              {chat.isLoadingOlderMessages ? '불러오는 중' : '이전 메시지 불러오기'}
+            </Button>
+          </div>
+        ) : null}
+
         {chat.isLoadingHistory ? (
           <p className="type-body font-medium text-stone-500" role="status">
             이전 메시지를 불러오는 중입니다.
@@ -503,6 +541,12 @@ export function ChatPanel({
               다시 시도
             </Button>
           </div>
+        ) : null}
+
+        {!chat.isLoadingHistory && chat.historyError && chat.messages.length > 0 ? (
+          <p className="text-center type-caption font-medium text-rose-700" role="alert">
+            {chat.historyError}
+          </p>
         ) : null}
 
         {visibleMessages.map((message) => (
@@ -593,6 +637,22 @@ export function ChatPanel({
           <label className="sr-only" htmlFor="chat-question">
             질문
           </label>
+          <button
+            aria-label={includeCurrentPage ? '현재 페이지 첨부 해제' : '현재 페이지 첨부'}
+            aria-pressed={includeCurrentPage}
+            className={cx(
+              'flex size-8 shrink-0 items-center justify-center rounded-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-600 mobile-web:size-11',
+              includeCurrentPage
+                ? 'bg-brand-50 text-brand-700 hover:bg-brand-100'
+                : 'text-stone-400 hover:bg-stone-100 hover:text-stone-700',
+            )}
+            disabled={chat.isTurnPending}
+            onClick={() => setIncludeCurrentPage((included) => !included)}
+            title={includeCurrentPage ? '현재 PDF 페이지를 질문에 첨부 중' : '현재 PDF 페이지를 첨부하지 않음'}
+            type="button"
+          >
+            <Paperclip aria-hidden="true" size={15} />
+          </button>
           <textarea
             aria-invalid={error ? true : undefined}
             className="min-h-8 max-h-40 flex-1 resize-none bg-transparent px-1.5 py-0.5 type-chat-body text-stone-950 placeholder:text-stone-400 focus:outline-none disabled:cursor-not-allowed"

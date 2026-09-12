@@ -15,7 +15,6 @@ import {
   AdminErrorMessage,
   formatCount,
   formatDateTime,
-  Metric,
   PanelMessage,
   toAdminError,
   type AdminErrorInfo,
@@ -96,7 +95,7 @@ export function InfraPanel({ repository }: { repository: AdminRepository }) {
   }, [refreshKey, repository])
 
   return (
-    <div className="h-full min-h-[560px] overflow-auto bg-[#F7F8FA]">
+    <div className="h-full min-h-[620px] overflow-auto bg-[#F7F8FA]">
       <div className="sticky top-0 z-20 flex flex-wrap items-center justify-between gap-3 border-b border-stone-200 bg-white px-4 py-3 mobile-phone:flex-col mobile-phone:items-stretch">
         <div className="flex flex-wrap items-center gap-3 mobile-phone:justify-between">
           <SegmentedControl
@@ -138,78 +137,67 @@ export function InfraPanel({ repository }: { repository: AdminRepository }) {
       </div>
 
       <div className="space-y-4 p-4">
-        <MetricsSection range={range} state={metrics} />
+        <InfraSummary app={app} cost={cost} metrics={metrics} />
+        <SystemSection app={app} range={range} metrics={metrics} />
         <CostSection state={cost} />
-        <AppSection state={app} />
       </div>
     </div>
   )
 }
 
-function MetricsSection({ range, state }: { range: InfraRange; state: LoadState<InfraMetrics> }) {
-  const data = state.data
-  const series = data?.series ?? emptySeries
+function InfraSummary({ app, cost, metrics }: { app: LoadState<InfraApp>; cost: LoadState<InfraCost>; metrics: LoadState<InfraMetrics> }) {
+  const metricData = metrics.data
+  const appData = app.data
+  const costData = cost.data
+  const statusFailed = (metricData?.latest?.status ?? 0) >= 1
   return (
-    <section aria-labelledby="server-metrics-title" className="rounded-lg border border-stone-200 bg-white">
-      <SectionHeader
-        id="server-metrics-title"
-        title="서버 상태"
-        updatedAt={data?.to ?? state.receivedAt}
-      />
-      {state.error ? <AdminErrorMessage error={state.error} /> : null}
-      {state.loading ? <PanelMessage message="서버 지표를 불러오는 중입니다." /> : null}
-      {!state.loading && data && !data.available ? (
-        <PanelMessage message={unavailableMessage(data.reason, 'metrics')} />
-      ) : null}
-      {!state.loading && data?.available ? (
-        <>
-          {data.stale ? <StaleNotice /> : null}
-          <div className="grid sm:grid-cols-2 xl:grid-cols-4">
-            <PercentMetric label="CPU" threshold={80} value={data.latest?.cpu ?? null} />
-            <PercentMetric label="메모리" threshold={85} value={data.latest?.mem ?? null} />
-            <PercentMetric label="디스크" threshold={80} value={data.latest?.disk ?? null} />
-            <Metric
-              caption={data.latest?.status == null ? '데이터 없음' : undefined}
-              label="상태검사"
-              tone={(data.latest?.status ?? 0) >= 1 ? 'danger' : 'default'}
-              value={data.latest?.status == null ? '-' : data.latest.status >= 1 ? '실패' : '정상'}
-            />
-          </div>
-          <div className="grid border-t border-stone-200 xl:grid-cols-2">
-            <InfraLineChart
-              ariaLabel="CPU, 메모리, 디스크 사용률 추이"
-              formatValue={formatPercent}
-              range={range}
-              series={[
-                { color: '#20263A', label: 'CPU', points: series.cpu },
-                { color: '#12833E', label: '메모리', points: series.mem },
-                { color: '#E11D48', label: '디스크', points: series.disk },
-              ]}
-              title="사용률"
-              yMax={100}
-            />
-            <InfraLineChart
-              ariaLabel="네트워크 수신 및 송신 추이"
-              formatValue={formatBytes}
-              range={range}
-              series={[
-                { color: '#2563EB', label: '수신', points: series.netIn },
-                { color: '#F59E0B', label: '송신', points: series.netOut },
-              ]}
-              title="네트워크"
-            />
-          </div>
-        </>
-      ) : null}
+    <section aria-label="서버 상태" className="overflow-hidden rounded-lg border border-stone-200 bg-white">
+      {metrics.error ? <AdminErrorMessage error={metrics.error} /> : null}
+      {!metrics.loading && metricData && !metricData.available ? <PanelMessage message={unavailableMessage(metricData.reason, 'metrics')} /> : null}
+      {metricData?.stale ? <StaleNotice /> : null}
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6">
+        <SummaryMetric danger={(metricData?.latest?.cpu ?? 0) > 80} label="CPU" value={formatPercent(metricData?.latest?.cpu)} />
+        <SummaryMetric danger={(metricData?.latest?.mem ?? 0) > 85} label="메모리" value={formatPercent(metricData?.latest?.mem)} />
+        <SummaryMetric danger={(metricData?.latest?.disk ?? 0) > 80} label="디스크" value={formatPercent(metricData?.latest?.disk)} />
+        <SummaryMetric label="가동 시간" value={appData?.available ? formatUptime(appData.uptimeSeconds) : '-'} />
+        <SummaryMetric danger={statusFailed} label="상태" value={metricData?.latest?.status == null ? '-' : statusFailed ? '실패' : '정상'} valueClassName={!statusFailed && metricData?.latest?.status != null ? 'text-emerald-700' : undefined} />
+        <SummaryMetric label="AWS 비용" value={costData?.available ? formatMoney(costData.monthToDate?.total ?? 0, costData.currency ?? 'USD') : '-'} />
+      </div>
     </section>
   )
+}
+
+function SummaryMetric({ danger = false, label, value, valueClassName }: { danger?: boolean; label: string; value: string; valueClassName?: string }) {
+  return <div className="min-w-0 border-r border-b border-stone-100 px-4 py-3 xl:border-b-0"><p className="type-caption text-stone-500">{label}</p><p className={`mt-1 truncate type-page-title font-bold ${danger ? 'text-rose-700' : valueClassName ?? 'text-stone-950'}`} title={value}>{value}</p>{value === '-' ? <span className="block type-micro text-stone-400">데이터 없음</span> : null}</div>
+}
+
+function SystemSection({ app, metrics, range }: { app: LoadState<InfraApp>; metrics: LoadState<InfraMetrics>; range: InfraRange }) {
+  const series = metrics.data?.series ?? emptySeries
+  return <section aria-labelledby="system-title" className="overflow-hidden rounded-lg border border-stone-200 bg-white"><SectionHeader id="system-title" title="시스템" updatedAt={metrics.data?.to ?? app.receivedAt} />{app.error ? <AdminErrorMessage error={app.error} /> : null}{metrics.loading || app.loading ? <PanelMessage message="시스템 상태를 불러오는 중입니다." /> : <div className="grid xl:grid-cols-[minmax(340px,1fr)_minmax(0,1.45fr)]"><AppStatusTable data={app.data} /><div className="min-w-0 border-t border-stone-200 xl:border-t-0 xl:border-l"><InfraLineChart ariaLabel="CPU, 메모리, 디스크 사용률 추이" formatValue={formatPercent} range={range} series={[{ color: '#20263A', label: 'CPU', points: series.cpu }, { color: '#10B981', label: '메모리', points: series.mem }, { color: '#E11D48', label: '디스크', points: series.disk }]} title="리소스 사용률" yMax={100} /><InfraLineChart ariaLabel="네트워크 수신 및 송신 추이" formatValue={formatBytes} range={range} series={[{ color: '#2563EB', label: '수신', points: series.netIn }, { color: '#F59E0B', label: '송신', points: series.netOut }]} title="네트워크" /></div></div>}</section>
+}
+
+function AppStatusTable({ data }: { data: InfraApp | null }) {
+  if (data && !data.available) return <PanelMessage message="앱 상태 정보를 일시적으로 가져오지 못했습니다." />
+  if (!data) return <PanelMessage message="앱 상태 데이터가 없습니다." />
+  const heapPercent = ratioPercent(data.jvm.heapUsedBytes, data.jvm.heapMaxBytes)
+  const errorPercent = data.http.requestCount > 0 ? (data.http.serverErrorCount / data.http.requestCount) * 100 : null
+  const dbPercent = ratioPercent(data.db.activeConnections, data.db.maxConnections)
+  const rows = [
+    ['JVM 힙', formatPercent(heapPercent), `${formatBytes(data.jvm.heapUsedBytes)} / ${formatBytes(data.jvm.heapMaxBytes)}`],
+    ['스레드', `${formatCount(data.jvm.liveThreads)}개`, `GC ${formatCount(data.jvm.gcCount)}회`],
+    ['HTTP 요청', `${formatCount(data.http.requestCount)}건`, `평균 ${data.http.averageResponseTimeMs == null ? '-' : `${data.http.averageResponseTimeMs.toFixed(1)}ms`}`],
+    ['5xx 오류', formatPercent(errorPercent), `${formatCount(data.http.serverErrorCount)}건 / ${formatCount(data.http.requestCount)}건`],
+    ['DB 풀', `${formatCount(data.db.activeConnections)} / ${formatCount(data.db.maxConnections)}`, `유휴 ${formatCount(data.db.idleConnections)} · 사용률 ${formatPercent(dbPercent)}`],
+    ['AI 서비스', data.aiService.status === 'UP' ? '정상' : '응답 없음', data.aiService.checkedAt ? `${formatDateTime(data.aiService.checkedAt)} 확인` : '확인 시각 없음'],
+  ]
+  return <div className="min-w-0"><h3 className="border-b border-stone-100 px-4 py-3 type-control font-bold text-stone-700">애플리케이션</h3><table className="w-full table-fixed type-caption"><thead className="bg-[#F7F8FA] text-left text-stone-500"><tr><th className="w-[34%] px-4 py-2">항목</th><th className="w-[25%] px-4 py-2 text-right">값</th><th className="px-4 py-2">상세</th></tr></thead><tbody>{rows.map(([label, value, detail]) => <tr className="border-b border-stone-100" key={label}><th className="px-4 py-2.5 text-left font-semibold text-stone-800">{label}</th><td className={`px-4 py-2.5 text-right font-semibold ${label === 'AI 서비스' && value === '정상' ? 'text-emerald-700' : label === '5xx 오류' && (errorPercent ?? 0) > 0 ? 'text-amber-700' : 'text-stone-700'}`}>{value}</td><td className="truncate px-4 py-2.5 text-stone-400" title={detail}>{detail}</td></tr>)}</tbody></table></div>
 }
 
 function CostSection({ state }: { state: LoadState<InfraCost> }) {
   const data = state.data
   const services = data?.monthToDate?.byService ?? []
   const daily = data?.daily ?? []
-  const maxService = Math.max(1, ...services.map((item) => item.amount))
+  const totalCost = Math.max(1, data?.monthToDate?.total ?? 0)
   const maxDaily = Math.max(1, ...daily.map((item) => item.total))
   return (
     <section aria-labelledby="cost-title" className="rounded-lg border border-stone-200 bg-white">
@@ -222,38 +210,32 @@ function CostSection({ state }: { state: LoadState<InfraCost> }) {
       {!state.loading && data?.available ? (
         <>
           {data.stale ? <StaleNotice /> : null}
-          <div className="grid xl:grid-cols-[minmax(220px,0.7fr)_1fr_1.4fr]">
+          <div className="grid xl:grid-cols-[minmax(360px,1fr)_minmax(0,1fr)]">
             <div className="border-b border-stone-100 p-4 xl:border-r xl:border-b-0">
-              <p className="type-caption text-stone-500">이번 달 누적</p>
-              <p className="mt-2 type-page-title font-bold text-stone-950">
-                {formatMoney(data.monthToDate?.total ?? 0, data.currency ?? 'USD')}
-              </p>
-              <p className="mt-2 type-caption text-stone-400">{data.note || '어제까지 확정치'}</p>
-            </div>
-            <div className="border-b border-stone-100 p-4 xl:border-r xl:border-b-0">
-              <h3 className="type-control font-bold text-stone-900">서비스별 비용</h3>
+              <h3 className="type-control font-bold text-stone-700">서비스별</h3>
               <div className="mt-3 space-y-3">
                 {services.length === 0 ? <p className="type-caption text-stone-500">비용 내역이 없습니다.</p> : services.map((item) => (
                   <div key={item.service}>
                     <div className="mb-1 flex items-center justify-between gap-3 type-caption">
-                      <span className="min-w-0 truncate text-stone-600" title={item.service}>{item.service}</span>
-                      <span className="shrink-0 font-medium text-stone-800">{formatMoney(item.amount, data.currency ?? 'USD')}</span>
+                      <span className="min-w-0 truncate font-medium text-stone-700" title={item.service}>{item.service}</span>
+                      <span className="flex shrink-0 items-center gap-3"><strong className="text-stone-800">{formatMoney(item.amount, data.currency ?? 'USD')}</strong><span className="w-8 text-right text-stone-400">{Math.round((item.amount / totalCost) * 100)}%</span></span>
                     </div>
                     <div className="h-1.5 overflow-hidden rounded-full bg-stone-100">
-                      <div className="h-full rounded-full bg-brand-700" style={{ width: `${(item.amount / maxService) * 100}%` }} />
+                      <div className="h-full rounded-full bg-brand-700" style={{ width: `${Math.min(100, (item.amount / totalCost) * 100)}%` }} />
                     </div>
                   </div>
                 ))}
               </div>
             </div>
             <div className="min-w-0 p-4">
-              <h3 className="type-control font-bold text-stone-900">최근 30일</h3>
+              <h3 className="type-control font-bold text-stone-700">일별 비용</h3>
               {daily.length === 0 ? <p className="py-8 text-center type-caption text-stone-500">일별 비용 내역이 없습니다.</p> : (
-                <div className="mt-3 flex h-36 items-end gap-1 overflow-x-auto pb-6" role="img" aria-label="최근 30일 일별 AWS 비용">
+                <div className="mt-3 flex h-40 items-end gap-3 overflow-x-auto pb-1" role="img" aria-label="최근 30일 일별 AWS 비용">
                   {daily.map((item) => (
-                    <div className="group relative flex h-full min-w-3 flex-1 items-end" key={item.date} title={`${item.date}: ${formatMoney(item.total, data.currency ?? 'USD')}`}>
-                      <div className="w-full rounded-t-sm bg-emerald-500" style={{ height: `${Math.max(2, (item.total / maxDaily) * 100)}%` }} />
-                      <span className="sr-only">{item.date} {formatMoney(item.total, data.currency ?? 'USD')}</span>
+                    <div className="flex h-full min-w-12 flex-1 flex-col items-center justify-end" key={item.date} title={`${item.date}: ${formatMoney(item.total, data.currency ?? 'USD')}`}>
+                      <strong className="mb-1 type-micro text-stone-600">{formatMoney(item.total, data.currency ?? 'USD')}</strong>
+                      <div className="w-7 rounded-t-sm bg-brand-700" style={{ height: `${Math.max(2, (item.total / maxDaily) * 100)}%` }} />
+                      <span className="mt-1 type-micro text-stone-400">{formatMonthDay(item.date)}</span>
                     </div>
                   ))}
                 </div>
@@ -263,63 +245,6 @@ function CostSection({ state }: { state: LoadState<InfraCost> }) {
         </>
       ) : null}
     </section>
-  )
-}
-
-function AppSection({ state }: { state: LoadState<InfraApp> }) {
-  const data = state.data
-  if (state.loading) {
-    return <section className="rounded-lg border border-stone-200 bg-white"><SectionHeader id="app-title" title="앱 상태" updatedAt={null} /><PanelMessage message="앱 상태를 불러오는 중입니다." /></section>
-  }
-  return (
-    <section aria-labelledby="app-title" className="rounded-lg border border-stone-200 bg-white">
-      <SectionHeader id="app-title" title="앱 상태" updatedAt={state.receivedAt} />
-      {state.error ? <AdminErrorMessage error={state.error} /> : null}
-      {data && !data.available ? <PanelMessage message="앱 상태 정보를 일시적으로 가져오지 못했습니다." /> : null}
-      {data?.available ? <AppCards data={data} /> : null}
-    </section>
-  )
-}
-
-function AppCards({ data }: { data: InfraApp }) {
-  const heapPercent = ratioPercent(data.jvm.heapUsedBytes, data.jvm.heapMaxBytes)
-  const errorPercent = data.http.requestCount > 0
-    ? (data.http.serverErrorCount / data.http.requestCount) * 100
-    : null
-  const dbPercent = ratioPercent(data.db.activeConnections, data.db.maxConnections)
-  const aiUp = data.aiService.status === 'UP'
-  return (
-    <div className="grid sm:grid-cols-2 xl:grid-cols-5">
-      <AppCard danger={(heapPercent ?? 0) > 85} label="JVM 힙" value={formatPercent(heapPercent)}>
-        {formatBytes(data.jvm.heapUsedBytes)} / {formatBytes(data.jvm.heapMaxBytes)} · 스레드 {formatCount(data.jvm.liveThreads)}
-      </AppCard>
-      <AppCard label="HTTP" value={`${formatCount(data.http.requestCount)}건`}>
-        5xx {formatPercent(errorPercent)} · 평균 {data.http.averageResponseTimeMs == null ? '-' : `${data.http.averageResponseTimeMs.toFixed(1)}ms`}
-      </AppCard>
-      <AppCard danger={(dbPercent ?? 0) > 80} label="DB 풀" value={`${formatCount(data.db.activeConnections)} / ${formatCount(data.db.maxConnections)}`}>
-        유휴 {formatCount(data.db.idleConnections)} · 사용률 {formatPercent(dbPercent)}
-      </AppCard>
-      <AppCard label="가동 시간" value={formatUptime(data.uptimeSeconds)}>
-        프로세스 기준
-      </AppCard>
-      <AppCard
-        danger={!aiUp}
-        label="AI 서비스"
-        value={<span className={aiUp ? 'inline-flex rounded-md bg-emerald-50 px-2 py-1 type-caption font-semibold text-emerald-700' : 'inline-flex rounded-md bg-rose-50 px-2 py-1 type-caption font-semibold text-rose-700'}>{aiUp ? '정상' : '응답 없음'}</span>}
-      >
-        {data.aiService.checkedAt ? formatDateTime(data.aiService.checkedAt) : '확인 시각 없음'}
-      </AppCard>
-    </div>
-  )
-}
-
-function AppCard({ children, danger = false, label, value }: { children: React.ReactNode; danger?: boolean; label: string; value: React.ReactNode }) {
-  return (
-    <div className="border-b border-stone-100 p-4 sm:border-r xl:border-b-0 xl:last:border-r-0">
-      <p className="type-caption text-stone-500">{label}</p>
-      <p className={`mt-1 type-section-title font-bold ${danger ? 'text-rose-700' : 'text-stone-950'}`}>{value}</p>
-      <p className="mt-1 type-caption text-stone-400">{children}</p>
-    </div>
   )
 }
 
@@ -419,10 +344,6 @@ function buildLinePath(points: InfraPoint[], minTime: number, maxTime: number, y
   }).filter(Boolean).join(' ')
 }
 
-function PercentMetric({ label, threshold, value }: { label: string; threshold: number; value: number | null }) {
-  return <Metric caption={value == null ? '데이터 없음' : undefined} label={label} tone={(value ?? 0) > threshold ? 'danger' : 'default'} value={formatPercent(value)} />
-}
-
 function SectionHeader({ id, title, updatedAt }: { id: string; title: string; updatedAt: string | null | undefined }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 px-4 py-3">
@@ -487,6 +408,11 @@ function formatMoney(value: number, currency: string) {
   } catch {
     return `${currency} ${value.toFixed(2)}`
   }
+}
+
+function formatMonthDay(value: string) {
+  const [, month, day] = value.split('-')
+  return `${Number(month)}/${Number(day)}`
 }
 
 function ratioPercent(value: number, max: number) {
