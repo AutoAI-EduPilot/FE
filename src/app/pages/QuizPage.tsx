@@ -692,6 +692,7 @@ function QuestionInput({
               <input
                 aria-label={choice.label}
                 checked={value === choice.id}
+                className="sr-only"
                 disabled={disabled}
                 name={question.id}
                 onChange={() => onChange(choice.id)}

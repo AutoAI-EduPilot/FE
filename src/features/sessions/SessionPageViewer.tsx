@@ -13,6 +13,7 @@ import {
 } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
+import pdfWorkerUrl from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
 import { Document, Page, pdfjs } from 'react-pdf'
 import { Link } from 'react-router-dom'
 import 'react-pdf/dist/Page/AnnotationLayer.css'
@@ -21,10 +22,7 @@ import 'react-pdf/dist/Page/TextLayer.css'
 import { cx } from '../../shared/lib/cx'
 import { useResponsiveViewport } from '../../shared/responsive'
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  'pdfjs-dist/build/pdf.worker.min.mjs',
-  import.meta.url,
-).toString()
+pdfjs.GlobalWorkerOptions.workerSrc = pdfWorkerUrl
 
 interface SessionPageViewerProps {
   backTo?: string

@@ -1,7 +1,7 @@
 import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { loadEnv } from 'vite'
-import { defineConfig } from 'vitest/config'
+import { configDefaults, defineConfig } from 'vitest/config'
 
 import { mockApiPlugin } from './dev/mockApiPlugin'
 
@@ -57,6 +57,7 @@ export default defineConfig(({ mode }) => {
       environment: 'jsdom',
       setupFiles: './src/test/setup.ts',
       css: true,
+      exclude: [...configDefaults.exclude, 'e2e/**'],
       restoreMocks: true,
     },
   }

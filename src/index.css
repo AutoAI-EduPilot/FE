@@ -237,7 +237,7 @@ html[data-responsive-mode='phone'] [aria-modal='true'][role='dialog'] > div {
   --color-brand-100: #e3e6ee;
   --color-brand-200: #c9ceda;
   --color-brand-300: #c9ceda;
-  --color-brand-400: #8a90a0;
+  --color-brand-400: #5f6675;
   --color-brand-500: #3c4152;
   --color-brand-600: #20263a;
   --color-brand-700: #20263a;
@@ -248,9 +248,9 @@ html[data-responsive-mode='phone'] [aria-modal='true'][role='dialog'] > div {
   --color-stone-100: #eef0f4;
   --color-stone-200: #e3e6ee;
   --color-stone-300: #c9ceda;
-  --color-stone-400: #a6acbb;
-  --color-stone-500: #8a90a0;
-  --color-stone-600: #6e7382;
+  --color-stone-400: #666c7a;
+  --color-stone-500: #5f6675;
+  --color-stone-600: #555c6b;
   --color-stone-700: #4a4f5e;
   --color-stone-800: #3c4152;
   --color-stone-900: #171a22;
@@ -357,6 +357,19 @@ html.mobile-web select {
   font-size: 16px;
 }
 
+/* Touch layouts use one minimum target contract across feature-owned controls. */
+html.mobile-web :is(
+  a[href],
+  button,
+  input:not([type='hidden']):not([type='checkbox']):not([type='radio']),
+  select,
+  textarea,
+  [role='button']
+) {
+  min-width: 44px;
+  min-height: 44px;
+}
+
 @utility mobile-safe-x {
   padding-left: max(1rem, env(safe-area-inset-left));
   padding-right: max(1rem, env(safe-area-inset-right));
@@ -419,7 +432,7 @@ html.dark .shadow-lg {
   --color-brand-100: #e3e6ee;
   --color-brand-200: #c9ceda;
   --color-brand-300: #c9ceda;
-  --color-brand-400: #8a90a0;
+  --color-brand-400: #5f6675;
   --color-brand-500: #3c4152;
   --color-brand-600: #20263a;
   --color-brand-700: #20263a;
@@ -430,9 +443,9 @@ html.dark .shadow-lg {
   --color-stone-100: #eef0f4;
   --color-stone-200: #e3e6ee;
   --color-stone-300: #c9ceda;
-  --color-stone-400: #a6acbb;
-  --color-stone-500: #8a90a0;
-  --color-stone-600: #6e7382;
+  --color-stone-400: #666c7a;
+  --color-stone-500: #5f6675;
+  --color-stone-600: #555c6b;
   --color-stone-700: #4a4f5e;
   --color-stone-800: #3c4152;
   --color-stone-900: #171a22;
