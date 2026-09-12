@@ -100,9 +100,10 @@ export function AppLayout() {
   const roleLabel = getRoleLabel(user?.role)
   const isAdmin = isAdminRole(user?.role)
   const isInstructor = isInstructorRole(user?.role)
-  const isAdminAiUsageWorkspace = isAdmin
+  const activeAdminTab = adminTabFromLocation(`${location.pathname}${location.search}`)
+  const isAdminFixedHeightWorkspace = isAdmin
     && location.pathname === routes.admin
-    && adminTabFromLocation(`${location.pathname}${location.search}`) === 'ai-usage'
+    && (activeAdminTab === 'ai-usage' || activeAdminTab === 'updates')
   const classroomsRepository = useMemo(
     () => createClassroomsRepository(apiRequest),
     [apiRequest],
@@ -316,11 +317,6 @@ export function AppLayout() {
     setIsSettingsOpen(true)
   }
 
-  function openUpdates() {
-    setIsMenuOpen(false)
-    void navigate(routes.updates)
-  }
-
   const profileMenu = (
     <div
       className="w-full rounded-xl border border-stone-200 bg-white p-1.5 shadow-lg dark:bg-stone-50"
@@ -334,15 +330,6 @@ export function AppLayout() {
       >
         <Settings aria-hidden="true" size={15} />
         설정
-      </button>
-      <button
-        className="flex h-9 w-full items-center gap-2.5 rounded-lg px-2.5 type-control font-medium text-stone-700 hover:bg-stone-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
-        onClick={openUpdates}
-        role="menuitem"
-        type="button"
-      >
-        <CalendarDays aria-hidden="true" size={15} />
-        업데이트
       </button>
       <div className="mx-2 my-1 h-px bg-stone-100" />
       <button
@@ -363,7 +350,7 @@ export function AppLayout() {
         'bg-[#F6F7F9] text-stone-900 dark:bg-[#1b1c20] lg:flex mobile-web:!flex-col mobile-web:max-w-full mobile-web:overflow-x-hidden',
         isStudyWorkspace
           ? 'h-dvh overflow-hidden'
-          : isAdminAiUsageWorkspace
+          : isAdminFixedHeightWorkspace
             ? 'flex h-dvh flex-col overflow-hidden lg:flex-row'
             : 'min-h-screen',
       )}
@@ -372,7 +359,7 @@ export function AppLayout() {
         className={cx(
           'relative z-40 flex border-b border-stone-200 bg-white px-4 py-3 dark:bg-[#222327] lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:flex-col lg:border-r lg:border-b-0 lg:py-4 mobile-web:sticky mobile-web:top-0 mobile-web:!h-auto mobile-web:!w-full mobile-web:!flex-row mobile-web:!border-r-0 mobile-web:!border-b mobile-web:!py-3 mobile-web:mobile-safe-x mobile-web:mobile-safe-top mobile-web:shadow-sm',
           isCollapsed ? 'lg:w-14 lg:px-2 mobile-web:!px-4' : 'lg:w-52 lg:px-2.5 mobile-web:!px-4',
-          isAdminAiUsageWorkspace && 'shrink-0',
+          isAdminFixedHeightWorkspace && 'shrink-0',
         )}
       >
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 lg:block lg:flex-none mobile-web:!flex mobile-web:!flex-1 mobile-web:!items-center">
@@ -592,7 +579,7 @@ export function AppLayout() {
             : cx(
                 'px-4 py-4 sm:px-6 lg:py-5 mobile-phone:px-3 mobile-web:mobile-safe-bottom',
                 isAdmin ? 'lg:px-8' : 'lg:px-12',
-                isAdminAiUsageWorkspace && 'min-h-0 overflow-hidden',
+                isAdminFixedHeightWorkspace && 'min-h-0 overflow-hidden',
               ),
         )}
       >
@@ -600,7 +587,7 @@ export function AppLayout() {
           className={
             isStudyWorkspace
               ? 'h-full min-h-0'
-              : isAdminAiUsageWorkspace
+              : isAdminFixedHeightWorkspace
                 ? 'h-full min-h-0 w-full min-w-0'
               : isAdmin
                 ? 'w-full min-w-0'
@@ -863,6 +850,7 @@ const adminNavigation: Array<{ icon: LucideIcon; label: string; to: string }> = 
   { icon: List, label: '강의실', to: `${routes.admin}?tab=classrooms` },
   { icon: Sparkles, label: 'AI 사용량', to: `${routes.admin}?tab=ai-usage` },
   { icon: ServerCog, label: '인프라', to: `${routes.admin}?tab=infra` },
+  { icon: CalendarDays, label: '업데이트', to: `${routes.admin}?tab=updates` },
 ]
 
 function adminTabFromLocation(value: string): string {

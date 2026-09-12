@@ -13,7 +13,7 @@ import {
 const roleRoutes: Record<QaRole, string[]> = {
   LEARNER: ['/classrooms', '/calendar', '/notes', '/review-quizzes', '/exams', '/settings', '/updates'],
   INSTRUCTOR: ['/classrooms', '/calendar', '/entrance-requests', '/settings', '/updates'],
-  ADMIN: ['/admin', '/admin?tab=classrooms', '/admin?tab=ai-usage', '/admin?tab=infra'],
+  ADMIN: ['/admin', '/admin?tab=classrooms', '/admin?tab=ai-usage', '/admin?tab=infra', '/admin?tab=updates'],
 }
 
 test.describe('public and authentication', () => {
@@ -75,6 +75,15 @@ for (const role of ['LEARNER', 'INSTRUCTOR', 'ADMIN'] as const) {
             expect.soft(pageOverflow, 'AI usage must not create page-level vertical scrolling').toBeLessThanOrEqual(2)
             await expect(page.getByRole('region', { name: 'AI 사용량 상세' })).toBeVisible()
             await expect(page.getByRole('region', { name: '사용자별 호출 목록' })).toBeVisible()
+          }
+          if (role === 'ADMIN' && path === '/admin?tab=updates') {
+            const pageOverflow = await page.evaluate(() => (
+              Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)
+              - document.documentElement.clientHeight
+            ))
+            expect.soft(pageOverflow, 'Admin updates must not create page-level vertical scrolling').toBeLessThanOrEqual(2)
+            await expect(page.getByRole('group', { name: '개발 파트' })).toBeVisible()
+            await expect(page.getByRole('link', { name: '업데이트' })).toHaveAttribute('aria-current', 'page')
           }
         })
       }
