@@ -209,6 +209,33 @@ describe('remote feature repositories', () => {
     })
   })
 
+  it('loads older session messages with the opaque server cursor', async () => {
+    const request = vi.fn().mockResolvedValue(success({
+      hasMore: false,
+      items: [
+        {
+          content: '더 이전 질문',
+          createdAt: '2026-07-26T00:00:00Z',
+          messageId: 470,
+          senderType: 'USER',
+          status: 'COMPLETED',
+        },
+      ],
+      nextCursor: null,
+    }))
+    const repository = createSessionsRepository(request as AuthenticatedRequest)
+
+    await expect(repository.listMessagePage?.('100', 'opaque cursor')).resolves.toEqual({
+      hasMore: false,
+      items: [expect.objectContaining({ content: '더 이전 질문', id: '470' })],
+      nextCursor: undefined,
+    })
+    expect(request).toHaveBeenCalledWith(
+      '/api/sessions/100/messages?size=50&cursor=opaque+cursor',
+      { signal: undefined },
+    )
+  })
+
   it('sends session page moves and learning turns using the contract paths', async () => {
     const request = vi
       .fn()

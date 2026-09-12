@@ -18,7 +18,10 @@ export interface SessionChat {
   clearNoteDraft: () => void
   clearUiActions: () => void
   historyError: string | null
+  hasOlderMessages: boolean
   isLoadingHistory: boolean
+  isLoadingOlderMessages: boolean
+  loadOlderMessages: () => Promise<boolean>
   isTurnPending: boolean
   messages: ChatMessage[]
   noteDraft: NoteDraft | null
@@ -46,7 +49,10 @@ export function useSessionChat(
 ): SessionChat {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
+  const [historyCursor, setHistoryCursor] = useState<string | undefined>()
+  const [hasOlderMessages, setHasOlderMessages] = useState(false)
   const [isLoadingHistory, setIsLoadingHistory] = useState(true)
+  const [isLoadingOlderMessages, setIsLoadingOlderMessages] = useState(false)
   const [isTurnPending, setIsTurnPending] = useState(false)
   const [historyReloadKey, setHistoryReloadKey] = useState(0)
   const [streamNotice, setStreamNotice] = useState<string | null>(null)
@@ -70,12 +76,14 @@ export function useSessionChat(
 
   useEffect(() => {
     const controller = new AbortController()
-    repository
-      .listMessages(sessionId, controller.signal)
-      .then((history) => {
+    loadMessagePage(repository, sessionId, undefined, controller.signal)
+      .then((page) => {
+        const history = page.items
         const nextMessages = history.map(mapSessionMessage)
         messagesRef.current = nextMessages
         setMessages(nextMessages)
+        setHistoryCursor(page.nextCursor)
+        setHasOlderMessages(page.hasMore)
         setHistoryError(null)
       })
       .catch((requestError: unknown) => {
@@ -89,6 +97,30 @@ export function useSessionChat(
 
     return () => controller.abort()
   }, [historyReloadKey, repository, sessionId])
+
+  const loadOlderMessages = useCallback(async () => {
+    if (!hasOlderMessages || !historyCursor || isLoadingOlderMessages) return false
+    setIsLoadingOlderMessages(true)
+    try {
+      const page = await loadMessagePage(repository, sessionId, historyCursor)
+      const existingIds = new Set(messagesRef.current.map((message) => message.id))
+      const olderMessages = page.items
+        .filter((message) => !existingIds.has(message.id))
+        .map(mapSessionMessage)
+      if (olderMessages.length > 0) {
+        updateMessages((current) => [...olderMessages, ...current])
+      }
+      setHistoryCursor(page.nextCursor)
+      setHasOlderMessages(page.hasMore)
+      setHistoryError(null)
+      return olderMessages.length > 0
+    } catch (requestError) {
+      setHistoryError(getChatErrorMessage(requestError))
+      return false
+    } finally {
+      setIsLoadingOlderMessages(false)
+    }
+  }, [hasOlderMessages, historyCursor, isLoadingOlderMessages, repository, sessionId, updateMessages])
 
   const appendMessages = useCallback((incoming: SessionMessage[]) => {
     if (incoming.length === 0) return
@@ -117,6 +149,8 @@ export function useSessionChat(
 
   const reloadHistory = useCallback(() => {
     setHistoryError(null)
+    setHistoryCursor(undefined)
+    setHasOlderMessages(false)
     setIsLoadingHistory(true)
     setHistoryReloadKey((key) => key + 1)
   }, [])
@@ -442,7 +476,10 @@ export function useSessionChat(
     clearNoteDraft,
     clearUiActions,
     historyError,
+    hasOlderMessages,
     isLoadingHistory,
+    isLoadingOlderMessages,
+    loadOlderMessages,
     isTurnPending,
     markMessageFailed,
     markMessageRetrying,
@@ -454,6 +491,22 @@ export function useSessionChat(
     streamUiActions,
     submitTurn,
     waitForTurnCompletion,
+  }
+}
+
+async function loadMessagePage(
+  repository: SessionsRepository,
+  sessionId: string,
+  cursor?: string,
+  signal?: AbortSignal,
+) {
+  if (repository.listMessagePage) {
+    return repository.listMessagePage(sessionId, cursor, signal)
+  }
+  return {
+    hasMore: false,
+    items: await repository.listMessages(sessionId, signal),
+    nextCursor: undefined,
   }
 }
 

@@ -65,6 +65,12 @@ interface CursorPage<T> {
   nextCursor?: string | null
 }
 
+export interface SessionMessagePage {
+  hasMore: boolean
+  items: SessionMessage[]
+  nextCursor?: string
+}
+
 interface SessionTurnDto {
   messages?: SessionMessageDto[]
   noteDraft?: unknown
@@ -148,6 +154,11 @@ export interface SessionsRepository {
     sessionId: string,
     signal?: AbortSignal,
   ) => Promise<SessionMessage[]>
+  listMessagePage?: (
+    sessionId: string,
+    cursor?: string,
+    signal?: AbortSignal,
+  ) => Promise<SessionMessagePage>
   listQuizzes: (
     sessionId: string,
     signal?: AbortSignal,
@@ -177,6 +188,24 @@ export function createSessionsRepository(
   request: AuthenticatedRequest,
   rawRequest?: AuthenticatedRawRequest,
 ): SessionsRepository {
+  const listMessagePage = async (
+    sessionId: string,
+    cursor?: string,
+    signal?: AbortSignal,
+  ): Promise<SessionMessagePage> => {
+    const query = new URLSearchParams({ size: '50' })
+    if (cursor) query.set('cursor', cursor)
+    const { data } = await request<CursorPage<SessionMessageDto>>(
+      `/api/sessions/${encodeURIComponent(sessionId)}/messages?${query}`,
+      { signal },
+    )
+    return {
+      hasMore: data.hasMore ?? false,
+      items: data.items.map(mapMessage),
+      nextCursor: data.nextCursor ?? undefined,
+    }
+  }
+
   return {
     async cancelTurn(sessionId, signal) {
       const { data } = await request<{ cancelled: boolean }>(
@@ -243,12 +272,10 @@ export function createSessionsRepository(
       return data.items.map(mapSession)
     },
     async listMessages(sessionId, signal) {
-      const { data } = await request<CursorPage<SessionMessageDto>>(
-        `/api/sessions/${encodeURIComponent(sessionId)}/messages?size=50`,
-        { signal },
-      )
-      return data.items.map(mapMessage)
+      const page = await listMessagePage(sessionId, undefined, signal)
+      return page.items
     },
+    listMessagePage,
     async listQuizzes(sessionId, signal) {
       const { data } = await request<SessionQuizListDto>(
         `/api/sessions/${encodeURIComponent(sessionId)}/quizzes`,

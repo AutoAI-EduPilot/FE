@@ -257,6 +257,41 @@ describe('ChatPanel', () => {
     )
   })
 
+  it('prepends older messages using the history cursor', async () => {
+    const listMessagePage = vi.fn()
+      .mockResolvedValueOnce({
+        hasMore: true,
+        items: [{
+          content: '최신 답변',
+          createdAt: '2026-07-27T00:00:00Z',
+          id: '500',
+          senderType: 'AI',
+        }],
+        nextCursor: 'older-cursor',
+      })
+      .mockResolvedValueOnce({
+        hasMore: false,
+        items: [{
+          content: '이전 질문',
+          createdAt: '2026-07-26T00:00:00Z',
+          id: '499',
+          senderType: 'USER',
+        }],
+      })
+    const repository = createRepository({ listMessagePage })
+    render(<ChatHarness repository={repository} />)
+
+    expect(await screen.findByText('최신 답변')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: '이전 메시지 불러오기' }))
+
+    expect(await screen.findByText('이전 질문')).toBeInTheDocument()
+    expect(listMessagePage).toHaveBeenNthCalledWith(1, '100', undefined, expect.any(AbortSignal))
+    expect(listMessagePage).toHaveBeenNthCalledWith(2, '100', 'older-cursor', undefined)
+    expect(screen.queryByRole('button', { name: '이전 메시지 불러오기' })).not.toBeInTheDocument()
+    const messages = screen.getAllByText(/이전 질문|최신 답변/)
+    expect(messages.map((message) => message.textContent)).toEqual(['이전 질문', '최신 답변'])
+  })
+
   it('sends with Enter, keeps Shift+Enter as a newline, and reports turn state', async () => {
     const onTurnCompleted = vi.fn()
     const repository = createRepository({
@@ -293,6 +328,7 @@ describe('ChatPanel', () => {
     await screen.findByLabelText('질문')
 
     expect(screen.queryByText('현재 페이지 첨부됨 · 3쪽')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: '현재 페이지 첨부 해제' })).toHaveAttribute('aria-pressed', 'true')
     fireEvent.change(screen.getByLabelText('질문'), {
       target: { value: '일반적인 개념만 설명해 주세요.' },
     })
@@ -305,6 +341,31 @@ describe('ChatPanel', () => {
         payload: {
           includeCurrentPage: true,
           message: '일반적인 개념만 설명해 주세요.',
+        },
+      }),
+      expect.any(AbortSignal),
+    ))
+  })
+
+  it('sends a general question without page context when attachment is disabled', async () => {
+    const repository = createRepository()
+    render(<ChatHarness currentPage={3} repository={repository} />)
+    await screen.findByLabelText('질문')
+
+    fireEvent.click(screen.getByRole('button', { name: '현재 페이지 첨부 해제' }))
+    expect(screen.getByRole('button', { name: '현재 페이지 첨부' })).toHaveAttribute('aria-pressed', 'false')
+    fireEvent.change(screen.getByLabelText('질문'), {
+      target: { value: '일반 지식으로 설명해 주세요.' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: '질문 보내기' }))
+
+    await waitFor(() => expect(repository.submitTurn).toHaveBeenCalledWith(
+      '100',
+      expect.objectContaining({
+        eventType: 'USER_QUESTION',
+        payload: {
+          includeCurrentPage: false,
+          message: '일반 지식으로 설명해 주세요.',
         },
       }),
       expect.any(AbortSignal),

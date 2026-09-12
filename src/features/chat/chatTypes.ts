@@ -5,6 +5,7 @@ export interface ChatMessage {
   content: string
   createdAt?: string
   id: string
+  includeCurrentPage?: boolean
   messageType?: string
   pageNumber?: number
   requestId?: string
