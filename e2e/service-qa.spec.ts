@@ -74,6 +74,7 @@ for (const role of ['LEARNER', 'INSTRUCTOR', 'ADMIN'] as const) {
             ))
             expect.soft(pageOverflow, 'AI usage must not create page-level vertical scrolling').toBeLessThanOrEqual(2)
             await expect(page.getByRole('region', { name: 'AI 사용량 상세' })).toBeVisible()
+            await expect(page.getByRole('region', { name: '사용자별 호출 목록' })).toBeVisible()
           }
         })
       }
