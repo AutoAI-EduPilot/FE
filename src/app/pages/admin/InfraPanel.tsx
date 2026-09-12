@@ -1,4 +1,4 @@
-import { RefreshCw } from 'lucide-react'
+import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 import type {
@@ -168,7 +168,7 @@ function InfraSummary({ app, cost, metrics }: { app: LoadState<InfraApp>; cost: 
 }
 
 function SummaryMetric({ danger = false, label, value, valueClassName }: { danger?: boolean; label: string; value: string; valueClassName?: string }) {
-  return <div className="min-w-0 border-r border-b border-stone-100 px-4 py-3 xl:border-b-0"><p className="type-caption text-stone-500">{label}</p><p className={`mt-1 truncate type-page-title font-bold ${danger ? 'text-rose-700' : valueClassName ?? 'text-stone-950'}`} title={value}>{value}</p>{value === '-' ? <span className="block type-micro text-stone-400">데이터 없음</span> : null}</div>
+  return <div className="min-w-0 border-r border-b border-stone-100 px-4 py-2.5 xl:border-b-0"><p className="type-micro text-stone-500">{label}</p><p className={`mt-0.5 truncate type-section-title font-bold ${danger ? 'text-rose-700' : valueClassName ?? 'text-stone-950'}`} title={value}>{value}</p>{value === '-' ? <span className="block type-micro text-stone-400">데이터 없음</span> : null}</div>
 }
 
 function SystemSection({ app, metrics, range }: { app: LoadState<InfraApp>; metrics: LoadState<InfraMetrics>; range: InfraRange }) {
@@ -196,9 +196,16 @@ function AppStatusTable({ data }: { data: InfraApp | null }) {
 function CostSection({ state }: { state: LoadState<InfraCost> }) {
   const data = state.data
   const services = data?.monthToDate?.byService ?? []
-  const daily = data?.daily ?? []
+  const allDaily = [...(data?.daily ?? [])].sort((first, second) => first.date.localeCompare(second.date))
+  const latestDate = allDaily.at(-1)?.date ?? localDate(new Date())
+  const latestWeek = weekEndingAt(latestDate)
+  const [weekOffset, setWeekOffset] = useState(0)
+  const selectedWeek = shiftDateRange(latestWeek, weekOffset * 7)
+  const daily = allDaily.filter((item) => item.date >= selectedWeek.from && item.date <= selectedWeek.to)
   const totalCost = Math.max(1, data?.monthToDate?.total ?? 0)
   const maxDaily = Math.max(1, ...daily.map((item) => item.total))
+  const canGoPrevious = allDaily.length > 0 && selectedWeek.from > allDaily[0].date
+  const canGoNext = weekOffset < 0
   return (
     <section aria-labelledby="cost-title" className="rounded-lg border border-stone-200 bg-white">
       <SectionHeader id="cost-title" title="AWS 비용" updatedAt={data?.updatedAt ?? state.receivedAt} />
@@ -211,9 +218,9 @@ function CostSection({ state }: { state: LoadState<InfraCost> }) {
         <>
           {data.stale ? <StaleNotice /> : null}
           <div className="grid xl:grid-cols-[minmax(360px,1fr)_minmax(0,1fr)]">
-            <div className="border-b border-stone-100 p-4 xl:border-r xl:border-b-0">
+            <div className="border-b border-stone-100 p-3 xl:border-r xl:border-b-0">
               <h3 className="type-control font-bold text-stone-700">서비스별</h3>
-              <div className="mt-3 space-y-3">
+              <div className="mt-2 space-y-2.5">
                 {services.length === 0 ? <p className="type-caption text-stone-500">비용 내역이 없습니다.</p> : services.map((item) => (
                   <div key={item.service}>
                     <div className="mb-1 flex items-center justify-between gap-3 type-caption">
@@ -227,14 +234,24 @@ function CostSection({ state }: { state: LoadState<InfraCost> }) {
                 ))}
               </div>
             </div>
-            <div className="min-w-0 p-4">
-              <h3 className="type-control font-bold text-stone-700">일별 비용</h3>
+            <div className="min-w-0 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="type-control font-bold text-stone-700">일별 비용</h3>
+                <WeekRangeControl
+                  canGoNext={canGoNext}
+                  canGoPrevious={canGoPrevious}
+                  label="AWS 비용 조회 기간"
+                  onNext={() => setWeekOffset((current) => Math.min(0, current + 1))}
+                  onPrevious={() => setWeekOffset((current) => current - 1)}
+                  range={selectedWeek}
+                />
+              </div>
               {daily.length === 0 ? <p className="py-8 text-center type-caption text-stone-500">일별 비용 내역이 없습니다.</p> : (
-                <div className="mt-3 flex h-40 items-end gap-3 overflow-x-auto pb-1" role="img" aria-label="최근 30일 일별 AWS 비용">
+                <div className="mt-2 flex h-32 items-end gap-2 overflow-x-auto pb-1" role="img" aria-label={`${selectedWeek.from}부터 ${selectedWeek.to}까지 일별 AWS 비용`}>
                   {daily.map((item) => (
-                    <div className="flex h-full min-w-12 flex-1 flex-col items-center justify-end" key={item.date} title={`${item.date}: ${formatMoney(item.total, data.currency ?? 'USD')}`}>
+                    <div className="flex h-full min-w-10 flex-1 flex-col items-center justify-end" key={item.date} title={`${item.date}: ${formatMoney(item.total, data.currency ?? 'USD')}`}>
                       <strong className="mb-1 type-micro text-stone-600">{formatMoney(item.total, data.currency ?? 'USD')}</strong>
-                      <div className="w-7 rounded-t-sm bg-brand-700" style={{ height: `${Math.max(2, (item.total / maxDaily) * 100)}%` }} />
+                      <div className="w-6 rounded-t-sm bg-brand-700" style={{ height: `${Math.max(2, (item.total / maxDaily) * 100)}%` }} />
                       <span className="mt-1 type-micro text-stone-400">{formatMonthDay(item.date)}</span>
                     </div>
                   ))}
@@ -279,51 +296,53 @@ export function InfraLineChart({
   }).join(', ')
 
   return (
-    <section className="min-w-0 border-b border-stone-100 p-4 xl:border-r xl:border-b-0 xl:last:border-r-0">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="type-control font-bold text-stone-900">{title}</h3>
-        <div className="flex flex-wrap items-center gap-3 type-caption text-stone-500">
+    <section className="min-w-0 border-b border-stone-100 p-3 xl:border-r xl:border-b-0 xl:last:border-r-0">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="type-caption font-bold text-stone-900">{title}</h3>
+        <div className="flex flex-wrap items-center gap-2.5 type-micro text-stone-500">
           {series.map((item) => <span className="flex items-center gap-1.5" key={item.label}><span className="size-2 rounded-full" style={{ backgroundColor: item.color }} />{item.label}</span>)}
         </div>
       </div>
       {values.length === 0 ? <PanelMessage message="선택한 기간의 지표가 없습니다." /> : (
         <>
-          <svg aria-label={ariaLabel} className="h-auto w-full" role="img" viewBox="0 0 720 220">
-            <title>{ariaLabel}. {latestSummary}</title>
-            {[0, 0.5, 1].map((ratio) => {
-              const y = 14 + ratio * 166
-              return <line key={ratio} stroke="#E8EAF1" strokeWidth="1" x1="44" x2="708" y1={y} y2={y} />
-            })}
-            {series.map((item) => (
-              <g key={item.label}>
-                <path
-                  d={buildLinePath(item.points, minTime, maxTime, resolvedMax)}
-                  data-series={item.label}
-                  fill="none"
-                  stroke={item.color}
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                />
-                {item.points.filter((point) => point.v != null).map((point) => {
-                  const x = scaleTime(Date.parse(point.t), minTime, maxTime)
-                  const y = scaleValue(point.v ?? 0, resolvedMax)
-                  return (
-                    <circle cx={x} cy={y} fill="transparent" key={`${item.label}-${point.t}`} r="6" tabIndex={0}>
-                      <title>{item.label} {formatChartTime(point.t, range)} {formatValue(point.v)}</title>
-                    </circle>
-                  )
-                })}
-              </g>
-            ))}
-            <text className="fill-stone-400 type-caption" textAnchor="end" x="40" y="18">{formatValue(resolvedMax)}</text>
-            <text className="fill-stone-400 type-caption" textAnchor="end" x="40" y="184">{formatValue(0)}</text>
-            {ticks.map((timestamp) => (
-              <text className="fill-stone-400 type-caption" key={timestamp} textAnchor="middle" x={scaleTime(timestamp, minTime, maxTime)} y="207">
-                {formatChartTime(new Date(timestamp).toISOString(), range)}
-              </text>
-            ))}
-          </svg>
+          <div className="overflow-x-auto">
+            <svg aria-label={ariaLabel} className="h-auto min-w-[720px] w-full" role="img" viewBox="0 0 900 180">
+              <title>{ariaLabel}. {latestSummary}</title>
+              {[0, 0.5, 1].map((ratio) => {
+                const y = CHART_TOP + ratio * (CHART_BOTTOM - CHART_TOP)
+                return <line key={ratio} stroke="#E8EAF1" strokeWidth="1" x1={CHART_LEFT} x2={CHART_RIGHT} y1={y} y2={y} />
+              })}
+              {series.map((item) => (
+                <g key={item.label}>
+                  <path
+                    d={buildLinePath(item.points, minTime, maxTime, resolvedMax)}
+                    data-series={item.label}
+                    fill="none"
+                    stroke={item.color}
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                  />
+                  {item.points.filter((point) => point.v != null).map((point) => {
+                    const x = scaleTime(Date.parse(point.t), minTime, maxTime)
+                    const y = scaleValue(point.v ?? 0, resolvedMax)
+                    return (
+                      <circle cx={x} cy={y} fill="transparent" key={`${item.label}-${point.t}`} r="6" tabIndex={0}>
+                        <title>{item.label} {formatChartTime(point.t, range)} {formatValue(point.v)}</title>
+                      </circle>
+                    )
+                  })}
+                </g>
+              ))}
+              <text className="fill-stone-400 type-micro" textAnchor="end" x="44" y={CHART_TOP + 4}>{formatValue(resolvedMax)}</text>
+              <text className="fill-stone-400 type-micro" textAnchor="end" x="44" y={CHART_BOTTOM + 4}>{formatValue(0)}</text>
+              {ticks.map((timestamp) => (
+                <text className="fill-stone-400 type-micro" key={timestamp} textAnchor="middle" x={scaleTime(timestamp, minTime, maxTime)} y="170">
+                  {formatChartTime(new Date(timestamp).toISOString(), range)}
+                </text>
+              ))}
+            </svg>
+          </div>
           <p className="sr-only">{latestSummary}</p>
         </>
       )}
@@ -347,8 +366,8 @@ function buildLinePath(points: InfraPoint[], minTime: number, maxTime: number, y
 function SectionHeader({ id, title, updatedAt }: { id: string; title: string; updatedAt: string | null | undefined }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 px-4 py-3">
-      <h2 className="type-section-title font-bold text-stone-950" id={id}>{title}</h2>
-      <p className="type-caption text-stone-400">갱신 {updatedAt ? formatDateTime(updatedAt) : '-'}</p>
+      <h2 className="type-control font-bold text-stone-950" id={id}>{title}</h2>
+      <p className="type-micro text-stone-400">갱신 {updatedAt ? formatDateTime(updatedAt) : '-'}</p>
     </div>
   )
 }
@@ -367,6 +386,30 @@ function SegmentedControl({ label, onChange, options, value }: { label: string; 
           {optionLabel}
         </button>
       ))}
+    </div>
+  )
+}
+
+function WeekRangeControl({
+  canGoNext,
+  canGoPrevious,
+  label,
+  onNext,
+  onPrevious,
+  range,
+}: {
+  canGoNext: boolean
+  canGoPrevious: boolean
+  label: string
+  onNext: () => void
+  onPrevious: () => void
+  range: { from: string; to: string }
+}) {
+  return (
+    <div aria-label={label} className="flex h-8 items-center overflow-hidden rounded-lg border border-stone-200 bg-white mobile-web:h-11">
+      <button aria-label="AWS 비용 이전 주" className="flex h-full w-8 items-center justify-center text-stone-500 hover:bg-stone-50 hover:text-stone-900 disabled:opacity-40 mobile-web:w-11" disabled={!canGoPrevious} onClick={onPrevious} type="button"><ChevronLeft aria-hidden="true" size={14} /></button>
+      <span className="min-w-24 px-1.5 text-center type-caption font-semibold text-stone-700">{formatWeekRange(range)}</span>
+      <button aria-label="AWS 비용 다음 주" className="flex h-full w-8 items-center justify-center text-stone-500 hover:bg-stone-50 hover:text-stone-900 disabled:opacity-40 mobile-web:w-11" disabled={!canGoNext} onClick={onNext} type="button"><ChevronRight aria-hidden="true" size={14} /></button>
     </div>
   )
 }
@@ -415,17 +458,49 @@ function formatMonthDay(value: string) {
   return `${Number(month)}/${Number(day)}`
 }
 
+function localDate(value: Date) {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Seoul' }).format(value)
+}
+
+function weekEndingAt(to: string) {
+  return { from: shiftIsoDate(to, -6), to }
+}
+
+function shiftDateRange(range: { from: string; to: string }, days: number) {
+  return { from: shiftIsoDate(range.from, days), to: shiftIsoDate(range.to, days) }
+}
+
+function shiftIsoDate(value: string, days: number) {
+  const date = new Date(`${value}T00:00:00Z`)
+  date.setUTCDate(date.getUTCDate() + days)
+  return date.toISOString().slice(0, 10)
+}
+
+function formatWeekRange(range: { from: string; to: string }) {
+  return `${formatPaddedMonthDay(range.from)} - ${formatPaddedMonthDay(range.to)}`
+}
+
+function formatPaddedMonthDay(value: string) {
+  const [, month, day] = value.split('-')
+  return `${month}.${day}`
+}
+
 function ratioPercent(value: number, max: number) {
   return max > 0 ? (value / max) * 100 : null
 }
 
+const CHART_LEFT = 52
+const CHART_RIGHT = 888
+const CHART_TOP = 12
+const CHART_BOTTOM = 142
+
 function scaleTime(value: number, min: number, max: number) {
-  if (max <= min) return 376
-  return 44 + ((value - min) / (max - min)) * 664
+  if (max <= min) return (CHART_LEFT + CHART_RIGHT) / 2
+  return CHART_LEFT + ((value - min) / (max - min)) * (CHART_RIGHT - CHART_LEFT)
 }
 
 function scaleValue(value: number, max: number) {
-  return 180 - (Math.max(0, Math.min(value, max)) / Math.max(1, max)) * 166
+  return CHART_BOTTOM - (Math.max(0, Math.min(value, max)) / Math.max(1, max)) * (CHART_BOTTOM - CHART_TOP)
 }
 
 function chartTicks(timestamps: number[], count: number) {

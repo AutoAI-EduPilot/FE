@@ -33,7 +33,11 @@ const metrics: InfraMetrics = {
 const cost: InfraCost = {
   available: true,
   currency: 'USD',
-  daily: [{ date: '2026-08-31', total: 2.25 }],
+  daily: [
+    { date: '2026-08-24', total: 1.25 },
+    { date: '2026-08-25', total: 1.5 },
+    { date: '2026-08-31', total: 2.25 },
+  ],
   monthToDate: {
     byService: [{ amount: 30, service: 'Amazon Elastic Compute Cloud' }],
     total: 42.75,
@@ -157,6 +161,25 @@ describe('InfraPanel', () => {
     await waitFor(() => expect(repository.getInfraCost).toHaveBeenCalledTimes(2))
     expect(repository.getInfraApp).toHaveBeenCalledTimes(2)
     expect(repository.getInfraMetrics).toHaveBeenCalledTimes(metricsCalls + 1)
+  })
+
+  it('shows AWS daily costs in fixed seven-day ranges', async () => {
+    const { repository } = renderPanel()
+    await screen.findByText('$42.75')
+
+    const rangeControl = screen.getByLabelText('AWS 비용 조회 기간')
+    expect(rangeControl).toHaveTextContent('08.25 - 08.31')
+    expect(screen.getByTitle('2026-08-31: $2.25')).toBeInTheDocument()
+    expect(screen.queryByTitle('2026-08-24: $1.25')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'AWS 비용 다음 주' })).toBeDisabled()
+
+    fireEvent.click(screen.getByRole('button', { name: 'AWS 비용 이전 주' }))
+
+    expect(rangeControl).toHaveTextContent('08.18 - 08.24')
+    expect(screen.getByTitle('2026-08-24: $1.25')).toBeInTheDocument()
+    expect(screen.queryByTitle('2026-08-31: $2.25')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'AWS 비용 다음 주' })).toBeEnabled()
+    expect(repository.getInfraCost).toHaveBeenCalledTimes(1)
   })
 
   it('does not poll when time passes', async () => {

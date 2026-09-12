@@ -100,6 +100,9 @@ export function AppLayout() {
   const roleLabel = getRoleLabel(user?.role)
   const isAdmin = isAdminRole(user?.role)
   const isInstructor = isInstructorRole(user?.role)
+  const isAdminAiUsageWorkspace = isAdmin
+    && location.pathname === routes.admin
+    && adminTabFromLocation(`${location.pathname}${location.search}`) === 'ai-usage'
   const classroomsRepository = useMemo(
     () => createClassroomsRepository(apiRequest),
     [apiRequest],
@@ -358,13 +361,18 @@ export function AppLayout() {
     <div
       className={cx(
         'bg-[#F6F7F9] text-stone-900 dark:bg-[#1b1c20] lg:flex mobile-web:!flex-col mobile-web:max-w-full mobile-web:overflow-x-hidden',
-        isStudyWorkspace ? 'h-dvh overflow-hidden' : 'min-h-screen',
+        isStudyWorkspace
+          ? 'h-dvh overflow-hidden'
+          : isAdminAiUsageWorkspace
+            ? 'flex h-dvh flex-col overflow-hidden lg:flex-row'
+            : 'min-h-screen',
       )}
     >
       <aside
         className={cx(
           'relative z-40 flex border-b border-stone-200 bg-white px-4 py-3 dark:bg-[#222327] lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:flex-col lg:border-r lg:border-b-0 lg:py-4 mobile-web:sticky mobile-web:top-0 mobile-web:!h-auto mobile-web:!w-full mobile-web:!flex-row mobile-web:!border-r-0 mobile-web:!border-b mobile-web:!py-3 mobile-web:mobile-safe-x mobile-web:mobile-safe-top mobile-web:shadow-sm',
           isCollapsed ? 'lg:w-14 lg:px-2 mobile-web:!px-4' : 'lg:w-52 lg:px-2.5 mobile-web:!px-4',
+          isAdminAiUsageWorkspace && 'shrink-0',
         )}
       >
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-4 lg:block lg:flex-none mobile-web:!flex mobile-web:!flex-1 mobile-web:!items-center">
@@ -581,13 +589,19 @@ export function AppLayout() {
           'min-w-0 flex-1',
           isStudyWorkspace
             ? 'h-[calc(100dvh-61px)] overflow-hidden p-0 lg:h-dvh mobile-web:!h-[calc(100dvh-113px)]'
-            : cx('px-4 py-4 sm:px-6 lg:py-5 mobile-phone:px-3 mobile-web:mobile-safe-bottom', isAdmin ? 'lg:px-8' : 'lg:px-12'),
+            : cx(
+                'px-4 py-4 sm:px-6 lg:py-5 mobile-phone:px-3 mobile-web:mobile-safe-bottom',
+                isAdmin ? 'lg:px-8' : 'lg:px-12',
+                isAdminAiUsageWorkspace && 'min-h-0 overflow-hidden',
+              ),
         )}
       >
         <div
           className={
             isStudyWorkspace
               ? 'h-full min-h-0'
+              : isAdminAiUsageWorkspace
+                ? 'h-full min-h-0 w-full min-w-0'
               : isAdmin
                 ? 'w-full min-w-0'
                 : 'app-page-frame'
