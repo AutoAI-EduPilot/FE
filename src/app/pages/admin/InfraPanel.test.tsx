@@ -143,7 +143,15 @@ describe('InfraPanel', () => {
   })
 
   it('reloads only metrics for filters and reloads every section manually', async () => {
-    const repository = createRepository()
+    const repository = createRepository({
+      getInfraCost: vi.fn()
+        .mockResolvedValueOnce(cost)
+        .mockResolvedValueOnce({
+          ...cost,
+          monthToDate: { ...cost.monthToDate, total: 43.5 },
+          updatedAt: '2026-09-01T01:30:00Z',
+        }),
+    })
     renderPanel(repository)
     await screen.findByText('$42.75')
 
@@ -159,6 +167,7 @@ describe('InfraPanel', () => {
     expect(refreshButton).toHaveTextContent('')
     fireEvent.click(refreshButton)
     await waitFor(() => expect(repository.getInfraCost).toHaveBeenCalledTimes(2))
+    expect(await screen.findByText('$43.50')).toBeInTheDocument()
     expect(repository.getInfraApp).toHaveBeenCalledTimes(2)
     expect(repository.getInfraMetrics).toHaveBeenCalledTimes(metricsCalls + 1)
   })
@@ -223,6 +232,8 @@ describe('InfraLineChart', () => {
     )
 
     expect(screen.getByRole('img', { name: 'CPU 추이' })).toBeInTheDocument()
+    expect(screen.getByRole('img', { name: 'CPU 추이' })).toHaveAttribute('viewBox', '0 0 1200 128')
+    expect(container.querySelector('path[data-series="CPU"]')).toHaveAttribute('stroke-width', '1.25')
     expect(container.querySelector('path[data-series="CPU"]')?.getAttribute('d')?.match(/M/g)).toHaveLength(2)
   })
 
