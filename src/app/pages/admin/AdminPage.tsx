@@ -17,6 +17,7 @@ import {
   type AiUsageUser,
 } from '../../../features/admin'
 import { useAuth } from '../../../features/auth'
+import { DevelopmentUpdatesPanel } from '../../../features/updates'
 import { usePageTitle } from '../../../shared/lib/usePageTitle'
 import { formatDetailedRelativeActivityDate } from '../../../shared/lib/format'
 import { useResponsiveViewport } from '../../../shared/responsive'
@@ -31,13 +32,14 @@ import {
 } from './adminShared'
 import { InfraPanel } from './InfraPanel'
 
-export type AdminTab = 'users' | 'classrooms' | 'ai-usage' | 'infra'
+export type AdminTab = 'users' | 'classrooms' | 'ai-usage' | 'infra' | 'updates'
 
 const tabs: Array<{ id: AdminTab; label: string }> = [
   { id: 'users', label: '회원' },
   { id: 'classrooms', label: '강의실' },
   { id: 'ai-usage', label: 'AI 사용량' },
   { id: 'infra', label: '인프라' },
+  { id: 'updates', label: '업데이트' },
 ]
 
 export function AdminPage() {
@@ -54,7 +56,7 @@ export function AdminPage() {
   }
 
   return (
-    <div className={tab === 'ai-usage'
+    <div className={tab === 'ai-usage' || tab === 'updates'
       ? 'flex h-full min-h-0 flex-col overflow-hidden'
       : 'flex min-h-[calc(100dvh-40px)] flex-col'}>
       <header className="border-b border-stone-200">
@@ -76,13 +78,14 @@ export function AdminPage() {
         </nav>
       </header>
 
-      <section className={tab === 'infra'
-        ? 'mt-5 min-h-0 flex-1 overflow-hidden'
+      <section className={tab === 'infra' || tab === 'updates'
+        ? 'mt-5 flex min-h-0 flex-1 flex-col overflow-hidden'
         : 'mt-5 min-h-0 flex-1 overflow-hidden rounded-lg border border-stone-200 bg-white shadow-sm shadow-stone-200/30'}>
         {tab === 'users' ? <UsersPanel repository={repository} /> : null}
         {tab === 'classrooms' ? <ClassroomsPanel repository={repository} /> : null}
         {tab === 'ai-usage' ? <AiUsagePanel repository={repository} /> : null}
         {tab === 'infra' ? <InfraPanel repository={repository} /> : null}
+        {tab === 'updates' ? <DevelopmentUpdatesPanel showTitle={false} /> : null}
       </section>
     </div>
   )

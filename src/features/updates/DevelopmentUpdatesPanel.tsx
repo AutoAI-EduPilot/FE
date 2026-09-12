@@ -49,9 +49,11 @@ const defaultRepository = createGithubUpdatesRepository((input, init) => fetch(i
 export function DevelopmentUpdatesPanel({
   initialDate,
   repository,
+  showTitle = true,
 }: {
   initialDate?: Date
   repository?: UpdatesRepository
+  showTitle?: boolean
 }) {
   const activeRepository = repository ?? defaultRepository
   const { mode } = useResponsiveViewport()
@@ -130,9 +132,13 @@ export function DevelopmentUpdatesPanel({
   }
 
   return (
-    <section aria-labelledby="development-updates-title" className="flex min-h-0 min-w-0 flex-col lg:flex-1">
+    <section
+      aria-label={showTitle ? undefined : '업데이트'}
+      aria-labelledby={showTitle ? 'development-updates-title' : undefined}
+      className="flex min-h-0 min-w-0 flex-col lg:flex-1"
+    >
       <div className="flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2">
+        {showTitle ? <div className="flex items-center gap-2">
           <h2 className="type-section-title font-bold text-stone-950" id="development-updates-title">업데이트</h2>
           <a
             className="inline-flex size-8 items-center justify-center rounded-lg text-stone-500 hover:bg-stone-100 hover:text-stone-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-600"
@@ -144,7 +150,7 @@ export function DevelopmentUpdatesPanel({
             <ExternalLink aria-hidden="true" size={15} />
             <span className="sr-only">GitHub 조직 열기</span>
           </a>
-        </div>
+        </div> : <span />}
         <div aria-label="개발 파트" className="flex h-9 rounded-lg bg-stone-100 p-0.5" role="group">
           {PARTS.map((part) => (
             <button
