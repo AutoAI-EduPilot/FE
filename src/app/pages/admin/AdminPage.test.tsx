@@ -14,11 +14,13 @@ afterEach(() => {
 describe('AdminPage', () => {
   it('refreshes the selected AI usage range from an icon-only button', async () => {
     const requestedPaths: string[] = []
+    const requestedUserPageSizes: string[] = []
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input) => {
       const url = new URL(input instanceof Request ? input.url : String(input), 'http://localhost')
       requestedPaths.push(url.pathname)
       if (url.pathname === '/api/admin/users') {
-        return success({ items: [], page: 0, size: 20, totalElements: 0, totalPages: 0 })
+        requestedUserPageSizes.push(url.searchParams.get('size') ?? '')
+        return success({ items: [], page: 0, size: 17, totalElements: 0, totalPages: 0 })
       }
       if (url.pathname === '/api/admin/ai-usage/summary') {
         return success({ daily: [], features: [] })
@@ -37,6 +39,7 @@ describe('AdminPage', () => {
       </ResponsiveViewportProvider>,
     )
 
+    await waitFor(() => expect(requestedUserPageSizes).toContain('17'))
     fireEvent.click(screen.getByRole('button', { name: 'AI 사용량' }))
     await waitFor(() => expect(countRequests(requestedPaths, '/api/admin/ai-usage/summary')).toBe(1))
     expect(screen.getByRole('region', { name: 'AI 사용량 상세' })).toHaveClass('overflow-hidden')
@@ -62,7 +65,7 @@ describe('AdminPage', () => {
         return success({ affiliation: '테스트 학교', authProvider: 'LOCAL', consentedAt: null, createdAt: '2026-09-01T00:00:00Z', email: 'member@example.com', id: 7, name: '회원', role: 'LEARNER', status: 'ACTIVE' })
       }
       if (url.pathname === '/api/admin/users') {
-        return success({ items: [{ authProvider: 'LOCAL', createdAt: '2026-09-01T00:00:00Z', email: 'member@example.com', id: 7, lastActiveAt: new Date().toISOString(), name: '회원', role: 'LEARNER', status: 'ACTIVE' }], page: 0, size: 20, totalElements: 1, totalPages: 1 })
+        return success({ items: [{ authProvider: 'LOCAL', createdAt: '2026-09-01T00:00:00Z', email: 'member@example.com', id: 7, lastActiveAt: new Date().toISOString(), name: '회원', role: 'LEARNER', status: 'ACTIVE' }], page: 0, size: 17, totalElements: 1, totalPages: 1 })
       }
       return new Response(null, { status: 404 })
     })
