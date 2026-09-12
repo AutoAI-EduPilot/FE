@@ -94,6 +94,8 @@ function isAdminTab(value: string | null): value is AdminTab {
 
 type Repository = ReturnType<typeof createAdminRepository>
 
+const ADMIN_USERS_PAGE_SIZE = 17
+
 function UsersPanel({ repository }: { repository: Repository }) {
   const { user: currentUser } = useAuth()
   const { isMobileWeb } = useResponsiveViewport()
@@ -128,7 +130,7 @@ function UsersPanel({ repository }: { repository: Repository }) {
       page,
       q: submittedQuery || undefined,
       role: role || undefined,
-      size: 20,
+      size: ADMIN_USERS_PAGE_SIZE,
       sort,
       status: status || undefined,
     }, controller.signal)
@@ -212,7 +214,7 @@ function UsersPanel({ repository }: { repository: Repository }) {
         {!loading && result?.items.length === 0 ? <PanelMessage message="조건에 맞는 회원이 없습니다." /> : null}
         {loading ? <PanelMessage message="회원 정보를 불러오는 중입니다." /> : null}
       </div>
-      <Pagination page={page} pageSize={result?.size ?? 20} totalElements={result?.totalElements ?? 0} totalPages={result?.totalPages ?? 0} onChange={setPage} />
+      <Pagination page={page} pageSize={result?.size ?? ADMIN_USERS_PAGE_SIZE} totalElements={result?.totalElements ?? 0} totalPages={result?.totalPages ?? 0} onChange={setPage} />
       {resetResult ? <PasswordResetDialog onClose={() => setResetResult(null)} result={resetResult} /> : null}
     </div>
   )
