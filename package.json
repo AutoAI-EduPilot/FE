@@ -13,7 +13,13 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:run": "vitest run",
-    "typecheck": "tsc -b --pretty false"
+    "typecheck": "tsc -b --pretty false",
+    "test:e2e:mock": "cross-env QA_ENV=mock playwright test",
+    "test:e2e:dev": "cross-env QA_ENV=dev playwright test",
+    "test:e2e:prod": "cross-env QA_ENV=prod playwright test",
+    "test:e2e:visual": "cross-env QA_ENV=mock QA_FULL_MATRIX=1 playwright test --grep @visual",
+    "test:qa:issues": "node scripts/report-qa-issues.mjs",
+    "test:overnight": "node scripts/run-overnight-qa.mjs"
   },
   "dependencies": {
     "@blocknote/core": "^0.54.0",
@@ -37,13 +43,16 @@
     "tailwindcss": "4.1.13"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
     "@eslint/js": "10.0.1",
+    "@playwright/test": "^1.63.0",
     "@testing-library/jest-dom": "7.0.0",
     "@testing-library/react": "16.3.2",
     "@types/node": "26.1.1",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
     "@vitejs/plugin-react": "5.2.0",
+    "cross-env": "^7.0.3",
     "eslint": "10.7.0",
     "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-react-refresh": "0.5.3",

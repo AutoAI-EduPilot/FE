@@ -178,6 +178,40 @@ describe('InstructorReportCriteriaPage', () => {
     expect(deleteRequests).toBe(1)
   })
 
+  it('explains when changes apply and blocks duplicate criterion names locally', async () => {
+    let createRequests = 0
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+      const url = new URL(input instanceof Request ? input.url : String(input), 'http://localhost')
+      const method = input instanceof Request ? input.method : (init?.method ?? 'GET')
+
+      if (method === 'GET' && url.pathname === '/api/classrooms/12/report-criteria') {
+        return success({ items: [builtinCriterionFixture] })
+      }
+      if (method === 'GET' && url.pathname === '/api/classrooms/12/report-criteria/generation') {
+        return success({ message: '', registeredCount: 0, status: 'IDLE' })
+      }
+      if (method === 'POST' && url.pathname === '/api/classrooms/12/report-criteria') {
+        createRequests += 1
+        return success(criterionFixture)
+      }
+      return new Response(null, { status: 404 })
+    })
+
+    renderPage()
+
+    expect(await screen.findByRole('note')).toHaveTextContent(
+      '기존에 저장된 리포트에는 영향을 주지 않으며, 다음 리포트 생성부터 반영됩니다.',
+    )
+    const addForm = screen.getByRole('form', { name: '기준 추가' })
+    fireEvent.change(within(addForm).getByRole('textbox', { name: '이름' }), { target: { value: ' 학습 참여 ' } })
+    fireEvent.change(within(addForm).getByRole('textbox', { name: '설명' }), { target: { value: '중복 설명' } })
+    fireEvent.change(within(addForm).getByRole('textbox', { name: '평가 기준' }), { target: { value: '중복 평가 기준' } })
+    fireEvent.click(within(addForm).getByRole('button', { name: '기준 추가' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('이름의 평가 기준이 이미 있습니다.')
+    expect(createRequests).toBe(0)
+  })
+
   it.each([
     [403, 'FORBIDDEN', '평가 기준을 삭제할 권한이 없습니다.'],
     [404, 'RESOURCE_NOT_FOUND', '이미 삭제되었거나 찾을 수 없는 평가 기준입니다.'],
