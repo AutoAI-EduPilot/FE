@@ -39,6 +39,8 @@ describe('AdminPage', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'AI 사용량' }))
     await waitFor(() => expect(countRequests(requestedPaths, '/api/admin/ai-usage/summary')).toBe(1))
+    expect(screen.getByRole('region', { name: 'AI 사용량 상세' })).toHaveClass('overflow-hidden')
+    expect(screen.getByRole('region', { name: '사용자별 호출 목록' })).toHaveClass('overflow-y-auto')
 
     const refreshButton = screen.getByRole('button', { name: 'AI 사용량 새로고침' })
     expect(refreshButton).toHaveAttribute('title', '새로고침')

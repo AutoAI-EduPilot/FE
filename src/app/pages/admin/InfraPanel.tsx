@@ -208,7 +208,14 @@ function CostSection({ state }: { state: LoadState<InfraCost> }) {
   const canGoNext = weekOffset < 0
   return (
     <section aria-labelledby="cost-title" className="rounded-lg border border-stone-200 bg-white">
-      <SectionHeader id="cost-title" title="AWS 비용" updatedAt={data?.updatedAt ?? state.receivedAt} />
+      <SectionHeader
+        detail={data?.updatedAt ? `비용 데이터 기준 ${formatDateTime(data.updatedAt)}` : undefined}
+        id="cost-title"
+        label="조회"
+        showSeconds
+        title="AWS 비용"
+        updatedAt={state.receivedAt}
+      />
       {state.error ? <AdminErrorMessage error={state.error} /> : null}
       {state.loading ? <PanelMessage message="AWS 비용 정보를 불러오는 중입니다." /> : null}
       {!state.loading && data && !data.available ? (
@@ -296,21 +303,21 @@ export function InfraLineChart({
   }).join(', ')
 
   return (
-    <section className="min-w-0 border-b border-stone-100 p-3 xl:border-r xl:border-b-0 xl:last:border-r-0">
-      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-        <h3 className="type-caption font-bold text-stone-900">{title}</h3>
-        <div className="flex flex-wrap items-center gap-2.5 type-micro text-stone-500">
-          {series.map((item) => <span className="flex items-center gap-1.5" key={item.label}><span className="size-2 rounded-full" style={{ backgroundColor: item.color }} />{item.label}</span>)}
+    <section className="min-w-0 border-b border-stone-100 p-2.5 xl:border-r xl:border-b-0 xl:last:border-r-0">
+      <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2">
+        <h3 className="type-micro font-bold text-stone-900">{title}</h3>
+        <div className="flex flex-wrap items-center gap-2 type-micro text-stone-500">
+          {series.map((item) => <span className="flex items-center gap-1" key={item.label}><span className="size-1.5 rounded-full" style={{ backgroundColor: item.color }} />{item.label}</span>)}
         </div>
       </div>
       {values.length === 0 ? <PanelMessage message="선택한 기간의 지표가 없습니다." /> : (
         <>
           <div className="overflow-x-auto">
-            <svg aria-label={ariaLabel} className="h-auto min-w-[720px] w-full" role="img" viewBox="0 0 900 180">
+            <svg aria-label={ariaLabel} className="h-auto min-w-[720px] w-full" role="img" viewBox="0 0 1200 128">
               <title>{ariaLabel}. {latestSummary}</title>
               {[0, 0.5, 1].map((ratio) => {
                 const y = CHART_TOP + ratio * (CHART_BOTTOM - CHART_TOP)
-                return <line key={ratio} stroke="#E8EAF1" strokeWidth="1" x1={CHART_LEFT} x2={CHART_RIGHT} y1={y} y2={y} />
+                return <line key={ratio} stroke="#E8EAF1" strokeWidth="0.75" x1={CHART_LEFT} x2={CHART_RIGHT} y1={y} y2={y} />
               })}
               {series.map((item) => (
                 <g key={item.label}>
@@ -321,23 +328,23 @@ export function InfraLineChart({
                     stroke={item.color}
                     strokeLinecap="round"
                     strokeLinejoin="round"
-                    strokeWidth="2"
+                    strokeWidth="1.25"
                   />
                   {item.points.filter((point) => point.v != null).map((point) => {
                     const x = scaleTime(Date.parse(point.t), minTime, maxTime)
                     const y = scaleValue(point.v ?? 0, resolvedMax)
                     return (
-                      <circle cx={x} cy={y} fill="transparent" key={`${item.label}-${point.t}`} r="6" tabIndex={0}>
+                      <circle cx={x} cy={y} fill="transparent" key={`${item.label}-${point.t}`} r="4" tabIndex={0}>
                         <title>{item.label} {formatChartTime(point.t, range)} {formatValue(point.v)}</title>
                       </circle>
                     )
                   })}
                 </g>
               ))}
-              <text className="fill-stone-400 type-micro" textAnchor="end" x="44" y={CHART_TOP + 4}>{formatValue(resolvedMax)}</text>
-              <text className="fill-stone-400 type-micro" textAnchor="end" x="44" y={CHART_BOTTOM + 4}>{formatValue(0)}</text>
+              <text className="fill-stone-400 type-micro" textAnchor="end" x="44" y={CHART_TOP + 3}>{formatValue(resolvedMax)}</text>
+              <text className="fill-stone-400 type-micro" textAnchor="end" x="44" y={CHART_BOTTOM + 3}>{formatValue(0)}</text>
               {ticks.map((timestamp) => (
-                <text className="fill-stone-400 type-micro" key={timestamp} textAnchor="middle" x={scaleTime(timestamp, minTime, maxTime)} y="170">
+                <text className="fill-stone-400 type-micro" key={timestamp} textAnchor="middle" x={scaleTime(timestamp, minTime, maxTime)} y="121">
                   {formatChartTime(new Date(timestamp).toISOString(), range)}
                 </text>
               ))}
@@ -363,11 +370,11 @@ function buildLinePath(points: InfraPoint[], minTime: number, maxTime: number, y
   }).filter(Boolean).join(' ')
 }
 
-function SectionHeader({ id, title, updatedAt }: { id: string; title: string; updatedAt: string | null | undefined }) {
+function SectionHeader({ detail, id, label = '갱신', showSeconds = false, title, updatedAt }: { detail?: string; id: string; label?: string; showSeconds?: boolean; title: string; updatedAt: string | null | undefined }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 border-b border-stone-200 px-4 py-3">
       <h2 className="type-control font-bold text-stone-950" id={id}>{title}</h2>
-      <p className="type-micro text-stone-400">갱신 {updatedAt ? formatDateTime(updatedAt) : '-'}</p>
+      <p className="type-micro text-stone-400" title={detail}>{label} {updatedAt ? formatInfraTimestamp(updatedAt, showSeconds) : '-'}</p>
     </div>
   )
 }
@@ -437,6 +444,19 @@ function formatPercent(value: number | null | undefined) {
   return value == null ? '-' : `${value.toFixed(1)}%`
 }
 
+function formatInfraTimestamp(value: string, showSeconds: boolean) {
+  if (!showSeconds) return formatDateTime(value)
+  return new Intl.DateTimeFormat('ko-KR', {
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    month: 'numeric',
+    second: '2-digit',
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+  }).format(new Date(value))
+}
+
 function formatUptime(seconds: number) {
   const minutes = Math.max(0, Math.floor(seconds / 60))
   const days = Math.floor(minutes / 1440)
@@ -490,9 +510,9 @@ function ratioPercent(value: number, max: number) {
 }
 
 const CHART_LEFT = 52
-const CHART_RIGHT = 888
-const CHART_TOP = 12
-const CHART_BOTTOM = 142
+const CHART_RIGHT = 1188
+const CHART_TOP = 8
+const CHART_BOTTOM = 94
 
 function scaleTime(value: number, min: number, max: number) {
   if (max <= min) return (CHART_LEFT + CHART_RIGHT) / 2

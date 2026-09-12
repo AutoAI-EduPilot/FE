@@ -182,16 +182,16 @@ export function createAdminRepository(request: AuthenticatedRequest): AdminRepos
     async getInfraMetrics(params, signal) {
       const response = await request<InfraMetrics>(
         `/api/admin/infra/metrics?${toQuery(params)}`,
-        { signal },
+        { cache: 'no-store', signal },
       )
       return response.data
     },
     async getInfraCost(signal) {
-      const response = await request<InfraCost>('/api/admin/infra/cost', { signal })
+      const response = await request<InfraCost>('/api/admin/infra/cost', { cache: 'no-store', signal })
       return response.data
     },
     async getInfraApp(signal) {
-      const response = await request<InfraApp>('/api/admin/infra/app', { signal })
+      const response = await request<InfraApp>('/api/admin/infra/app', { cache: 'no-store', signal })
       return response.data
     },
     async getUser(userId, signal) {

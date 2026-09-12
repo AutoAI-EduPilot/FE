@@ -64,17 +64,17 @@ describe('admin repository', () => {
     expect(request).toHaveBeenNthCalledWith(
       1,
       '/api/admin/infra/metrics?env=prod&range=6h',
-      { signal: controller.signal },
+      { cache: 'no-store', signal: controller.signal },
     )
     expect(request).toHaveBeenNthCalledWith(
       2,
       '/api/admin/infra/cost',
-      { signal: controller.signal },
+      { cache: 'no-store', signal: controller.signal },
     )
     expect(request).toHaveBeenNthCalledWith(
       3,
       '/api/admin/infra/app',
-      { signal: controller.signal },
+      { cache: 'no-store', signal: controller.signal },
     )
   })
 })
