@@ -67,6 +67,14 @@ for (const role of ['LEARNER', 'INSTRUCTOR', 'ADMIN'] as const) {
           await page.goto(path)
           await expect(page).not.toHaveURL(/\/login(?:\?|$)/)
           await assertPageHealthy(page, testInfo, { axe: path === roleRoutes[role][0] })
+          if (role === 'ADMIN' && path === '/admin?tab=ai-usage') {
+            const pageOverflow = await page.evaluate(() => (
+              Math.max(document.body.scrollHeight, document.documentElement.scrollHeight)
+              - document.documentElement.clientHeight
+            ))
+            expect.soft(pageOverflow, 'AI usage must not create page-level vertical scrolling').toBeLessThanOrEqual(2)
+            await expect(page.getByRole('region', { name: 'AI 사용량 상세' })).toBeVisible()
+          }
         })
       }
 
