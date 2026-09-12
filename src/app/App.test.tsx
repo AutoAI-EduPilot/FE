@@ -127,7 +127,7 @@ describe('AppRoutes', () => {
     expect(await screen.findByRole('heading', { name: '회원' })).toBeInTheDocument()
     const adminNavigation = screen.getByRole('navigation', { name: '관리자 메뉴' })
     expect(adminNavigation).toBeInTheDocument()
-    expect(within(adminNavigation).getAllByRole('button')).toHaveLength(4)
+    expect(within(adminNavigation).getAllByRole('button')).toHaveLength(5)
     fireEvent.click(within(adminNavigation).getByRole('button', { name: '인프라' }))
     expect(await screen.findByRole('heading', { name: '인프라' })).toBeInTheDocument()
     expect(
@@ -136,7 +136,16 @@ describe('AppRoutes', () => {
       ),
     ).toBe(true)
     expect(screen.getByRole('link', { name: '강의실' })).toHaveAttribute('href', '/admin?tab=classrooms')
+    expect(screen.getByRole('link', { name: '업데이트' })).toHaveAttribute('href', '/admin?tab=updates')
     expect(screen.queryByRole('button', { name: /알림/ })).not.toBeInTheDocument()
+
+    fireEvent.click(within(adminNavigation).getByRole('button', { name: '업데이트' }))
+    expect(await screen.findByRole('heading', { name: '업데이트' })).toBeInTheDocument()
+    expect(screen.getByRole('group', { name: '개발 파트' })).toBeInTheDocument()
+
+    const [profileTrigger] = screen.getAllByRole('button', { name: '프로필 메뉴' })
+    fireEvent.click(profileTrigger)
+    expect(screen.queryByRole('menuitem', { name: '업데이트' })).not.toBeInTheDocument()
   })
 
   it('shows nullable admin AI token totals as unavailable', async () => {
@@ -310,17 +319,12 @@ describe('AppRoutes', () => {
     expect(screen.queryByRole('dialog', { name: '설정' })).not.toBeInTheDocument()
   })
 
-  it('opens development updates as a standalone page from the profile menu', async () => {
+  it('keeps development updates out of the profile menu', () => {
     renderRoute('/')
 
     const [profileTrigger] = screen.getAllByRole('button', { name: '프로필 메뉴' })
     fireEvent.click(profileTrigger)
-    const [updatesMenuItem] = screen.getAllByRole('menuitem', { name: '업데이트' })
-    fireEvent.click(updatesMenuItem)
-
-    expect(await screen.findByRole('heading', { name: '업데이트' })).toBeInTheDocument()
-    expect(screen.getByRole('group', { name: '개발 파트' })).toBeInTheDocument()
-    expect(screen.queryByRole('dialog', { name: '설정' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: '업데이트' })).not.toBeInTheDocument()
   })
 
   it('applies saved profile changes to the shared sidebar profile', async () => {
